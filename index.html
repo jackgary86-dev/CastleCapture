@@ -56,6 +56,24 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #toast small { display: block; font-family: var(--ui); font-size: 13px; color: var(--muted); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: rgb(23 20 14 / 0.45); }
 
+/* Lords: portraits, taunts and the pre-battle card */
+.portrait { flex: none; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid var(--c, var(--edge)); background: var(--timber); }
+.portrait svg { width: 100%; height: 100%; display: block; }
+#taunt { position: absolute; left: 14px; bottom: 14px; max-width: min(420px, calc(100% - 28px)); display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; border-radius: 40px 6px 6px 40px; background: rgb(23 20 14 / 0.92); border: 2px solid var(--c); pointer-events: none; }
+#taunt .portrait { width: 48px; height: 48px; }
+#taunt b { display: block; font-size: 13px; color: var(--c); }
+#taunt q { font-family: var(--display); font-size: 18px; line-height: 1.2; quotes: "\201C" "\201D"; }
+.lords { display: grid; gap: 14px; }
+.lord { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.lord .portrait { width: 84px; height: 84px; }
+.lord h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; line-height: 1.05; }
+.lord .title { font-size: 14px; color: var(--ink-soft); }
+.lord q { display: block; margin-top: 6px; font-family: var(--display); font-size: 19px; line-height: 1.25; color: var(--ink); quotes: "\201C" "\201D"; }
+.endquote { display: flex; gap: 12px; align-items: center; }
+.endquote .portrait { width: 56px; height: 56px; }
+.endquote q { font-family: var(--display); font-size: 18px; line-height: 1.25; color: var(--ink); quotes: "\201C" "\201D"; }
+.endquote small { display: block; font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+
 /* Parchment sheets */
 .sheet { width: 100%; max-width: 540px; color: var(--ink); background: var(--parchment);
   background-image: radial-gradient(ellipse at 30% 20%, rgb(255 248 225 / 0.35), transparent 60%), radial-gradient(ellipse at 80% 90%, rgb(120 90 40 / 0.18), transparent 55%);
@@ -137,6 +155,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   <div id="board">
     <canvas id="cv"></canvas>
     <div id="toast" hidden></div>
+    <div id="taunt" hidden></div>
 
     <div class="overlay" id="menu">
       <div class="sheet">
@@ -166,6 +185,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <button data-field="theirs" aria-pressed="true">Invade their homeland</button>
             <button data-field="mine">Defend your homeland</button>
           </div>
+          <span class="sublabel">Lord taunts</span>
+          <div class="seg" id="tauntSeg">
+            <button data-taunts="on" aria-pressed="true">On</button>
+            <button data-taunts="off">Off</button>
+          </div>
           <button class="primary" id="btnQuick">March to war</button>
         </div>
         <div class="group">
@@ -188,6 +212,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       </div>
     </div>
 
+    <div class="overlay" id="lordOv" hidden>
+      <div class="sheet">
+        <span class="label" id="lordHead">Your rival</span>
+        <div class="lords" id="lordList"></div>
+        <button class="primary" id="btnFight">To battle</button>
+      </div>
+    </div>
+
     <div class="overlay" id="pauseOv" hidden>
       <div class="sheet">
         <h2>Truce</h2>
@@ -203,6 +235,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       <div class="sheet">
         <h2 id="endTitle">Victory</h2>
         <p id="endText"></p>
+        <div class="endquote" id="endQuote"></div>
         <div class="stats">
           <div><span>Time</span><strong id="endTime">0:00</strong></div>
           <div><span>Castles taken</span><strong id="endCaps">0</strong></div>
@@ -300,6 +333,110 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     },
   };
   const ARMY_IDS = Object.keys(ARMIES);
+
+  // ---------- the lords who command each army as a rival ----------
+  const LORDS = {
+    aldmere: {
+      name: 'Queen Isolde Varr', short: 'Isolde', title: 'the Mason Queen',
+      bio: 'Patient and formal, she believes every war is won by the side whose walls stand longest.',
+      challenge: 'Aldmere has stood nine hundred years. It will stand tonight.',
+      lines: {
+        capture: ['Another stone for my walls.', 'You built that badly. I will build it better.'],
+        lose: ['A setback. Walls can be rebuilt.', 'Enjoy it while it lasts.'],
+        power: ['By the Oath of Stone!'],
+        nearDefeat: ['Even good walls fall. Remember that I built them.'],
+        victory: ['Patience wins every siege. You had none.'],
+        defeat: ['The vale is yours. Keep its walls in good repair.'],
+      },
+    },
+    kharzul: {
+      name: 'Khagan Torvek Ash-Mane', short: 'Torvek', title: 'the Red Wind',
+      bio: 'Warlord of the clans. He has never built a wall and never retreated.',
+      challenge: "Your walls are just firewood I haven't burned yet.",
+      lines: {
+        capture: ['Burn it. We ride on.', 'Ha! Next!'],
+        lose: ["Keep it. I'll take two of yours.", 'A pile of sticks. I have more.'],
+        power: ['The moon is red! RIDE!'],
+        nearDefeat: ['A horse lord dies in the saddle, not on his knees!'],
+        victory: ['The steppe wind blows over your ashes.'],
+        defeat: ['You ride well, for a wall-builder.'],
+      },
+    },
+    frostmark: {
+      name: 'Jarl Sigrun Ironfrost', short: 'Sigrun', title: 'the White Wall',
+      bio: 'Eldest jarl of the fjords. Silent for long stretches, then sudden and brutal.',
+      challenge: 'Come north, then.',
+      lines: {
+        capture: ['You left it open to the cold.'],
+        lose: ['Hm.'],
+        power: ['Winter takes them.'],
+        counter: ['Now.'],
+        nearDefeat: ['The ice breaks in spring. It always returns.'],
+        victory: ['The north keeps its own.'],
+        defeat: ['Spring comes early this year.'],
+      },
+    },
+    solmara: {
+      name: 'Sultan Amaru al-Zahir', short: 'Amaru', title: 'the Golden Hand',
+      bio: 'The richest ruler in the realm, who treats every war as a trade negotiation.',
+      challenge: 'Every castle has a price. Yours is cheap.',
+      lines: {
+        capture: ['Bought and paid for.', 'A bargain.'],
+        lose: ['A small expense.', 'Put it on my account.'],
+        power: ['Open the treasury!'],
+        nearDefeat: ['Surely we can come to an arrangement?'],
+        victory: ['The sands are mine. Send me the bill.'],
+        defeat: ['Well played. Name your price.'],
+      },
+    },
+    nyx: {
+      name: 'The Hollow Matron Veyra', short: 'Veyra', title: 'Mother of Crows',
+      bio: 'High witch of the Covenant, who speaks in whispers and seems to know your next move.',
+      challenge: 'The crows told me you would come.',
+      lines: {
+        capture: ['Empty halls echo so sweetly.', 'I saw that coming. Did you?'],
+        lose: ['Take it. The mire will take it back.'],
+        power: ['Fly, my darlings. Feast.'],
+        nearDefeat: ['The mire keeps what it drowns. I will return.'],
+        victory: ['Sleep now. The crows will keep watch.'],
+        defeat: ['The crows did not see this. How interesting.'],
+      },
+    },
+  };
+
+  // Painted busts, 64×64.
+  function portrait(id) {
+    const A = ARMIES[id];
+    const bust = (skin, extra) => `<svg viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" fill="${A.roof}"/><circle cx="32" cy="26" r="30" fill="${A.color}" opacity="0.25"/>
+      ${extra.back || ''}
+      <path d="M8 64c2-14 12-20 24-20s22 6 24 20z" fill="${A.color}"/>
+      <rect x="27" y="36" width="10" height="9" fill="${skin}"/>
+      <ellipse cx="32" cy="28" rx="11" ry="13" fill="${skin}"/>
+      ${extra.front || ''}</svg>`;
+    switch (id) {
+      case 'aldmere': return bust('#f0d2b4', {
+        back: '<path d="M17 30c0-14 7-20 15-20s15 6 15 20v20H17z" fill="#f4efe4"/>',
+        front: '<path d="M21 22c2-8 7-11 11-11s9 3 11 11c-3-3-7-4-11-4s-8 1-11 4z" fill="#6b4a30"/><path d="M21 17l3-8 4 5 4-7 4 7 4-5 3 8z" fill="#e9b43b" stroke="#8a6512" stroke-width="0.8"/><circle cx="32" cy="12" r="1.6" fill="#4f8ff0"/><ellipse cx="28" cy="29" rx="1.3" ry="1" fill="#2a2014"/><ellipse cx="36" cy="29" rx="1.3" ry="1" fill="#2a2014"/><path d="M29 36q3 1.5 6 0" stroke="#9a5a4a" stroke-width="1.2" fill="none"/><path d="M14 50l18 6 18-6" stroke="#e9b43b" stroke-width="2" fill="none"/>',
+      });
+      case 'kharzul': return bust('#c8936a', {
+        back: '<path d="M32 2c4 2 5 6 3 10" stroke="#1a1410" stroke-width="4" fill="none" stroke-linecap="round"/>',
+        front: '<path d="M19 22c0-9 6-12 13-12s13 3 13 12c-4-2-8-3-13-3s-9 1-13 3z" fill="#4a3220"/><rect x="19" y="18" width="26" height="4" fill="#d9443e"/><path d="M22 34c2 10 6 13 10 13s8-3 10-13c-3 3-6 4-10 4s-7-1-10-4z" fill="#1a1410"/><path d="M27 29l3-1M34 28l3 1" stroke="#1a1410" stroke-width="1.6"/><path d="M38 22l3 12" stroke="#8a4a3a" stroke-width="1.2"/><path d="M10 52l12-6M54 52l-12-6" stroke="#6b4a2f" stroke-width="4"/>',
+      });
+      case 'frostmark': return bust('#f2dccb', {
+        back: '<rect x="18" y="26" width="6" height="26" rx="3" fill="#e8ecef"/><rect x="40" y="26" width="6" height="26" rx="3" fill="#e8ecef"/><path d="M18 34h6M18 40h6M18 46h6M40 34h6M40 40h6M40 46h6" stroke="#b9c3cb" stroke-width="1"/>',
+        front: '<path d="M20 24c1-9 6-13 12-13s11 4 12 13c-3-4-7-5-12-5s-9 1-12 5z" fill="#e8ecef"/><rect x="20" y="18" width="24" height="3" fill="#9aa3ab"/><circle cx="32" cy="19.5" r="2" fill="#36c2b4"/><path d="M27 29h3M34 29h3" stroke="#2a2014" stroke-width="1.4"/><path d="M29 36h6" stroke="#9a6a5a" stroke-width="1.2"/><path d="M10 54c6-8 14-10 22-10s16 2 22 10" stroke="#f4f8fb" stroke-width="5" fill="none"/>',
+      });
+      case 'solmara': return bust('#a8744e', {
+        front: '<path d="M18 22c0-10 6-14 14-14s14 4 14 14c0 2-1 3-2 3H20c-1 0-2-1-2-3z" fill="#f3ead6"/><path d="M19 18q13-6 26 0" stroke="#d9cfb8" stroke-width="1.4" fill="none"/><circle cx="32" cy="17" r="2.6" fill="#e9b43b" stroke="#8a6512" stroke-width="0.8"/><path d="M23 33c1 9 5 12 9 12s8-3 9-12c-3 2-6 3-9 3s-6-1-9-3z" fill="#1a1410"/><ellipse cx="28" cy="29" rx="1.3" ry="1" fill="#1a1410"/><ellipse cx="36" cy="29" rx="1.3" ry="1" fill="#1a1410"/><path d="M14 50q18 8 36 0" stroke="#e9b43b" stroke-width="3" fill="none"/>',
+      });
+      default: return bust('#d8cfe0', {
+        back: '<path d="M12 64c0-30 6-54 20-58 14 4 20 28 20 58z" fill="#241a33"/>',
+        front: '<path d="M18 40c0-18 5-30 14-32 9 2 14 14 14 32-3-8-7-14-14-14s-11 6-14 14z" fill="#2e2242"/><ellipse cx="28" cy="31" rx="1.8" ry="1.2" fill="#c9a2ff"/><ellipse cx="36" cy="31" rx="1.8" ry="1.2" fill="#c9a2ff"/><path d="M30 38q2 1 4 0" stroke="#6a5a7a" stroke-width="1" fill="none"/><path d="M44 12l6-6M45 15l7-3" stroke="#0e0a14" stroke-width="2" stroke-linecap="round"/>',
+      });
+    }
+  }
+  const portraitHtml = id => `<span class="portrait" style="--c:${ARMIES[id].color}">${portrait(id)}</span>`;
 
   // Homeland maps: ground, roads, scenery and the style of unclaimed keeps.
   const THEMES = {
@@ -526,8 +663,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       cfg, ...map, theme, packets: [], fx: [], time: 0, over: false, paused: false, owners,
       fac: Object.fromEntries(owners.map((o, i) => [o, cfg.armies[i]])),
       pw: Object.fromEntries(owners.map(o => [o, { ready: FIRST_CHARGE, until: -1 }])),
-      ais: aiIds.map((id, i) => ({ id, diff: cfg.demo ? 'medium' : cfg.diff, timer: 1.4 + i * 0.35 })),
+      ais: aiIds.map((id, i) => ({ id, diff: cfg.demo ? 'medium' : cfg.diff, timer: 1.4 + i * 0.35, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() })),
       caps: 0, peak: 0, hintDone: cfg.demo || store.get('cs-hint', false),
+      intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {},
     };
     sel.clear();
     resize();
@@ -557,8 +695,28 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (!G.cfg.demo) {
       toast(o === 1 ? `You ${A.power.call}!` : `${A.full} ${A.power.they}!`, o === 1 ? A.power.desc : A.power.desc.replace(/\byour\b/g, 'their'), A.color);
       sfx.power(o === 1);
+      if (o !== 1) taunt(o, 'power', true);
     }
+    const ai = G.ais.find(a => a.id === o);
+    if (ai) ai.readyAt = null;
     return true;
+  }
+
+  // A lord speaks. Routine lines are rate-limited per lord and overall; key moments can force through.
+  const lordOf = o => LORDS[G.fac[o]];
+  function taunt(o, kind, force = false) {
+    if (!G || G.cfg.demo || o === 1 || !tauntsOn) return;
+    const lines = lordOf(o).lines[kind];
+    if (!lines) return;
+    if (!force && (G.time - (G.tauntAt[o] ?? -99) < 12 || G.time - G.lastTaunt < 4)) return;
+    G.tauntAt[o] = G.lastTaunt = G.time;
+    const A = army(o), L = lordOf(o);
+    tauntEl.style.setProperty('--c', A.color);
+    tauntEl.innerHTML = `${portraitHtml(G.fac[o])}<div><b>${L.short}, ${L.title}</b><q></q></div>`;
+    tauntEl.querySelector('q').textContent = pick(lines);
+    tauntEl.hidden = false;
+    clearTimeout(tauntTimer);
+    tauntTimer = setTimeout(() => { tauntEl.hidden = true; }, 4500);
   }
 
   function send(owner, sources, target, frac = 0.5) {
@@ -575,7 +733,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
         const off = (Math.random() - 0.5) * s.r * 1.1;
         G.packets.push({
-          owner, to: target, n: cnt, delay: i * 0.06, phase: Math.random() * 6.28,
+          owner, from: s, to: target, n: cnt, delay: i * 0.06, phase: Math.random() * 6.28,
           x: s.x + Math.cos(ang) * s.r * 0.8 - Math.sin(ang) * off,
           y: s.y + Math.sin(ang) * s.r * 0.8 + Math.cos(ang) * off,
         });
@@ -600,40 +758,65 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     return Math.ceil(def + 2);
   }
 
+  const threatOn = (p, me, inc) => inc[p.id].reduce((a, v, o) => o !== me ? a + v : a, 0);
+
+  // When each AI fires its power. Named lords override their army's default timing.
   function aiPower(ai, inc, mine) {
-    const me = ai.id;
+    const me = ai.id, id = G.fac[me];
     if (G.pw[me].ready > 0) return;
+    if (ai.readyAt == null) ai.readyAt = G.time;
+    const waited = G.time - ai.readyAt;
     if (ai.diff === 'easy' && Math.random() < 0.6) return;
-    const threatOn = p => inc[p.id].reduce((a, v, o) => o !== me ? a + v : a, 0);
+    const falling = mine.filter(p => threatOn(p, me, inc) >= 8 && threatOn(p, me, inc) > (p.units + inc[p.id][me]) * defOf(me));
+    const incoming = mine.reduce((a, p) => a + threatOn(p, me, inc), 0);
     let use = false;
-    switch (army(me).power.id) {
-      case 'stoneOath':
-        use = mine.some(p => threatOn(p) >= 12 && threatOn(p) > (p.units + inc[p.id][me]) * defOf(me));
+    switch (id) {
+      case 'aldmere':
+        // Isolde saves the Oath until two castles are under attack at once.
+        use = ai.diff === 'easy' ? falling.length >= 1 : falling.length >= 2;
         break;
-      case 'wintersGrip': {
-        const incoming = mine.reduce((a, p) => a + threatOn(p), 0);
-        use = incoming >= 30 || mine.some(p => threatOn(p) >= 12 && threatOn(p) > (p.units + inc[p.id][me]) * defOf(me));
+      case 'kharzul':
+        // Torvek opens his big attacks with the charge (see aiThink); never as a defence.
+        use = ai.diff === 'easy' && G.packets.some(k => k.owner === me && k.to.owner && k.to.owner !== me);
         break;
-      }
-      case 'bloodMoon':
-        use = G.packets.reduce((a, k) => a + (k.owner === me && k.to.owner !== me ? k.n : 0), 0) >= 15;
+      case 'frostmark':
+        // Sigrun freezes a big attack, then remembers where it came from.
+        use = incoming >= 25 || falling.length >= 1;
+        if (use) ai.counter = new Set(G.packets.filter(k => k.owner !== me && k.to.owner === me && k.from).map(k => k.from.id));
         break;
-      case 'goldenTithe':
-        use = mine.length >= 3;
+      case 'solmara':
+        // Amaru opens the treasury right after a wave of captures.
+        ai.recentCaps = ai.recentCaps.filter(t => G.time - t < 15);
+        use = ai.recentCaps.length >= 2 || (waited > 60 && mine.length >= 3);
         break;
-      case 'crows':
-        use = G.planets.some(p => p.owner && p.owner !== me && p.units >= 30);
+      case 'nyx':
+        // Veyra looses the crows just before her main attack (see aiThink); this is a fallback.
+        use = waited > 60 && G.planets.some(p => p.owner && p.owner !== me && p.units >= 30);
         break;
     }
     if (use) usePower(me);
   }
 
   function aiThink(ai) {
-    const me = ai.id, P = G.planets, d = ai.diff, pz = army(me).ai;
+    const me = ai.id, id = G.fac[me], P = G.planets, d = ai.diff;
+    const pz = { ...army(me).ai };
     const mine = P.filter(p => p.owner === me);
     if (!mine.length) return;
     const inc = incomingTable();
+    const enemyCastles = P.filter(p => p.owner && p.owner !== me);
+    const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => dist(p, q))) : Infinity;
     aiPower(ai, inc, mine);
+
+    // Sigrun: the moment her blizzard lifts, strike the castles that attacked her.
+    if (id === 'frostmark' && ai.counter && G.time >= G.pw[me].until) {
+      const targets = P.filter(p => ai.counter.has(p.id) && p.owner && p.owner !== me).sort((a, b) => a.units - b.units);
+      ai.counter = null;
+      if (targets.length) {
+        const t = targets[0];
+        const srcs = mine.filter(s => s.units > 8).sort((a, b) => dist(a, t) - dist(b, t)).slice(0, 4);
+        if (send(me, srcs, t, 0.6)) { taunt(me, 'counter', true); return; }
+      }
+    }
 
     if (d === 'easy') {
       if (Math.random() < 0.45) return;
@@ -649,16 +832,41 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       return;
     }
 
-    // Defend castles about to fall. Defensive armies react earlier.
-    for (const p of mine) {
-      const threat = inc[p.id].reduce((a, v, o) => o !== me ? a + v : a, 0);
-      const hold = (p.units + inc[p.id][me]) * defOf(me) + rate(p) * 1.5;
-      if (threat > 0 && threat > hold * pz.defendAt) {
-        const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => dist(a, p) - dist(b, p));
-        if (helpers.length) {
-          send(me, d === 'hard' ? helpers.slice(0, 2) : [helpers[0]], p, 0.5);
-          if (d === 'medium') return;
+    // Amaru expands faster than anyone in the first minute.
+    if (id === 'solmara' && G.time < 60) { pz.neutralBias *= 2; pz.sendFrac = 0.55; }
+
+    // Defend castles about to fall. Defensive armies react earlier; Torvek never does.
+    if (id !== 'kharzul') {
+      for (const p of mine) {
+        const threat = threatOn(p, me, inc);
+        const hold = (p.units + inc[p.id][me]) * defOf(me) + rate(p) * 1.5;
+        if (threat > 0 && threat > hold * pz.defendAt) {
+          const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => dist(a, p) - dist(b, p));
+          if (helpers.length) {
+            send(me, d === 'hard' ? helpers.slice(0, 2) : [helpers[0]], p, 0.5);
+            if (d === 'medium') return;
+          }
         }
+      }
+    }
+
+    // Isolde keeps her front-line castles topped up before she attacks anywhere.
+    if (id === 'aldmere' && enemyCastles.length && mine.length > 1 && Math.random() < 0.5) {
+      const byDanger = [...mine].sort((a, b) => nearestOf(a, enemyCastles) - nearestOf(b, enemyCastles));
+      const frontLine = byDanger.filter(p => nearestOf(p, enemyCastles) < nearestOf(byDanger[0], enemyCastles) * 1.3);
+      const weak = frontLine.find(p => p.units < 18);
+      const rear = byDanger.slice().reverse().find(p => !frontLine.includes(p) && p.units > 25);
+      if (weak && rear) { send(me, [rear], weak, 0.5); return; }
+    }
+
+    // Sigrun intercepts columns marching on unclaimed keeps near her lands when her shieldwall would win.
+    if (id === 'frostmark' && Math.random() < 0.6) {
+      for (const nt of P.filter(p => p.owner === 0 && nearestOf(p, mine) < 220)) {
+        const enemyIn = G.packets.filter(k => k.to === nt && k.owner !== me);
+        if (!enemyIn.length || inc[nt.id][me] > 0) continue;
+        const strength = enemyIn.reduce((a, k) => a + k.n * roadOf(k.owner), 0);
+        const h = mine.filter(s => s.units > 10).sort((a, b) => dist(a, nt) - dist(b, nt))[0];
+        if (h && Math.floor(h.units * 0.5) * roadOf(me) > strength) { send(me, [h], nt, 0.5); return; }
       }
     }
 
@@ -667,35 +875,61 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const enemyTotal = Math.max(1, ...G.owners.filter(o => o !== me).map(totalOf));
     const bold = myTotal > enemyTotal * pz.boldAt ? 2 : 1;
 
+    // Torvek fixes on the strongest rival's biggest castle and keeps hammering it.
+    if (id === 'kharzul' && (!ai.focus || ai.focus.owner === me || ai.focus.owner === 0)) {
+      const rivals = G.owners.filter(o => o !== me).sort((a, b) => totalOf(b) - totalOf(a));
+      ai.focus = P.filter(p => p.owner === rivals[0]).sort((a, b) => b.units - a.units)[0] || null;
+    }
+
+    let candidates = P.filter(t => t.owner !== me);
+    // Sigrun holds her army home early, taking only neutrals and near-empty castles.
+    if (id === 'frostmark' && G.time < 100 && bold === 1) candidates = candidates.filter(t => t.owner === 0 || t.units < 5);
+    // Isolde advances one castle at a time once she outnumbers you two to one.
+    if (id === 'aldmere' && myTotal > enemyTotal * 2) candidates = candidates.sort((a, b) => nearestOf(a, mine) - nearestOf(b, mine)).slice(0, 3);
+
     let best = null;
     const maxSrc = d === 'hard' ? 4 : 1;
-    for (const t of P) {
-      if (t.owner === me) continue;
+    for (const t of candidates) {
       const srcs = mine.filter(s => s.units >= pz.keep).sort((a, b) => dist(a, t) - dist(b, t));
       const chosen = [];
       let sum = 0, far = 0, need = Infinity;
+      // Amaru avoids even fights against other kingdoms.
+      const margin = pz.margin * (id === 'solmara' && t.owner && bold === 1 ? 1.15 : 1);
       for (const s of srcs) {
         if (chosen.length >= maxSrc) break;
         chosen.push(s);
         sum += Math.floor(s.units * pz.sendFrac);
         far = Math.max(far, dist(s, t));
-        need = needAt(t, far, inc, me) * pz.margin;
+        need = needAt(t, far, inc, me) * margin;
         if (sum >= need) break;
       }
       if (!chosen.length || need <= 2 || sum < need) continue;
       let worth = (t.r * PROD + 0.4) * (t.owner === 0 ? pz.neutralBias : pz.enemyBias * bold);
       if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
+      if (id === 'kharzul' && t === ai.focus) worth *= 2.5;
+      if (id === 'nyx') {
+        // Veyra pounces on castles that were just emptied, and boxes rivals in with nearby keeps.
+        const prev = ai.snap.get(t.id);
+        if (t.owner && prev >= 10 && t.units < prev * 0.55) worth *= 4;
+        if (!t.owner && nearestOf(t, enemyCastles) < 200) worth *= 1.6;
+      }
       const score = worth / (need + far * 0.06);
-      if (!best || score > best.score) best = { score, chosen, t };
+      if (!best || score > best.score) best = { score, chosen, t, sum };
     }
-    if (best) { send(me, best.chosen, best.t, pz.sendFrac); return; }
+    if (id === 'nyx') ai.snap = new Map(P.map(p => [p.id, p.units]));
+
+    if (best) {
+      const big = best.t.owner && (best.sum >= 20 || (id === 'kharzul' && best.sum >= 10));
+      // Veyra drops the crows before her main attack lands; Torvek charges alongside his.
+      if (id === 'nyx' && big && G.pw[me].ready === 0) usePower(me);
+      send(me, best.chosen, best.t, pz.sendFrac);
+      if (id === 'kharzul' && big && G.pw[me].ready === 0) usePower(me);
+      return;
+    }
 
     // Nothing worth attacking: defensive armies move troops from safe castles to the front.
-    if (pz.front && Math.random() < 0.5 && mine.length > 1) {
-      const enemyCastles = P.filter(p => p.owner && p.owner !== me);
-      if (!enemyCastles.length) return;
-      const danger = p => Math.min(...enemyCastles.map(e => dist(p, e)));
-      const byDanger = [...mine].sort((a, b) => danger(a) - danger(b));
+    if (pz.front && Math.random() < 0.5 && mine.length > 1 && enemyCastles.length) {
+      const byDanger = [...mine].sort((a, b) => nearestOf(a, enemyCastles) - nearestOf(b, enemyCastles));
       const front = byDanger[0], rear = byDanger[byDanger.length - 1];
       if (rear !== front && rear.units > 20) send(me, [rear], front, 0.5);
     }
@@ -734,12 +968,25 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
     for (const ai of G.ais) {
       ai.timer -= dt;
-      if (ai.timer <= 0) { ai.timer = intervals[ai.diff] * army(ai.id).ai.thinkMul * (0.8 + Math.random() * 0.4); aiThink(ai); }
+      if (ai.timer <= 0) {
+        // Amaru moves quickly while there are keeps to claim.
+        const hurry = G.fac[ai.id] === 'solmara' && G.time < 60 ? 0.75 : 1;
+        ai.timer = intervals[ai.diff] * army(ai.id).ai.thinkMul * hurry * (0.8 + Math.random() * 0.4);
+        aiThink(ai);
+      }
     }
 
     const alive = o => G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o);
     G.ais = G.ais.filter(ai => alive(ai.id));
     G.peak = Math.max(G.peak, totalOf(1));
+    // A lord on the brink says so, once.
+    if (!G.cfg.demo) for (const o of G.owners.slice(1)) {
+      if (G.nearDefeat.has(o) || !alive(o)) continue;
+      const castles = G.planets.filter(p => p.owner === o).length;
+      G.maxCastles[o] = Math.max(G.maxCastles[o] || 0, castles);
+      const brink = (G.maxCastles[o] >= 3 && castles <= 1) || (G.time > 30 && totalOf(o) < totalOf(1) * 0.2);
+      if (brink) { G.nearDefeat.add(o); taunt(o, 'nearDefeat', true); }
+    }
 
     if (G.cfg.demo) {
       if (!alive(1) || !alive(2) || G.time > 150) newGame(demoCfg());
@@ -761,6 +1008,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       t.owner = k.owner; t.units = -t.units * D / A;
       if (k.owner === 1) G.caps++;
       if (!G.cfg.demo && (k.owner === 1 || was === 1)) sfx.horn(k.owner === 1);
+      const capturer = G.ais.find(a => a.id === k.owner);
+      if (capturer) capturer.recentCaps.push(G.time);
+      if (was === 1) taunt(k.owner, 'capture');
+      else if (k.owner === 1 && was) taunt(was, 'lose');
       if (was === 1) sel.delete(t);
       G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: col(k.owner), age: 0 });
     }
@@ -1296,8 +1547,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   // ---------- HUD ----------
   const strengthEl = document.getElementById('strength'), statusEl = document.getElementById('status');
   const btnPower = document.getElementById('btnPower'), powerText = document.getElementById('powerText'), powerIcon = document.getElementById('powerIcon');
-  const toastEl = document.getElementById('toast');
-  let hudTick = 0, toastTimer = 0;
+  const toastEl = document.getElementById('toast'), tauntEl = document.getElementById('taunt');
+  let hudTick = 0, toastTimer = 0, tauntTimer = 0;
+  let tauntsOn = store.get('cs-taunts', true);
 
   function toast(title, detail, color) {
     toastEl.innerHTML = '';
@@ -1317,7 +1569,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (G.cfg.demo) {
       statusEl.textContent = `${army(1).name} vs ${army(2).name}`;
     } else {
-      const rivals = G.owners.slice(1).map(o => army(o).name).join(' & ');
+      const rivals = G.owners.slice(1).map(o => `${lordOf(o).short} of ${army(o).name}`).join(' & ');
       const label = G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name} vs ${rivals}` : `${DIFF_NAME[G.cfg.diff]} · vs ${rivals}`;
       statusEl.textContent = `${label} · ${fmtTime(G.time)}`;
     }
@@ -1348,7 +1600,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (G && !G.over && !G.paused) update(dt);
+    if (G && !G.over && !G.paused && !G.intro) update(dt);
     for (const s of [...sel]) if (s.owner !== 1) sel.delete(s);
     draw(now);
     if ((hudTick += dt) > 0.2) { hudTick = 0; hud(); }
@@ -1369,7 +1621,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
     return best;
   }
-  const playable = () => G && !G.cfg.demo && !G.over && !G.paused;
+  const playable = () => G && !G.cfg.demo && !G.over && !G.paused && !G.intro;
 
   function playerSend(t) {
     if (send(1, [...sel].filter(s => s !== t), t, sendPct)) {
@@ -1434,7 +1686,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   function selectAll() { if (playable()) G.planets.forEach(p => p.owner === 1 && sel.add(p)); }
   function setPaused(v) {
-    if (!G || G.cfg.demo || G.over) return;
+    if (!G || G.cfg.demo || G.over || G.intro) return;
     G.paused = v; pauseOv.hidden = !v;
     btnPause.textContent = v ? 'Resume' : 'Pause';
   }
@@ -1450,7 +1702,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   // ---------- menus ----------
   const $ = id => document.getElementById(id);
-  const menu = $('menu'), pauseOv = $('pauseOv'), endOv = $('endOv'), btnPause = $('btnPause'), btnAll = $('btnAll');
+  const menu = $('menu'), pauseOv = $('pauseOv'), endOv = $('endOv'), lordOv = $('lordOv'), btnPause = $('btnPause'), btnAll = $('btnAll');
   let qDiff = 'medium', qAis = 1, qField = 'theirs', qRival = 'random';
   let myArmy = ARMY_IDS.includes(store.get('cs-army', 'aldmere')) ? store.get('cs-army', 'aldmere') : 'aldmere';
 
@@ -1466,6 +1718,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   segment('aiSeg', 'ais', v => qAis = +v);
   segment('fieldSeg', 'field', v => qField = v);
   segment('rivalSeg', 'rival', v => qRival = v);
+  segment('tauntSeg', 'taunts', v => { tauntsOn = v === 'on'; store.set('cs-taunts', tauntsOn); });
+  $('tauntSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.taunts === 'on') === tauntsOn)));
 
   function setArmyColors(id) {
     const A = ARMIES[id];
@@ -1488,6 +1742,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <dt>Power</dt><dd><b>${A.power.name}.</b> ${A.power.desc}</dd>
         <dt>Homeland</dt><dd>${A.homeland}</dd>
         <dt>As a rival</dt><dd>${A.personality}</dd>
+        <dt>Lord</dt><dd><b>${LORDS[myArmy].name}, ${LORDS[myArmy].title}.</b> ${LORDS[myArmy].bio}</dd>
       </dl>`;
     if (qRival !== 'random' && qRival === myArmy) qRival = 'random';
     $('rivalSeg').innerHTML = `<button data-rival="random" aria-pressed="${qRival === 'random'}">Random</button>` +
@@ -1509,7 +1764,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function renderLadder() {
     const unlocked = store.get('cs-unlocked', 1), done = store.get('cs-done', []);
     $('ladder').innerHTML = LEVELS.map((L, i) => {
-      const rivals = levelRivals(i + 1).map(id => ARMIES[id].name).join(' & ');
+      const rivals = levelRivals(i + 1).map(id => `${LORDS[id].short} of ${ARMIES[id].name}`).join(' & ');
       return `<button data-level="${i + 1}" ${i + 1 > unlocked ? 'disabled' : ''} class="${done.includes(i + 1) ? 'done' : ''}" title="${L.name}: vs ${rivals} · ${DIFF_NAME[L.diff]}"><b>${['I','II','III','IV','V','VI','VII','VIII'][i]}</b><small>${i + 1 > unlocked ? 'Locked' : L.name}</small></button>`;
     }).join('');
   }
@@ -1534,8 +1789,24 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     btnPause.disabled = false; btnAll.disabled = false; btnPause.textContent = 'Pause';
     setArmyColors(cfg.armies[0]);
     newGame(cfg);
-    const me = ARMIES[cfg.armies[0]], foes = cfg.armies.slice(1).map(id => ARMIES[id].full).join(' and ');
-    toast(`${ARMIES[cfg.map].homeland}`, `${me.full} against ${foes}`, me.color);
+    tauntEl.hidden = true;
+    // The rival lords introduce themselves before the battle starts.
+    const rivals = cfg.armies.slice(1);
+    $('lordHead').textContent = rivals.length > 1 ? `Your rivals in ${ARMIES[cfg.map].homeland}` : `Your rival in ${ARMIES[cfg.map].homeland}`;
+    $('lordList').innerHTML = rivals.map(id => {
+      const L = LORDS[id], A = ARMIES[id];
+      return `<div class="lord">${portraitHtml(id)}<div><h3>${L.name}</h3><div class="title">${L.title[0].toUpperCase() + L.title.slice(1)} · ${A.full}<span class="chip" style="--c:${A.color};--ci:${A.ink}">${A.role}</span></div><q>${L.challenge}</q></div></div>`;
+    }).join('');
+    G.intro = true;
+    lordOv.hidden = false;
+    $('btnFight').focus();
+  }
+  function startBattle() {
+    if (!G || !G.intro) return;
+    G.intro = false;
+    lordOv.hidden = true;
+    const me = ARMIES[G.cfg.armies[0]], foes = G.cfg.armies.slice(1).map(id => ARMIES[id].full).join(' and ');
+    toast(`${ARMIES[G.cfg.map].homeland}`, `${me.full} against ${foes}`, me.color);
   }
   function demoCfg() {
     const pair = shuffle(ARMY_IDS).slice(0, 2);
@@ -1543,7 +1814,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   function toMenu() {
     renderArmies(); renderLadder();
-    menu.hidden = false; endOv.hidden = true; pauseOv.hidden = true; toastEl.hidden = true;
+    menu.hidden = false; endOv.hidden = true; pauseOv.hidden = true; toastEl.hidden = true; tauntEl.hidden = true; lordOv.hidden = true;
     btnPause.disabled = true; btnAll.disabled = true;
     newGame(demoCfg());
   }
@@ -1561,6 +1832,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     $('endText').textContent = win
       ? (lv === LEVELS.length ? `The High Throne has fallen. ${me.full} rules the realm.` : lv ? `${LEVELS[lv - 1].name} is yours. ${LEVELS[lv].name} awaits.` : `${me.name} banners fly over every castle in ${G.theme === THEMES[me.map] ? 'your homeland' : ARMIES[G.cfg.map].homeland}.`)
       : `Your last castle has fallen to ${G.owners.slice(1).map(o => army(o).full).join(' and ')}. Claim more keeps early, and keep your power for the moment it matters.`;
+    // The rival lord has the last word: the strongest survivor if you lost, the last one standing if you won.
+    const lordO = win ? G.owners[G.owners.length - 1] : G.owners.slice(1).sort((a, b) => totalOf(b) - totalOf(a))[0];
+    const L = lordOf(lordO);
+    $('endQuote').innerHTML = `${portraitHtml(G.fac[lordO])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
+    $('endQuote').querySelector('q').textContent = pick(L.lines[win ? 'defeat' : 'victory']);
+    tauntEl.hidden = true;
     $('endTime').textContent = fmtTime(G.time);
     $('endCaps').textContent = G.caps;
     $('endPeak').textContent = Math.floor(G.peak);
@@ -1577,6 +1854,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   btnPause.addEventListener('click', () => setPaused(!G.paused));
   btnAll.addEventListener('click', selectAll);
   btnPower.addEventListener('click', playerPower);
+  $('btnFight').addEventListener('click', startBattle);
 
   const btnSound = $('btnSound');
   function toggleSound() {
