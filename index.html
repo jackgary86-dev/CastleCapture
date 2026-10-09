@@ -7,24 +7,18 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:wght@400;500;700;800&display=swap">
 <style>
-/* Layout: a dark timber command bar over a full-height painted field map; menus are parchment sheets over a live AI-vs-AI siege. */
+/* Layout: a dark timber command bar over a full-height painted map; menus are parchment sheets over a live AI-vs-AI siege. */
 :root {
   --timber: #17140e;
-  --field: #33432a;
-  --field-lit: #3d5031;
-  --road: #8d7a55;
-  --stone: #bdb3a0;
-  --stone-dark: #807563;
   --parchment: #dccba2;
   --ink: #2a2014;
   --ink-soft: #5e4f37;
   --text: #ece2c6;
   --muted: #a99d80;
   --line: #3a3324;
-  --blue: #4f8ff0;
-  --red: #d9443e;
-  --gold: #e9b43b;
-  --neutral: #8c8676;
+  --edge: #4a412e;
+  --army: #4f8ff0;
+  --army-ink: #08142a;
   --display: "IM Fell English SC", "Palatino Linotype", Georgia, serif;
   --ui: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
   color-scheme: dark;
@@ -36,25 +30,34 @@ body { height: 100%; margin: 0; background: var(--timber); color: var(--text); f
 #app { height: 100%; display: flex; flex-direction: column; gap: 10px; padding-inline: 16px; padding-block: 10px; }
 header { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: 0.04em; white-space: nowrap; line-height: 1; }
-#strength { flex: 1 1 140px; min-width: 120px; height: 10px; display: flex; gap: 2px; border-radius: 2px; overflow: hidden; background: var(--line); border: 1px solid #4a412e; }
+#strength { flex: 1 1 140px; min-width: 120px; height: 10px; display: flex; gap: 2px; border-radius: 2px; overflow: hidden; background: var(--line); border: 1px solid var(--edge); }
 #strength span { height: 100%; transition: width 0.4s ease; }
 #status { color: var(--muted); font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tools { display: flex; gap: 6px; flex-wrap: wrap; }
-.sendctl { display: flex; align-items: center; gap: 0; border: 1px solid #4a412e; border-radius: 4px; overflow: hidden; }
-.sendctl span { padding: 0 8px; font-size: 13px; color: var(--muted); }
-.sendctl button { border: 0; border-left: 1px solid #4a412e; border-radius: 0; padding: 5px 9px; font-variant-numeric: tabular-nums; }
-.sendctl button[aria-pressed="true"] { background: var(--blue); color: #08142a; font-weight: 800; }
-.sendctl button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-right: 3px; }
-button { font: inherit; font-weight: 500; color: var(--text); background: transparent; border: 1px solid #4a412e; border-radius: 4px; padding: 5px 12px; cursor: pointer; }
+button { font: inherit; font-weight: 500; color: var(--text); background: transparent; border: 1px solid var(--edge); border-radius: 4px; padding: 5px 12px; cursor: pointer; }
 button:hover:not(:disabled) { border-color: var(--muted); }
-button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button:focus-visible { outline: 2px solid #e9b43b; outline-offset: 2px; }
 button:disabled { opacity: 0.35; cursor: not-allowed; }
-#board { flex: 1; position: relative; min-height: 0; border: 2px solid #4a412e; border-radius: 6px; overflow: hidden; }
+.sendctl { display: flex; align-items: center; border: 1px solid var(--edge); border-radius: 4px; overflow: hidden; }
+.sendctl span { padding: 0 8px; font-size: 13px; color: var(--muted); }
+.sendctl button { border: 0; border-left: 1px solid var(--edge); border-radius: 0; padding: 5px 9px; font-variant-numeric: tabular-nums; }
+.sendctl button[aria-pressed="true"] { background: var(--army); color: var(--army-ink); font-weight: 800; }
+.sendctl button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-right: 3px; }
+#btnPower { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--army) 35%, transparent) var(--charge, 0%), transparent var(--charge, 0%)); }
+#btnPower svg { width: 16px; height: 16px; color: var(--army); flex: none; }
+#btnPower.ready { border-color: var(--army); background: color-mix(in srgb, var(--army) 22%, transparent); animation: glow 1.6s ease-in-out infinite; }
+#btnPower.active { border-color: var(--army); background: var(--army); color: var(--army-ink); font-weight: 800; }
+#btnPower.active svg { color: var(--army-ink); }
+@keyframes glow { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--army) 35%, transparent); } }
+#board { flex: 1; position: relative; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; overflow: hidden; }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#toast { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 2px solid var(--toast, var(--army)); color: var(--text); font-family: var(--display); font-size: 20px; text-align: center; pointer-events: none; text-wrap: balance; }
+#toast small { display: block; font-family: var(--ui); font-size: 13px; color: var(--muted); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: rgb(23 20 14 / 0.45); }
 
 /* Parchment sheets */
-.sheet { width: 100%; max-width: 470px; color: var(--ink); background: var(--parchment);
+.sheet { width: 100%; max-width: 540px; color: var(--ink); background: var(--parchment);
   background-image: radial-gradient(ellipse at 30% 20%, rgb(255 248 225 / 0.35), transparent 60%), radial-gradient(ellipse at 80% 90%, rgb(120 90 40 / 0.18), transparent 55%);
   border: 1px solid #a8925f; border-radius: 3px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px;
   box-shadow: 0 0 0 4px rgb(220 203 162 / 0.25), 0 24px 60px rgb(0 0 0 / 0.55); }
@@ -66,9 +69,27 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .sheet button.primary:hover { background: #3669b8; }
 .sheet button:focus-visible { outline-color: #2f5ea8; }
 .label { font-family: var(--display); font-size: 17px; color: var(--ink); border-bottom: 1px solid #b39d6c; padding-bottom: 3px; }
+.sublabel { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
 .group { display: flex; flex-direction: column; gap: 8px; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; }
 .seg button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--parchment); }
+
+/* Army picker */
+.armies { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.armies button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 6px; min-width: 0; line-height: 1.15; }
+.armies svg { width: 30px; height: 30px; color: var(--c); }
+.armies b { font-size: 14px; }
+.armies small { font-size: 11px; color: var(--ink-soft); }
+.armies button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--parchment); }
+.armies button[aria-pressed="true"] small { color: #cbbb92; }
+.dossier { border-left: 4px solid var(--c); padding: 10px 12px; background: rgb(255 250 235 / 0.35); display: grid; gap: 8px; }
+.dossier h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; line-height: 1.1; }
+.dossier p { font-size: 14px; }
+.dossier dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 14px; line-height: 1.4; }
+.dossier dt { font-weight: 700; color: var(--ink); }
+.dossier dd { margin: 0; color: var(--ink-soft); min-width: 0; }
+.chip { display: inline-block; font-family: var(--ui); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 6px; border-radius: 2px; background: var(--c); color: var(--ci); vertical-align: middle; margin-left: 6px; }
+
 .ladder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .ladder button { padding: 6px 2px; display: flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.2; min-width: 0; }
 .ladder b { font-family: var(--display); font-weight: 400; font-size: 18px; }
@@ -84,10 +105,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .stats div { display: flex; flex-direction: column; }
 .stats span { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.08em; }
 .stats strong { font-size: 22px; font-weight: 800; }
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   h1 { font-size: 20px; }
   .sheet { padding: 18px; gap: 13px; }
   .sheet h2 { font-size: 30px; }
+  .armies svg { width: 24px; height: 24px; }
+  .armies b { font-size: 12px; }
+  .armies small { font-size: 10px; }
 }
 </style>
 
@@ -104,6 +128,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <button data-pct="0.75"><kbd>3</kbd>75%</button>
         <button data-pct="1"><kbd>4</kbd>100%</button>
       </div>
+      <button id="btnPower" title="Special power (Q)" disabled><span id="powerIcon"></span><span id="powerText">Special power</span></button>
       <button id="btnAll" title="Select all your castles (Space)" disabled>Select all</button>
       <button id="btnSound" title="Sound (M)">Sound on</button>
       <button id="btnPause" title="Pause (P)" disabled>Pause</button>
@@ -111,26 +136,41 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   </header>
   <div id="board">
     <canvas id="cv"></canvas>
+    <div id="toast" hidden></div>
 
     <div class="overlay" id="menu">
       <div class="sheet">
         <h2>Castle Siege</h2>
-        <p>Take every enemy castle. Drag from a castle flying your blue banner to march its garrison anywhere on the map.</p>
+        <p>Five kingdoms war over the realm. Choose an army, then take every enemy castle by marching troops along the roads.</p>
+        <div class="group">
+          <span class="label">Choose your army</span>
+          <div class="armies" id="armyPick"></div>
+          <div class="dossier" id="dossier"></div>
+        </div>
         <div class="group">
           <span class="label">Skirmish</span>
+          <span class="sublabel">Difficulty</span>
           <div class="seg" id="diffSeg">
             <button data-diff="easy">Squire</button>
             <button data-diff="medium" aria-pressed="true">Knight</button>
             <button data-diff="hard">Warlord</button>
           </div>
+          <span class="sublabel">Rival army</span>
+          <div class="seg" id="rivalSeg"></div>
+          <span class="sublabel">Rivals and battlefield</span>
           <div class="seg" id="aiSeg">
-            <button data-ais="1" aria-pressed="true">1 rival kingdom</button>
+            <button data-ais="1" aria-pressed="true">1 rival</button>
             <button data-ais="2">2 rivals</button>
+          </div>
+          <div class="seg" id="fieldSeg">
+            <button data-field="theirs" aria-pressed="true">Invade their homeland</button>
+            <button data-field="mine">Defend your homeland</button>
           </div>
           <button class="primary" id="btnQuick">March to war</button>
         </div>
         <div class="group">
           <span class="label">Campaign</span>
+          <p style="font-size:14px">Eight battles across the rival homelands. Your chosen army fights them all.</p>
           <div class="ladder" id="ladder"></div>
         </div>
         <div class="group">
@@ -138,9 +178,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
           <ul class="rules">
             <li><b>Drag</b> from your castle to any castle to send troops. Keys <b>1–4</b> or the <b>scroll wheel</b> choose how many: 25%, 50%, 75% or all.</li>
             <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
-            <li><b>Armies that meet on the road fight.</b> The larger column marches on with what's left, so you can intercept attacks.</li>
+            <li><b>Special power:</b> press <b>Q</b> or the power button. It's ready 45 seconds into the battle, then recharges for five minutes.</li>
+            <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
-            <li><b>Bigger castles</b> train troops faster. Grey, unclaimed keeps never grow.</li>
+            <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
             <li><b>Space</b> selects all your castles. <b>P</b> pauses. <b>M</b> mutes.</li>
           </ul>
         </div>
@@ -179,16 +220,95 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
 <script>
 (() => {
-  const css = getComputedStyle(document.documentElement);
-  const tok = n => css.getPropertyValue(n).trim();
-  const COL = { 0: tok('--neutral'), 1: tok('--blue'), 2: tok('--red'), 3: tok('--gold') };
-  const C = {
-    timber: tok('--timber'), field: tok('--field'), fieldLit: tok('--field-lit'), road: tok('--road'),
-    stone: tok('--stone'), stoneDark: tok('--stone-dark'), text: tok('--text'), parchment: tok('--parchment'), ink: tok('--ink'),
-  };
-  const SPEED = 80;             // marching speed, world units per second
+  const SPEED = 80;             // base marching speed, world units per second
   const PROD = 0.055;           // troops per second per unit of castle size
+  const FIRST_CHARGE = 45;      // seconds before a special power is first ready
+  const RECHARGE = 300;         // seconds a special power takes to recharge after use
+  const NEUTRAL = '#8c8676', INK = '#2a2014', PARCH = '#dccba2', TIMBER = '#17140e', WARN = '#e0362f';
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- the five armies ----------
+  const EMBLEM = {
+    crown: '<path fill="currentColor" d="M3 19h18l-1.6-11-4.6 4.2L12 5 9.2 12.2 4.6 8z"/><rect fill="currentColor" x="3" y="20" width="18" height="2"/>',
+    moon: '<path fill="currentColor" d="M14.5 2.5a9.5 9.5 0 1 0 7 15.8A8 8 0 0 1 14.5 2.5z"/><path fill="none" stroke="currentColor" stroke-width="1.6" d="M17 6l4-4M19 9l3-1"/>',
+    snow: '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7"/><path d="M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5M3 10.5l3.6-.9-.9-3.6M21 13.5l-3.6.9.9 3.6M3 13.5l3.6.9-.9 3.6M21 10.5l-3.6-.9.9-3.6"/></g>',
+    sun: '<circle fill="currentColor" cx="12" cy="12" r="4.6"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></g>',
+    eye: '<path fill="none" stroke="currentColor" stroke-width="2" d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle fill="currentColor" cx="12" cy="12" r="3.4"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 1v2.5M5 3l1.4 2M19 3l-1.4 2"/>',
+  };
+  const svg = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${EMBLEM[name]}</svg>`;
+
+  const ARMIES = {
+    aldmere: {
+      name: 'Aldmere', full: 'The Azure Crown of Aldmere', emblem: 'crown',
+      color: '#4f8ff0', roof: '#2f5ea8', ink: '#08142a', plaqueText: '#fff8e6',
+      role: 'Defense', homeland: 'The Vale of Aldmere', map: 'vale',
+      castle: 'stone', flag: 'swallow', soldier: 'spear',
+      story: "Aldmere's kings have held the green river vale for nine hundred years without losing a keep for long. Its masons' guild is older than the crown, and every child there learns that a wall built well is worth a hundred spears.",
+      strength: 'Masterwork walls. Every defender in an Aldmere castle counts as 1.3 soldiers.',
+      stats: { atk: 1, def: 1.3, speed: 1, prod: 1, road: 1, neutral: 1 },
+      power: { id: 'stoneOath', name: 'Stone Oath', dur: 20, desc: 'For 20 seconds, every defender in your castles counts double.', call: 'swear the Stone Oath', they: 'swears the Stone Oath' },
+      personality: 'Defensive. Holds the frontier, reinforces early, and marches only when it badly outnumbers you.',
+      ai: { sendFrac: 0.45, keep: 10, enemyBias: 0.9, neutralBias: 1, margin: 1.35, defendAt: 0.8, thinkMul: 1.1, front: true, opportunist: 1.2, boldAt: 1.6 },
+    },
+    kharzul: {
+      name: 'Kharzul', full: 'The Kharzul Horde', emblem: 'moon',
+      color: '#d9443e', roof: '#a8322d', ink: '#2a0806', plaqueText: '#fff8e6',
+      role: 'Attack', homeland: 'The Red Steppe', map: 'steppe',
+      castle: 'palisade', flag: 'tassel', soldier: 'rider',
+      story: 'Born in the saddle on the endless red grass, the clans of Kharzul build no stone. They raise palisades where they halt and burn them when they ride on. Their shamans read every war in the colour of the moon.',
+      strength: 'Horse lords. Riders move 30% faster and strike 1.25× harder, but wooden palisades defend at only 0.9.',
+      stats: { atk: 1.25, def: 0.9, speed: 1.3, prod: 1, road: 1, neutral: 1 },
+      power: { id: 'bloodMoon', name: 'Blood Moon Charge', dur: 15, desc: 'For 15 seconds, your riders move twice as fast and hit 1.5× harder.', call: 'charge under the Blood Moon', they: 'charges under the Blood Moon' },
+      personality: 'Very aggressive. Attacks constantly with most of its army and rarely stops to defend.',
+      ai: { sendFrac: 0.75, keep: 4, enemyBias: 2.2, neutralBias: 0.9, margin: 1.0, defendAt: 1.4, thinkMul: 0.7, front: false, opportunist: 1.3, boldAt: 0.9 },
+    },
+    frostmark: {
+      name: 'Frostmark', full: 'The Jarls of Frostmark', emblem: 'snow',
+      color: '#36c2b4', roof: '#1f7f75', ink: '#04201d', plaqueText: '#04201d',
+      role: 'Defense', homeland: 'The Frostmark Fjords', map: 'tundra',
+      castle: 'longhouse', flag: 'square', soldier: 'shield',
+      story: 'In the frozen north the jarls winter behind stone and pine, waiting out storms that would kill any army caught in the open. They are slow to march and almost impossible to dislodge, and their shieldwalls do not break.',
+      strength: 'Shieldwall. Frostmark troops count 1.4× in battles on the road, and castles defend at 1.25. They march 5% slower.',
+      stats: { atk: 1, def: 1.25, speed: 0.95, prod: 1, road: 1.4, neutral: 1 },
+      power: { id: 'wintersGrip', name: "Winter's Grip", dur: 12, desc: 'A blizzard sweeps the map. For 12 seconds, every enemy soldier in the field freezes in place.', call: "call down Winter's Grip", they: "calls down Winter's Grip" },
+      personality: 'Very defensive. Builds up behind its walls, punishes weak attacks, and strikes only at castles left nearly empty.',
+      ai: { sendFrac: 0.4, keep: 14, enemyBias: 0.6, neutralBias: 1, margin: 1.6, defendAt: 0.6, thinkMul: 1.25, front: true, opportunist: 2.4, boldAt: 1.9 },
+    },
+    solmara: {
+      name: 'Solmara', full: 'The Sun Dominion of Solmara', emblem: 'sun',
+      color: '#e9b43b', roof: '#c08a1c', ink: '#2a1c02', plaqueText: '#2a1c02',
+      role: 'Balanced', homeland: 'The Sunscorched Sands', map: 'desert',
+      castle: 'domes', flag: 'pennant', soldier: 'turban',
+      story: "Solmara's wealth flows from the oases and caravan roads of the great desert. Its sultans pay their soldiers in gold, and gold raises soldiers faster than any blade can cut them down.",
+      strength: 'Rich treasury. Castles train troops 15% faster, but soldiers fight at 0.95.',
+      stats: { atk: 0.95, def: 0.95, speed: 1, prod: 1.15, road: 1, neutral: 1 },
+      power: { id: 'goldenTithe', name: 'Golden Tithe', dur: 15, desc: 'Open the treasury. For 15 seconds, your castles train troops 2.5 times as fast.', call: 'open the Golden Tithe', they: 'opens the Golden Tithe' },
+      personality: 'Balanced. Expands steadily, defends what it holds, and attacks when the odds are good.',
+      ai: { sendFrac: 0.5, keep: 8, enemyBias: 1.3, neutralBias: 1.1, margin: 1.15, defendAt: 0.9, thinkMul: 1, front: false, opportunist: 1.4, boldAt: 1.3 },
+    },
+    nyx: {
+      name: 'Nyxhollow', full: 'The Nyxhollow Covenant', emblem: 'eye',
+      color: '#a46ae0', roof: '#5b3a85', ink: '#170828', plaqueText: '#fff8e6',
+      role: 'Attack', homeland: 'Nyxhollow Mire', map: 'mire',
+      castle: 'spires', flag: 'streamer', soldier: 'hood',
+      story: 'Out of the drowned marshes comes the Covenant, a court of witches and hooded zealots. Unclaimed keeps open their gates to Nyxhollow whispers, and the crows of the mire carry plague wherever they are sent.',
+      strength: 'Whispers. Attacks on unclaimed keeps count 1.5×, and Covenant troops strike 1.15× harder.',
+      stats: { atk: 1.15, def: 1, speed: 1, prod: 1, road: 1, neutral: 1.5 },
+      power: { id: 'crows', name: 'Plague of Crows', dur: 3, desc: 'Crows descend on the three largest enemy castles. Each loses 40% of its garrison at once.', call: 'loose the Plague of Crows', they: 'looses the Plague of Crows' },
+      personality: 'Aggressive and cunning. Snaps up unclaimed keeps quickly and pounces on any castle you leave weak.',
+      ai: { sendFrac: 0.6, keep: 6, enemyBias: 1.8, neutralBias: 1.4, margin: 1.05, defendAt: 1.0, thinkMul: 0.85, front: false, opportunist: 2.2, boldAt: 1.1 },
+    },
+  };
+  const ARMY_IDS = Object.keys(ARMIES);
+
+  // Homeland maps: ground, roads, scenery and the style of unclaimed keeps.
+  const THEMES = {
+    vale:   { bg: '#263220', field: '#33432a', lit: '#3d5031', road: '#8d7a55', ring: PARCH, tree: 'oak',   trees: 90, clump: 0.7, rocks: 0,  pools: 3, pool: '#3f6a7a', castle: 'stone' },
+    steppe: { bg: '#4a3a20', field: '#6c5a32', lit: '#7b683c', road: '#a88d5a', ring: PARCH, tree: 'shrub', trees: 45, clump: 0.4, rocks: 28, pools: 0, pool: '#5c7480', castle: 'palisade' },
+    tundra: { bg: '#8a96a2', field: '#c3cdd6', lit: '#d8e0e7', road: '#8d98a3', ring: INK,   tree: 'pine',  trees: 85, clump: 0.75, rocks: 14, pools: 3, pool: '#9fbfd2', castle: 'longhouse' },
+    desert: { bg: '#9a7843', field: '#c8a462', lit: '#d6b574', road: '#a3824a', ring: INK,   tree: 'palm',  trees: 30, clump: 0,  rocks: 10, pools: 4, pool: '#3f8fa0', castle: 'domes' },
+    mire:   { bg: '#16131c', field: '#28242f', lit: '#332d3d', road: '#5a4f68', ring: PARCH, tree: 'dead',  trees: 60, clump: 0.6, rocks: 0,  pools: 9, pool: '#1a1426', castle: 'spires' },
+  };
 
   const LEVELS = [
     { seed: 11, n: 12, diff: 'easy',   ais: 1, name: 'Thornbury' },
@@ -206,6 +326,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const mulberry = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const shuffle = arr => arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(v => v[1]);
   const alpha = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
   const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const store = {
@@ -277,6 +398,18 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
           tone(f * 2, t + d, dur, { type: 'triangle', vol: 0.05 });
         });
       },
+      power(mine) {
+        if (!ready()) return;
+        const t = ac.currentTime;
+        const chord = mine ? [147, 220, 294] : [110, 131, 165];
+        chord.forEach(f => tone(f, t, 1.3, { type: 'sawtooth', vol: 0.09, cutoff: mine ? 1600 : 700 }));
+        burst(t, 0.6, { vol: 0.15, freq: 300 });
+      },
+      chime() {
+        if (!ready()) return;
+        const t = ac.currentTime;
+        [880, 1320].forEach((f, i) => tone(f, t + i * 0.12, 0.5, { type: 'triangle', vol: 0.08 }));
+      },
       fanfare(won) {
         if (!ready()) return;
         const t = ac.currentTime;
@@ -293,7 +426,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   addEventListener('keydown', () => sfx.unlock());
 
   // ---------- map generation ----------
-  function genMap(seed, n, players, portrait, aiBonus = 0) {
+  function genMap(seed, n, players, portrait, theme, aiBonus = 0) {
     const rnd = mulberry(seed);
     const W = 1000, H = 640, cx = W / 2, cy = H / 2;
     const pts = [];
@@ -335,8 +468,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const rot = p => portrait ? { x: p.y, y: W - p.x } : { x: p.x, y: p.y };
     const planets = pts.map((p, id) => ({ id, ...rot(p), r: p.r, owner: p.owner, units: p.units }));
     const w = portrait ? H : W, h = portrait ? W : H;
+    const clear = (x, y, pad) => planets.every(p => Math.hypot(p.x - x, p.y - y) > p.r + pad);
 
-    // Scenery: roads between neighbouring castles, meadows and woods.
+    // Scenery: roads between neighbouring castles, then the homeland's own features.
     const roads = [], seen = new Set();
     for (const a of planets) {
       planets.filter(b => b !== a).sort((b, c) => dist(a, b) - dist(a, c)).slice(0, 2).forEach(b => {
@@ -348,17 +482,33 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       });
     }
     const meadows = Array.from({ length: 9 }, () => ({ x: rnd() * w, y: rnd() * h, rx: 80 + rnd() * 140, ry: 50 + rnd() * 90 }));
+    const pools = [];
+    for (let i = 0; i < 300 && pools.length < theme.pools; i++) {
+      const x = 40 + rnd() * (w - 80), y = 40 + rnd() * (h - 80), rx = 18 + rnd() * 26;
+      if (clear(x, y, rx + 24)) pools.push({ x, y, rx, ry: rx * (0.45 + rnd() * 0.2) });
+    }
     const trees = [];
-    for (let i = 0; i < 400 && trees.length < 90; i++) {
-      // Trees grow in clumps around a few seeds.
-      const base = trees.length && rnd() < 0.7 ? trees[Math.floor(rnd() * trees.length)] : { x: rnd() * w, y: rnd() * h };
-      const x = base.x + (rnd() - 0.5) * 60, y = base.y + (rnd() - 0.5) * 60;
-      if (x < 8 || y < 8 || x > w - 8 || y > h - 8) continue;
-      if (planets.some(p => Math.hypot(p.x - x, p.y - y) < p.r + 30)) continue;
+    for (let i = 0; i < 600 && trees.length < theme.trees; i++) {
+      let x, y;
+      if (theme.tree === 'palm' && pools.length) {
+        // Palms grow around the oases.
+        const o = pools[Math.floor(rnd() * pools.length)], a = rnd() * Math.PI * 2;
+        x = o.x + Math.cos(a) * (o.rx + 6 + rnd() * 14); y = o.y + Math.sin(a) * (o.ry + 5 + rnd() * 10);
+      } else {
+        const base = trees.length && rnd() < theme.clump ? trees[Math.floor(rnd() * trees.length)] : { x: rnd() * w, y: rnd() * h };
+        x = base.x + (rnd() - 0.5) * 60; y = base.y + (rnd() - 0.5) * 60;
+      }
+      if (x < 8 || y < 8 || x > w - 8 || y > h - 8 || !clear(x, y, 30)) continue;
+      if (theme.tree !== 'palm' && pools.some(o => Math.hypot((o.x - x) / o.rx, (o.y - y) / o.ry) < 1.2)) continue;
       trees.push({ x, y, s: 5 + rnd() * 4, shade: rnd() });
     }
     trees.sort((a, b) => a.y - b.y);
-    return { planets, w, h, roads, meadows, trees };
+    const rocks = [];
+    for (let i = 0; i < 300 && rocks.length < theme.rocks; i++) {
+      const x = rnd() * w, y = rnd() * h;
+      if (clear(x, y, 22)) rocks.push({ x, y, s: 2 + rnd() * 3.5 });
+    }
+    return { planets, w, h, roads, meadows, trees, pools, rocks };
   }
 
   // ---------- game state ----------
@@ -367,12 +517,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   function newGame(cfg) {
     const portrait = board.clientHeight > board.clientWidth * 1.1;
-    const players = cfg.ais + 1;
-    const map = genMap(cfg.seed, cfg.n, players, portrait, cfg.aiBonus || 0);
-    const aiIds = cfg.demo ? [1, 2] : (players === 2 ? [2] : [2, 3]);
+    const players = cfg.armies.length;
+    const theme = THEMES[ARMIES[cfg.map].map];
+    const map = genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0);
+    const owners = players === 2 ? [1, 2] : [1, 2, 3];
+    const aiIds = cfg.demo ? [1, 2] : owners.slice(1);
     G = {
-      cfg, ...map, packets: [], fx: [], time: 0, over: false, paused: false,
-      owners: players === 2 ? [1, 2] : [1, 2, 3],
+      cfg, ...map, theme, packets: [], fx: [], time: 0, over: false, paused: false, owners,
+      fac: Object.fromEntries(owners.map((o, i) => [o, cfg.armies[i]])),
+      pw: Object.fromEntries(owners.map(o => [o, { ready: FIRST_CHARGE, until: -1 }])),
       ais: aiIds.map((id, i) => ({ id, diff: cfg.demo ? 'medium' : cfg.diff, timer: 1.4 + i * 0.35 })),
       caps: 0, peak: 0, hintDone: cfg.demo || store.get('cs-hint', false),
     };
@@ -380,7 +533,33 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     resize();
   }
 
-  const rate = p => p.owner ? p.r * PROD : 0;
+  // ---------- army stats and powers ----------
+  const army = o => ARMIES[G.fac[o]];
+  const col = o => o ? army(o).color : NEUTRAL;
+  const powerOn = (o, id) => o && army(o).power.id === id && G.time < G.pw[o].until;
+  const atkOf = o => army(o).stats.atk * (powerOn(o, 'bloodMoon') ? 1.5 : 1);
+  const defOf = o => o ? army(o).stats.def * (powerOn(o, 'stoneOath') ? 2 : 1) : 1;
+  const speedOf = o => SPEED * army(o).stats.speed * (powerOn(o, 'bloodMoon') ? 2 : 1);
+  const roadOf = o => atkOf(o) * army(o).stats.road;
+  const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1);
+  const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2.5 : 1) : 0;
+  const frozen = o => G.owners.some(q => q !== o && powerOn(q, 'wintersGrip'));
+
+  function usePower(o) {
+    const pw = G.pw[o], A = army(o);
+    if (pw.ready > 0 || G.over) return false;
+    pw.ready = RECHARGE;
+    pw.until = G.time + A.power.dur;
+    if (A.power.id === 'crows') {
+      const targets = G.planets.filter(p => p.owner && p.owner !== o).sort((a, b) => b.units - a.units).slice(0, 3);
+      for (const t of targets) { t.units *= 0.6; G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
+    }
+    if (!G.cfg.demo) {
+      toast(o === 1 ? `You ${A.power.call}!` : `${A.full} ${A.power.they}!`, o === 1 ? A.power.desc : A.power.desc.replace(/\byour\b/g, 'their'), A.color);
+      sfx.power(o === 1);
+    }
+    return true;
+  }
 
   function send(owner, sources, target, frac = 0.5) {
     let launched = false;
@@ -411,93 +590,138 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     return inc;
   }
 
-  // ---------- AI ----------
+  // ---------- AI: each army's personality shapes how it plays ----------
+  // Troops `me` must send to take `t`, after travel time, reinforcements and army strengths.
   function needAt(t, far, inc, me) {
     let def = t.units;
-    if (t.owner !== 0) def += rate(t) * (far / SPEED) + inc[t.id][t.owner];
+    if (t.owner !== 0) def += rate(t) * (far / speedOf(me)) + inc[t.id][t.owner];
+    def = def * defOf(t.owner) / strikeOf(me, t);
     def -= inc[t.id][me];
     return Math.ceil(def + 2);
   }
 
+  function aiPower(ai, inc, mine) {
+    const me = ai.id;
+    if (G.pw[me].ready > 0) return;
+    if (ai.diff === 'easy' && Math.random() < 0.6) return;
+    const threatOn = p => inc[p.id].reduce((a, v, o) => o !== me ? a + v : a, 0);
+    let use = false;
+    switch (army(me).power.id) {
+      case 'stoneOath':
+        use = mine.some(p => threatOn(p) >= 12 && threatOn(p) > (p.units + inc[p.id][me]) * defOf(me));
+        break;
+      case 'wintersGrip': {
+        const incoming = mine.reduce((a, p) => a + threatOn(p), 0);
+        use = incoming >= 30 || mine.some(p => threatOn(p) >= 12 && threatOn(p) > (p.units + inc[p.id][me]) * defOf(me));
+        break;
+      }
+      case 'bloodMoon':
+        use = G.packets.reduce((a, k) => a + (k.owner === me && k.to.owner !== me ? k.n : 0), 0) >= 15;
+        break;
+      case 'goldenTithe':
+        use = mine.length >= 3;
+        break;
+      case 'crows':
+        use = G.planets.some(p => p.owner && p.owner !== me && p.units >= 30);
+        break;
+    }
+    if (use) usePower(me);
+  }
+
   function aiThink(ai) {
-    const me = ai.id, P = G.planets, d = ai.diff;
+    const me = ai.id, P = G.planets, d = ai.diff, pz = army(me).ai;
     const mine = P.filter(p => p.owner === me);
     if (!mine.length) return;
+    const inc = incomingTable();
+    aiPower(ai, inc, mine);
 
     if (d === 'easy') {
       if (Math.random() < 0.45) return;
-      const srcs = mine.filter(p => p.units >= 14);
+      const srcs = mine.filter(p => p.units >= Math.max(14, pz.keep));
       if (!srcs.length) return;
       const s = pick(srcs);
-      const ts = P.filter(p => p.owner !== me).sort((a, b) => dist(s, a) - dist(s, b)).slice(0, 4);
-      if (ts.length) send(me, [s], pick(ts));
+      let ts = P.filter(p => p.owner !== me).sort((a, b) => dist(s, a) - dist(s, b)).slice(0, 5);
+      // Aggressive armies prefer enemy castles even on easy; defensive ones prefer quiet expansion.
+      const enemies = ts.filter(t => t.owner), neutrals = ts.filter(t => !t.owner);
+      if (pz.enemyBias > 1.5 && enemies.length) ts = enemies;
+      else if (pz.enemyBias < 1 && neutrals.length) ts = neutrals;
+      if (ts.length) send(me, [s], pick(ts), pz.sendFrac);
       return;
     }
 
-    const inc = incomingTable();
-    // Reinforce castles that are about to fall.
+    // Defend castles about to fall. Defensive armies react earlier.
     for (const p of mine) {
       const threat = inc[p.id].reduce((a, v, o) => o !== me ? a + v : a, 0);
-      if (threat > p.units + inc[p.id][me] + rate(p) * 1.5) {
+      const hold = (p.units + inc[p.id][me]) * defOf(me) + rate(p) * 1.5;
+      if (threat > 0 && threat > hold * pz.defendAt) {
         const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => dist(a, p) - dist(b, p));
         if (helpers.length) {
-          send(me, d === 'hard' ? helpers.slice(0, 2) : [helpers[0]], p);
+          send(me, d === 'hard' ? helpers.slice(0, 2) : [helpers[0]], p, 0.5);
           if (d === 'medium') return;
         }
       }
     }
-    // Attack or expand where the return per troop spent is best.
+
+    // Defensive armies turn bold once they clearly outnumber everyone.
+    const myTotal = totalOf(me);
+    const enemyTotal = Math.max(1, ...G.owners.filter(o => o !== me).map(totalOf));
+    const bold = myTotal > enemyTotal * pz.boldAt ? 2 : 1;
+
     let best = null;
     const maxSrc = d === 'hard' ? 4 : 1;
     for (const t of P) {
       if (t.owner === me) continue;
-      const srcs = mine.filter(s => s.units >= 6).sort((a, b) => dist(a, t) - dist(b, t));
+      const srcs = mine.filter(s => s.units >= pz.keep).sort((a, b) => dist(a, t) - dist(b, t));
       const chosen = [];
       let sum = 0, far = 0, need = Infinity;
       for (const s of srcs) {
         if (chosen.length >= maxSrc) break;
         chosen.push(s);
-        sum += Math.floor(s.units / 2);
+        sum += Math.floor(s.units * pz.sendFrac);
         far = Math.max(far, dist(s, t));
-        need = needAt(t, far, inc, me);
+        need = needAt(t, far, inc, me) * pz.margin;
         if (sum >= need) break;
       }
       if (!chosen.length || need <= 2 || sum < need) continue;
-      const worth = (t.r * PROD + 0.4) * (t.owner === 0 ? 1 : d === 'hard' ? 1.7 : 1.3);
+      let worth = (t.r * PROD + 0.4) * (t.owner === 0 ? pz.neutralBias : pz.enemyBias * bold);
+      if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
       const score = worth / (need + far * 0.06);
       if (!best || score > best.score) best = { score, chosen, t };
     }
-    if (best) send(me, best.chosen, best.t);
+    if (best) { send(me, best.chosen, best.t, pz.sendFrac); return; }
+
+    // Nothing worth attacking: defensive armies move troops from safe castles to the front.
+    if (pz.front && Math.random() < 0.5 && mine.length > 1) {
+      const enemyCastles = P.filter(p => p.owner && p.owner !== me);
+      if (!enemyCastles.length) return;
+      const danger = p => Math.min(...enemyCastles.map(e => dist(p, e)));
+      const byDanger = [...mine].sort((a, b) => danger(a) - danger(b));
+      const front = byDanger[0], rear = byDanger[byDanger.length - 1];
+      if (rear !== front && rear.units > 20) send(me, [rear], front, 0.5);
+    }
   }
 
   // ---------- simulation ----------
   function update(dt) {
     G.time += dt;
     for (const p of G.planets) p.units += rate(p) * dt;
+    for (const o of G.owners) {
+      const pw = G.pw[o], was = pw.ready;
+      pw.ready = Math.max(0, pw.ready - dt);
+      if (o === 1 && was > 0 && pw.ready === 0 && !G.cfg.demo) sfx.chime();
+    }
 
     for (let i = G.packets.length - 1; i >= 0; i--) {
       const k = G.packets[i];
+      if (frozen(k.owner)) continue;
       if (k.delay > 0) { k.delay -= dt; continue; }
       const t = k.to, dx = t.x - k.x, dy = t.y - k.y, dd = Math.hypot(dx, dy);
       if (dd <= t.r * 0.8) {
         G.packets.splice(i, 1);
-        if (t.owner === k.owner) t.units += k.n;
-        else {
-          t.units -= k.n;
-          G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
-          if (!G.cfg.demo && (k.owner === 1 || t.owner === 1)) sfx.clash();
-          if (t.units < 0) {
-            const was = t.owner;
-            t.owner = k.owner; t.units = -t.units;
-            if (k.owner === 1) G.caps++;
-            if (!G.cfg.demo && (k.owner === 1 || was === 1)) sfx.horn(k.owner === 1);
-            if (was === 1) sel.delete(t);
-            G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: COL[k.owner], age: 0 });
-          }
-        }
+        arrive(k, t);
         continue;
       }
-      const step = Math.min(dd, SPEED * dt);
+      const step = Math.min(dd, speedOf(k.owner) * dt);
       k.x += dx / dd * step; k.y += dy / dd * step;
       k.dir = dx < 0 ? -1 : 1;
     }
@@ -505,12 +729,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     roadBattles();
 
     for (const f of G.fx) f.age += dt;
-    G.fx = G.fx.filter(f => f.age < (f.kind === 'capture' ? 0.9 : 0.35));
+    G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6 }[f.kind] || 0.35));
 
     const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
     for (const ai of G.ais) {
       ai.timer -= dt;
-      if (ai.timer <= 0) { ai.timer = intervals[ai.diff] * (0.8 + Math.random() * 0.4); aiThink(ai); }
+      if (ai.timer <= 0) { ai.timer = intervals[ai.diff] * army(ai.id).ai.thinkMul * (0.8 + Math.random() * 0.4); aiThink(ai); }
     }
 
     const alive = o => G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o);
@@ -525,25 +749,43 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     else if (G.owners.slice(1).every(o => !alive(o))) endGame(true);
   }
 
-  // Columns from different kingdoms that meet on the road fight: both lose
-  // the smaller group's strength and the survivors march on.
+  // Attackers deal damage scaled by their strike strength against the defender's wall strength.
+  function arrive(k, t) {
+    if (t.owner === k.owner) { t.units += k.n; return; }
+    const A = strikeOf(k.owner, t), D = defOf(t.owner);
+    t.units -= k.n * A / D;
+    G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
+    if (!G.cfg.demo && (k.owner === 1 || t.owner === 1)) sfx.clash();
+    if (t.units < 0) {
+      const was = t.owner;
+      t.owner = k.owner; t.units = -t.units * D / A;
+      if (k.owner === 1) G.caps++;
+      if (!G.cfg.demo && (k.owner === 1 || was === 1)) sfx.horn(k.owner === 1);
+      if (was === 1) sel.delete(t);
+      G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: col(k.owner), age: 0 });
+    }
+  }
+
+  // Columns from different kingdoms that meet on the road fight. Each side's
+  // road strength decides how many of the other it takes down.
   function roadBattles() {
     const R = 9;
     const act = G.packets.filter(k => k.delay <= 0).sort((a, b) => a.x - b.x);
     let fought = false;
     for (let i = 0; i < act.length; i++) {
       const a = act[i];
-      for (let j = i + 1; a.n > 0 && j < act.length && act[j].x - a.x < R; j++) {
+      for (let j = i + 1; a.n > 0.05 && j < act.length && act[j].x - a.x < R; j++) {
         const b = act[j];
-        if (b.n <= 0 || b.owner === a.owner || Math.abs(b.y - a.y) >= R) continue;
-        const m = Math.min(a.n, b.n);
-        a.n -= m; b.n -= m;
+        if (b.n <= 0.05 || b.owner === a.owner || Math.abs(b.y - a.y) >= R) continue;
+        const sa = roadOf(a.owner), sb = roadOf(b.owner);
+        const m = Math.min(a.n * sa, b.n * sb);
+        a.n -= m / sa; b.n -= m / sb;
         fought = true;
         G.fx.push({ kind: 'clash', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, age: 0 });
         if (!G.cfg.demo) sfx.clash();
       }
     }
-    if (fought) G.packets = G.packets.filter(k => k.n > 0);
+    if (fought) G.packets = G.packets.filter(k => k.n > 0.05);
   }
 
   function totalOf(o) {
@@ -568,69 +810,232 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   const ptr = { down: false, moved: false, sx: 0, sy: 0, wx: 0, wy: 0, start: null, wasSel: false, hover: null };
 
+  const poly = (pts, fill) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); };
+  const shadeRight = (x, y, w, h, a = 0.14) => { ctx.fillStyle = `rgba(0,0,0,${a})`; ctx.fillRect(x + w * 0.62, y, w * 0.38, h); };
   function crenels(x, y, w, size) {
     const n = Math.max(2, Math.round(w / (size * 2)));
     const step = w / (n * 2 - 1);
     for (let i = 0; i < n; i++) ctx.fillRect(x + i * step * 2, y - size, step, size);
   }
+  function arch(cx, baseY, gw, gh, pointed) {
+    ctx.fillStyle = INK; ctx.beginPath();
+    ctx.moveTo(cx - gw / 2, baseY); ctx.lineTo(cx - gw / 2, baseY - gh + gw / 2);
+    if (pointed) ctx.quadraticCurveTo(cx - gw / 2, baseY - gh - gw * 0.2, cx, baseY - gh - gw * 0.35), ctx.quadraticCurveTo(cx + gw / 2, baseY - gh - gw * 0.2, cx + gw / 2, baseY - gh + gw / 2);
+    else ctx.arc(cx, baseY - gh + gw / 2, gw / 2, Math.PI, 0);
+    ctx.lineTo(cx + gw / 2, baseY); ctx.fill();
+  }
 
-  function flag(x, y, h, col, now, seed) {
-    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2;
+  // Each army's castle style. Returns the points where its banners fly.
+  const CASTLE = {
+    stone(p, s, baseY, tier, roofCol) {
+      const stone = '#bdb3a0', dark = '#807563';
+      const block = (x, y, w, h, shade, cren = true) => {
+        ctx.fillStyle = shade ? dark : stone; ctx.fillRect(x, y, w, h);
+        if (cren) crenels(x, y, w, Math.max(2, s * 0.12));
+        shadeRight(x, y, w, h);
+      };
+      const cone = (cx, y, w, h) => poly([[cx - w / 2 - 1.5, y], [cx + w / 2 + 1.5, y], [cx, y - h]], roofCol);
+      if (tier === 1) {
+        const w = s * 0.9, h = s * 1.3;
+        block(p.x - w / 2, baseY - h, w, h, false, false);
+        cone(p.x, baseY - h, w, s * 0.6);
+        return [[p.x, baseY - h - s * 0.6]];
+      }
+      const ww = s * (tier === 2 ? 1.7 : 2), wh = s * 0.75, tw = s * 0.5, th = s * (tier === 2 ? 1.2 : 1.1);
+      const lx = p.x - ww / 2 - tw * 0.3, rx = p.x + ww / 2 - tw * 0.7;
+      block(lx, baseY - th, tw, th, true, false); cone(lx + tw / 2, baseY - th, tw, s * 0.5);
+      block(rx, baseY - th, tw, th, true, false); cone(rx + tw / 2, baseY - th, tw, s * 0.5);
+      block(p.x - ww / 2 + tw * 0.4, baseY - wh, ww - tw * 0.8, wh);
+      let flagAt = [lx + tw / 2, baseY - th - s * 0.5];
+      if (tier === 3) {
+        const kw = s * 0.75, kh = s * 1.5;
+        block(p.x - kw / 2, baseY - kh, kw, kh);
+        flagAt = [p.x, baseY - kh - s * 0.12];
+      }
+      arch(p.x, baseY, s * 0.36, s * 0.46);
+      return [flagAt];
+    },
+    palisade(p, s, baseY, tier, roofCol) {
+      const wood = '#8a5a33', woodDark = '#68431f';
+      const yurt = (cx, r) => {
+        ctx.fillStyle = '#d9c9a3'; ctx.beginPath(); ctx.arc(cx, baseY - s * 0.38, r, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = roofCol; ctx.fillRect(cx - r, baseY - s * 0.38 - r * 0.45, r * 2, r * 0.18);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.arc(cx, baseY - s * 0.38, r, Math.PI * 1.5, 0); ctx.lineTo(cx, baseY - s * 0.38); ctx.fill();
+      };
+      const pw = s * (tier === 1 ? 1.2 : tier === 2 ? 1.8 : 2.2), ph = s * (tier === 1 ? 0.5 : 0.62);
+      let flagAt;
+      if (tier === 3) {
+        // Wooden watchtower behind the palisade.
+        const tx = p.x - pw * 0.28, th = s * 1.55;
+        ctx.fillStyle = woodDark; ctx.fillRect(tx - s * 0.08, baseY - th, s * 0.16, th);
+        ctx.fillStyle = wood; ctx.fillRect(tx - s * 0.3, baseY - th, s * 0.6, s * 0.28);
+        poly([[tx - s * 0.36, baseY - th], [tx + s * 0.36, baseY - th], [tx, baseY - th - s * 0.3]], roofCol);
+        flagAt = [tx, baseY - th - s * 0.3];
+      }
+      const yurts = tier === 1 ? [[0, 0.45]] : tier === 2 ? [[-0.4, 0.42], [0.4, 0.34]] : [[0.05, 0.5], [0.6, 0.34]];
+      yurts.forEach(([dx, r]) => yurt(p.x + dx * s, r * s));
+      if (!flagAt) flagAt = [p.x + yurts[0][0] * s, baseY - s * 0.38 - yurts[0][1] * s];
+      // Pointed stakes.
+      const n = Math.max(5, Math.round(pw / (s * 0.17)));
+      const sw = pw / n;
+      for (let i = 0; i < n; i++) {
+        const x = p.x - pw / 2 + i * sw;
+        if (tier > 1 && Math.abs(x + sw / 2 - p.x) < s * 0.2) continue;
+        poly([[x, baseY], [x, baseY - ph], [x + sw / 2, baseY - ph - sw * 0.9], [x + sw, baseY - ph], [x + sw, baseY]], i % 2 ? wood : woodDark);
+      }
+      if (tier > 1) { ctx.fillStyle = INK; ctx.fillRect(p.x - s * 0.2, baseY - ph * 0.8, s * 0.4, ph * 0.8); }
+      return [flagAt];
+    },
+    longhouse(p, s, baseY, tier, roofCol) {
+      const stone = '#9aa3ab', timber = '#5a4433', snow = '#f4f8fb';
+      const roof = (cx, y, w, h) => {
+        poly([[cx - w / 2 - 2, y], [cx + w / 2 + 2, y], [cx, y - h]], '#3b2e24');
+        poly([[cx - w * 0.28, y - h * 0.45], [cx + w * 0.28, y - h * 0.45], [cx, y - h - 0.5]], snow);
+        ctx.fillStyle = roofCol; ctx.fillRect(cx - 1.2, y - h - 4, 2.4, 4);
+      };
+      const tower = (cx, w, h) => {
+        ctx.fillStyle = stone; ctx.fillRect(cx - w / 2, baseY - h, w, h); shadeRight(cx - w / 2, baseY - h, w, h);
+        roof(cx, baseY - h, w, s * 0.75);
+        return [cx, baseY - h - s * 0.75 - 4];
+      };
+      if (tier === 1) return [tower(p.x, s * 0.8, s * 1.15)];
+      let flagAt;
+      if (tier === 3) flagAt = tower(p.x - s * 0.75, s * 0.55, s * 1.5);
+      const lw = s * (tier === 2 ? 1.3 : 1.5), lh = s * 0.5, ly = baseY - s * 0.3 - lh;
+      ctx.fillStyle = timber; ctx.fillRect(p.x - lw / 2 + s * 0.1, ly, lw, lh); shadeRight(p.x - lw / 2 + s * 0.1, ly, lw, lh, 0.2);
+      roof(p.x + s * 0.1, ly, lw, s * 0.7);
+      if (!flagAt) flagAt = [p.x + s * 0.1, ly - s * 0.7 - 4];
+      // Low rubble wall in front.
+      const ww = s * (tier === 2 ? 1.8 : 2.1), wh = s * 0.32;
+      ctx.fillStyle = stone; ctx.beginPath(); ctx.roundRect(p.x - ww / 2, baseY - wh, ww, wh, [wh * 0.4, wh * 0.4, 0, 0]); ctx.fill();
+      ctx.fillStyle = snow; ctx.fillRect(p.x - ww / 2 + 2, baseY - wh, ww - 4, 1.6);
+      arch(p.x, baseY, s * 0.3, s * 0.3);
+      return [flagAt];
+    },
+    domes(p, s, baseY, tier, roofCol) {
+      const sand = '#e2c48a', sandDark = '#b9975c';
+      const dome = (cx, y, r) => {
+        ctx.fillStyle = roofCol; ctx.beginPath(); ctx.ellipse(cx, y, r, r * 1.05, 0, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.beginPath(); ctx.ellipse(cx - r * 0.35, y - r * 0.45, r * 0.25, r * 0.4, -0.4, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx, y - r * 1.05); ctx.lineTo(cx, y - r * 1.05 - 4); ctx.stroke();
+        return [cx, y - r * 1.05 - 4];
+      };
+      const minaret = (cx, h) => {
+        const w = s * 0.32;
+        ctx.fillStyle = sandDark; ctx.fillRect(cx - w / 2, baseY - h, w, h);
+        ctx.fillStyle = sand; ctx.fillRect(cx - w * 0.75, baseY - h * 0.72, w * 1.5, 2);
+        return dome(cx, baseY - h, w * 0.62);
+      };
+      if (tier === 1) return [minaret(p.x, s * 1.5)];
+      const bw = s * (tier === 2 ? 1.5 : 1.9), bh = s * 0.8;
+      const flags = [];
+      if (tier === 3) { minaret(p.x - bw / 2 - s * 0.12, s * 1.7); minaret(p.x + bw / 2 + s * 0.12, s * 1.7); }
+      flags.push(dome(p.x, baseY - bh, s * (tier === 2 ? 0.45 : 0.6)));
+      ctx.fillStyle = sand; ctx.fillRect(p.x - bw / 2, baseY - bh, bw, bh); shadeRight(p.x - bw / 2, baseY - bh, bw, bh, 0.12);
+      // Stepped merlons.
+      const n = Math.max(4, Math.round(bw / (s * 0.25)));
+      for (let i = 0; i < n; i++) { const x = p.x - bw / 2 + (i + 0.5) * bw / n; poly([[x - 2.2, baseY - bh], [x + 2.2, baseY - bh], [x, baseY - bh - 3.5]], sand); }
+      arch(p.x, baseY, s * 0.36, s * 0.5, true);
+      return flags;
+    },
+    spires(p, s, baseY, tier, roofCol, glow) {
+      const slate = '#4b4558', slateDark = '#353042';
+      const spire = (cx, w, h, rh) => {
+        ctx.fillStyle = slateDark; ctx.fillRect(cx - w / 2, baseY - h, w, h); shadeRight(cx - w / 2, baseY - h, w, h, 0.2);
+        poly([[cx - w / 2 - 1.5, baseY - h], [cx + w / 2 + 1.5, baseY - h], [cx, baseY - h - rh]], roofCol);
+        ctx.fillStyle = glow; ctx.fillRect(cx - w * 0.15, baseY - h * 0.75, w * 0.3, h * 0.16);
+        return [cx, baseY - h - rh];
+      };
+      if (tier === 1) return [spire(p.x, s * 0.6, s * 1.2, s * 0.95)];
+      const ww = s * (tier === 2 ? 1.6 : 2), wh = s * 0.58;
+      const flags = [];
+      const sp = tier === 2 ? [[-0.62, 1.15, 0.85], [0.62, 1.0, 0.75]] : [[-0.8, 1.0, 0.75], [0.8, 1.0, 0.75]];
+      sp.forEach(([dx, h, rh]) => flags.push(spire(p.x + dx * s, s * 0.42, s * h, s * rh)));
+      if (tier === 3) flags.unshift(spire(p.x, s * 0.55, s * 1.55, s * 1.15));
+      ctx.fillStyle = slate; ctx.fillRect(p.x - ww / 2 + s * 0.2, baseY - wh, ww - s * 0.4, wh);
+      const n = Math.max(4, Math.round(ww / (s * 0.22)));
+      for (let i = 0; i < n; i++) { const x = p.x - ww / 2 + s * 0.2 + (i + 0.5) * (ww - s * 0.4) / n; poly([[x - 1.8, baseY - wh], [x + 1.8, baseY - wh], [x, baseY - wh - 4]], slate); }
+      arch(p.x, baseY, s * 0.32, s * 0.42, true);
+      return [flags[0]];
+    },
+  };
+
+  // Each army's banner shape.
+  const FLAG = {
+    swallow(x, top, h, c, wave) {
+      const fw = h * 0.75, fh = h * 0.45;
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, top);
+      ctx.quadraticCurveTo(x + fw * 0.5, top + wave, x + fw, top + fh * 0.15 + wave * 0.5);
+      ctx.lineTo(x + fw * 0.82, top + fh * 0.5);
+      ctx.lineTo(x + fw, top + fh * 0.85 - wave * 0.5);
+      ctx.quadraticCurveTo(x + fw * 0.5, top + fh - wave, x, top + fh);
+      ctx.closePath(); ctx.fill();
+    },
+    tassel(x, top, h, c, wave) {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, top, 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = c; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath(); ctx.moveTo(x + i, top + 2);
+        ctx.quadraticCurveTo(x + i * 2 + wave * 1.5, top + h * 0.3, x + i * 2.5 + wave * 2.5, top + h * 0.55); ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+    },
+    square(x, top, h, c, wave) {
+      const bw = h * 0.6, bh = h * 0.62, sway = wave * 0.6;
+      ctx.strokeStyle = INK; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x, top + 1); ctx.lineTo(x + bw, top + 1); ctx.stroke();
+      poly([[x + 1, top + 1], [x + bw, top + 1], [x + bw + sway, top + bh], [x + bw / 2 + sway, top + bh * 0.8], [x + 1 + sway, top + bh]], c);
+    },
+    pennant(x, top, h, c, wave) {
+      const fw = h * 1.0, fh = h * 0.32;
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, top);
+      ctx.quadraticCurveTo(x + fw * 0.5, top + fh * 0.3 + wave, x + fw, top + fh * 0.5 + wave * 1.4);
+      ctx.quadraticCurveTo(x + fw * 0.5, top + fh * 0.75 + wave, x, top + fh);
+      ctx.closePath(); ctx.fill();
+    },
+    streamer(x, top, h, c, wave, now) {
+      ctx.strokeStyle = c; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, top + 1.5);
+      const len = h * 1.1, ph = reduceMotion ? 0 : now / 220;
+      for (let i = 1; i <= 10; i++) { const t = i / 10; ctx.lineTo(x + len * t, top + 1.5 + Math.sin(ph + t * 6) * 2.4 * t + t * 3); }
+      ctx.stroke(); ctx.lineCap = 'butt';
+    },
+  };
+
+  function drawFlag(x, y, h, o, now, seed) {
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
+    if (!o) return;
     const wave = reduceMotion ? 0 : Math.sin(now / 260 + seed) * 1.6;
-    const fw = h * 0.75, fh = h * 0.45, top = y - h;
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.quadraticCurveTo(x + fw * 0.5, top + wave, x + fw, top + fh * 0.15 + wave * 0.5);
-    ctx.lineTo(x + fw * 0.82, top + fh * 0.5);
-    ctx.lineTo(x + fw, top + fh * 0.85 - wave * 0.5);
-    ctx.quadraticCurveTo(x + fw * 0.5, top + fh - wave, x, top + fh);
-    ctx.closePath(); ctx.fill();
+    FLAG[army(o).flag](x, y - h, h, col(o), wave, now);
   }
 
   function drawCastle(p, now) {
-    const s = p.r, col = COL[p.owner], baseY = p.y + s * 0.55;
+    const s = p.r, baseY = p.y + s * 0.55;
     const tier = s < 18 ? 1 : s < 26 ? 2 : 3;
+    const c = col(p.owner);
     // Claimed land under the castle.
     ctx.beginPath(); ctx.ellipse(p.x, baseY - s * 0.1, s * 1.25, s * 0.62, 0, 0, Math.PI * 2);
-    ctx.fillStyle = p.owner ? alpha(col, 0.28) : 'rgba(20,18,12,0.22)'; ctx.fill();
-    if (p.owner) { ctx.strokeStyle = alpha(col, 0.7); ctx.lineWidth = 1.5; ctx.stroke(); }
-
-    const block = (x, y, w, h, shade) => {
-      ctx.fillStyle = shade ? C.stoneDark : C.stone;
-      ctx.fillRect(x, y, w, h);
-      crenels(x, y, w, Math.max(2, s * 0.12));
-      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fillRect(x + w * 0.62, y, w * 0.38, h);
-    };
-    const flags = [];
-    if (tier === 1) {
-      const w = s * 0.9, h = s * 1.45;
-      block(p.x - w / 2, baseY - h, w, h);
-      flags.push([p.x, baseY - h - s * 0.12]);
-    } else {
-      const ww = s * (tier === 2 ? 1.7 : 2), wh = s * 0.75;
-      const tw = s * 0.5, th = s * (tier === 2 ? 1.25 : 1.15);
-      block(p.x - ww / 2 - tw * 0.3, baseY - th, tw, th, true);
-      block(p.x + ww / 2 - tw * 0.7, baseY - th, tw, th, true);
-      if (tier === 3) {
-        const kw = s * 0.75, kh = s * 1.6;
-        block(p.x - ww / 2 + tw * 0.4, baseY - wh, ww - tw * 0.8, wh);
-        block(p.x - kw / 2, baseY - kh, kw, kh);
-        flags.push([p.x, baseY - kh - s * 0.12]);
-      } else {
-        block(p.x - ww / 2 + tw * 0.4, baseY - wh, ww - tw * 0.8, wh);
-        flags.push([p.x - ww / 2 + tw * 0.2, baseY - th - s * 0.1]);
-      }
-      // Gate.
-      ctx.fillStyle = C.ink;
-      const gw = s * 0.36, gh = s * 0.46;
-      ctx.beginPath(); ctx.moveTo(p.x - gw / 2, baseY); ctx.lineTo(p.x - gw / 2, baseY - gh + gw / 2);
-      ctx.arc(p.x, baseY - gh + gw / 2, gw / 2, Math.PI, 0); ctx.lineTo(p.x + gw / 2, baseY); ctx.fill();
+    ctx.fillStyle = p.owner ? alpha(c, 0.3) : 'rgba(20,18,12,0.22)'; ctx.fill();
+    if (p.owner) { ctx.strokeStyle = alpha(c, 0.75); ctx.lineWidth = 1.5; ctx.stroke(); }
+    if (powerOn(p.owner, 'stoneOath')) {
+      const pulse = reduceMotion ? 0.7 : 0.5 + 0.35 * Math.sin(now / 200);
+      ctx.save(); ctx.translate(p.x, baseY - s * 0.6); ctx.scale(1, 0.9);
+      ctx.beginPath(); ctx.arc(0, 0, s * 1.35, Math.PI * 1.05, Math.PI * 1.95);
+      ctx.strokeStyle = alpha(c, pulse); ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
     }
-    for (const [fx, fy] of flags) {
-      if (p.owner) flag(fx, fy, s * 0.7, col, now, p.id);
-      else { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - s * 0.45); ctx.stroke(); }
+
+    const style = p.owner ? army(p.owner).castle : G.theme.castle;
+    const roofCol = p.owner ? army(p.owner).roof : '#6f6a5e';
+    const glow = p.owner ? c : '#5a5468';
+    const flags = CASTLE[style](p, s, baseY, tier, roofCol, glow);
+    for (const [fx, fy] of flags) drawFlag(fx, fy, s * 0.6, p.owner, now, p.id);
+
+    if (powerOn(p.owner, 'goldenTithe') && !reduceMotion) {
+      for (let i = 0; i < 4; i++) {
+        const t = (now / 900 + i * 0.25 + p.id * 0.13) % 1;
+        ctx.fillStyle = alpha('#ffd75e', 1 - t);
+        ctx.beginPath(); ctx.arc(p.x + Math.sin(i * 2.1 + p.id) * s * 0.7, baseY - s * 0.4 - t * s * 1.6, 1.8, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
     // Garrison plaque.
@@ -638,24 +1043,58 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const fs = Math.max(11, s * 0.5);
     ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
     const tw = ctx.measureText(label).width + fs * 0.8, th = fs * 1.2, py = baseY + s * 0.22;
-    ctx.fillStyle = p.owner ? col : C.parchment;
+    ctx.fillStyle = p.owner ? c : PARCH;
     ctx.beginPath(); ctx.roundRect(p.x - tw / 2, py, tw, th, 3); ctx.fill();
-    ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = p.owner ? '#fff8e6' : C.ink;
+    ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = p.owner ? army(p.owner).plaqueText : INK;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(label, p.x, py + th / 2 + 1);
   }
 
-  function soldier(x, y, col, t, dir) {
-    const step = reduceMotion ? 0 : Math.sin(t);
-    ctx.strokeStyle = C.ink; ctx.lineWidth = 0.9;
+  // Each army's soldier.
+  function soldier(x, y, o, t, dir, style) {
+    const c = col(o), step = reduceMotion ? 0 : Math.sin(t);
+    ctx.strokeStyle = INK; ctx.lineWidth = 0.9;
+    if (style === 'rider') {
+      ctx.beginPath();
+      ctx.moveTo(x - 2.5, y); ctx.lineTo(x - 2.5 + step * 1.5, y + 3);
+      ctx.moveTo(x + 2.5, y); ctx.lineTo(x + 2.5 - step * 1.5, y + 3);
+      ctx.stroke();
+      ctx.fillStyle = '#6b4a2f'; ctx.beginPath(); ctx.ellipse(x, y - 1, 4, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x + 4 * dir, y - 3, 1.6, 1.1, -0.6 * dir, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = c; ctx.fillRect(x - 1.3, y - 6, 2.6, 3.6);
+      ctx.fillStyle = '#e8c9a0'; ctx.beginPath(); ctx.arc(x, y - 7, 1.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - 3 * dir, y - 3); ctx.lineTo(x + 5 * dir, y - 9); ctx.stroke();
+      return;
+    }
+    // Legs.
     ctx.beginPath();
     ctx.moveTo(x, y - 1); ctx.lineTo(x - 1.4 * step, y + 2.6);
     ctx.moveTo(x, y - 1); ctx.lineTo(x + 1.4 * step, y + 2.6);
-    ctx.moveTo(x + 2 * dir, y + 1.5); ctx.lineTo(x + 2 * dir, y - 7.5);
     ctx.stroke();
-    ctx.fillStyle = col; ctx.fillRect(x - 1.5, y - 4.6, 3, 4);
-    ctx.fillStyle = '#e8c9a0'; ctx.beginPath(); ctx.arc(x, y - 5.8, 1.3, 0, Math.PI * 2); ctx.fill();
+    if (style === 'hood') {
+      poly([[x - 2.4, y + 1], [x + 2.4, y + 1], [x, y - 6.5]], c);
+      poly([[x - 1.6, y - 4.6], [x + 1.6, y - 4.6], [x + 0.6 * dir, y - 8.6]], '#241f2d');
+      ctx.fillStyle = '#c9a2ff'; ctx.fillRect(x + 0.3 * dir - 0.4, y - 6.2, 0.8, 0.8);
+      return;
+    }
+    if (style === 'turban') {
+      poly([[x - 2.2, y + 0.5], [x + 2.2, y + 0.5], [x + 1.2, y - 4.6], [x - 1.2, y - 4.6]], c);
+      ctx.fillStyle = '#c8956a'; ctx.beginPath(); ctx.arc(x, y - 5.6, 1.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f3ead6'; ctx.beginPath(); ctx.ellipse(x, y - 6.6, 1.7, 1.1, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x + 2 * dir, y + 1.5); ctx.lineTo(x + 2 * dir, y - 8.5); ctx.stroke();
+      return;
+    }
+    ctx.fillStyle = c; ctx.fillRect(x - 1.5, y - 4.6, 3, 4);
+    ctx.fillStyle = style === 'shield' ? '#e2c7a2' : '#e8c9a0'; ctx.beginPath(); ctx.arc(x, y - 5.8, 1.3, 0, Math.PI * 2); ctx.fill();
+    if (style === 'shield') {
+      ctx.fillStyle = '#9aa3ab'; ctx.fillRect(x - 1.4, y - 7.6, 2.8, 1);
+      ctx.beginPath(); ctx.arc(x + 1.8 * dir, y - 2.6, 2.3, 0, Math.PI * 2);
+      ctx.fillStyle = army(o).roof; ctx.fill(); ctx.strokeStyle = '#d8dde2'; ctx.lineWidth = 0.7; ctx.stroke();
+      return;
+    }
+    ctx.fillStyle = '#9aa3ab'; ctx.fillRect(x - 1.4, y - 7.4, 2.8, 1.1);
+    ctx.strokeStyle = INK; ctx.beginPath(); ctx.moveTo(x + 2 * dir, y + 1.5); ctx.lineTo(x + 2 * dir, y - 7.5); ctx.stroke();
   }
 
   // Red banners over the player's castles that enemy troops are marching on.
@@ -664,21 +1103,20 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     for (const p of G.planets) {
       if (p.owner !== 1) continue;
       const threat = inc[p.id][2] + inc[p.id][3];
-      if (!threat) continue;
-      const falls = threat > p.units + inc[p.id][1];
+      if (threat < 0.5) continue;
+      const falls = threat > (p.units + inc[p.id][1]) * defOf(1);
       if (falls) {
         const pulse = reduceMotion ? 0.6 : 0.45 + 0.4 * Math.sin(now / 160);
         ctx.save(); ctx.translate(p.x, p.y + p.r * 0.45); ctx.scale(1, 0.5);
         ctx.beginPath(); ctx.arc(0, 0, p.r * 1.6, 0, Math.PI * 2);
-        ctx.strokeStyle = alpha(COL[2], pulse); ctx.lineWidth = 5; ctx.stroke(); ctx.restore();
+        ctx.strokeStyle = alpha(WARN, pulse); ctx.lineWidth = 5; ctx.stroke(); ctx.restore();
       }
       const label = String(Math.ceil(threat)), fs = 12;
       ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
-      const w = ctx.measureText(label).width + 24, h = 17, x = p.x - w / 2, y = p.y - p.r * 1.95 - h;
-      ctx.fillStyle = falls ? COL[2] : alpha(COL[2], 0.8);
+      const w = ctx.measureText(label).width + 24, h = 17, x = p.x - w / 2, y = p.y - p.r * 2.05 - h;
+      ctx.fillStyle = falls ? WARN : alpha(WARN, 0.8);
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(p.x + 4, y + h); ctx.lineTo(p.x, y + h + 5); ctx.lineTo(p.x - 4, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.stroke();
-      // Crossed swords.
+      ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke();
       const ix = x + 9, iy = y + h / 2;
       ctx.strokeStyle = '#fff8e6'; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(ix - 4, iy - 4); ctx.lineTo(ix + 4, iy + 4); ctx.moveTo(ix + 4, iy - 4); ctx.lineTo(ix - 4, iy + 4); ctx.stroke();
@@ -687,67 +1125,129 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
   }
 
-  function drawScenery() {
-    ctx.fillStyle = C.field; ctx.fillRect(0, 0, G.w, G.h);
-    ctx.fillStyle = C.fieldLit;
+  function drawTree(t, kind) {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(t.x + 2, t.y + t.s * 0.7, t.s, t.s * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+    if (kind === 'oak') {
+      ctx.fillStyle = t.shade < 0.5 ? '#1f2c18' : '#26361d'; ctx.beginPath(); ctx.arc(t.x, t.y, t.s, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(160,190,110,0.18)'; ctx.beginPath(); ctx.arc(t.x - t.s * 0.3, t.y - t.s * 0.35, t.s * 0.5, 0, Math.PI * 2); ctx.fill();
+    } else if (kind === 'shrub') {
+      const r = t.s * 0.55;
+      ctx.fillStyle = t.shade < 0.5 ? '#4f4a24' : '#5c5a2a';
+      ctx.beginPath(); ctx.arc(t.x - r * 0.6, t.y, r, 0, Math.PI * 2); ctx.arc(t.x + r * 0.6, t.y + 0.5, r * 0.85, 0, Math.PI * 2); ctx.fill();
+    } else if (kind === 'pine') {
+      const s = t.s * 1.2;
+      poly([[t.x - s * 0.7, t.y + s * 0.5], [t.x + s * 0.7, t.y + s * 0.5], [t.x, t.y - s * 0.9]], t.shade < 0.5 ? '#24402f' : '#2c4a37');
+      poly([[t.x - s * 0.5, t.y - s * 0.15], [t.x + s * 0.5, t.y - s * 0.15], [t.x, t.y - s * 1.4]], '#2f5040');
+      poly([[t.x - s * 0.22, t.y - s * 0.95], [t.x + s * 0.22, t.y - s * 0.95], [t.x, t.y - s * 1.4]], '#f4f8fb');
+    } else if (kind === 'palm') {
+      ctx.strokeStyle = '#7a5a33'; ctx.lineWidth = 1.6; ctx.beginPath();
+      ctx.moveTo(t.x, t.y + t.s * 0.5); ctx.quadraticCurveTo(t.x + 2, t.y - t.s * 0.5, t.x + 1, t.y - t.s * 1.3); ctx.stroke();
+      ctx.strokeStyle = t.shade < 0.5 ? '#3f6b2a' : '#4d7a30'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        const a = Math.PI + i * Math.PI / 4;
+        ctx.beginPath(); ctx.moveTo(t.x + 1, t.y - t.s * 1.3);
+        ctx.quadraticCurveTo(t.x + 1 + Math.cos(a) * t.s * 0.8, t.y - t.s * 1.3 + Math.sin(a) * t.s * 0.5 - 2, t.x + 1 + Math.cos(a) * t.s * 1.2, t.y - t.s * 1.0 + Math.sin(a) * t.s * 0.4);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+    } else {
+      ctx.strokeStyle = '#100d16'; ctx.lineWidth = 1.4; ctx.beginPath();
+      ctx.moveTo(t.x, t.y + t.s * 0.5); ctx.lineTo(t.x, t.y - t.s * 1.2);
+      ctx.moveTo(t.x, t.y - t.s * 0.4); ctx.lineTo(t.x - t.s * 0.6, t.y - t.s * 1.0);
+      ctx.moveTo(t.x, t.y - t.s * 0.7); ctx.lineTo(t.x + t.s * 0.7, t.y - t.s * 1.2);
+      ctx.moveTo(t.x - t.s * 0.6, t.y - t.s * 1.0); ctx.lineTo(t.x - t.s * 0.8, t.y - t.s * 1.4);
+      ctx.stroke();
+    }
+  }
+
+  function drawScenery(now) {
+    const T = G.theme;
+    ctx.fillStyle = T.field; ctx.fillRect(0, 0, G.w, G.h);
+    ctx.fillStyle = T.lit;
     for (const m of G.meadows) { ctx.beginPath(); ctx.ellipse(m.x, m.y, m.rx, m.ry, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const o of G.pools) {
+      ctx.fillStyle = T.pool; ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx, o.ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx * 0.95, o.ry * 0.9, 0, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
+    }
     ctx.lineCap = 'round';
     for (const [w, a] of [[9, 0.25], [5, 0.55]]) {
-      ctx.strokeStyle = alpha(C.road, a); ctx.lineWidth = w;
+      ctx.strokeStyle = alpha(T.road, a); ctx.lineWidth = w;
       for (const r of G.roads) { ctx.beginPath(); ctx.moveTo(r.a.x, r.a.y + r.a.r * 0.5); ctx.quadraticCurveTo(r.mx, r.my, r.b.x, r.b.y + r.b.r * 0.5); ctx.stroke(); }
     }
     ctx.lineCap = 'butt';
-    for (const t of G.trees) {
-      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(t.x + 2, t.y + t.s * 0.7, t.s, t.s * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = t.shade < 0.5 ? '#1f2c18' : '#26361d'; ctx.beginPath(); ctx.arc(t.x, t.y, t.s, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(160,190,110,0.18)'; ctx.beginPath(); ctx.arc(t.x - t.s * 0.3, t.y - t.s * 0.35, t.s * 0.5, 0, Math.PI * 2); ctx.fill();
+    for (const r of G.rocks) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x + 1, r.y + r.s * 0.4, r.s, r.s * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#8b8577'; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.s, r.s * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const t of G.trees) drawTree(t, T.tree);
+    if (T.tree === 'dead' && !reduceMotion) {
+      // Drifting marsh fog.
+      for (let i = 0; i < 5; i++) {
+        const x = ((now / 60 + i * 260) % (G.w + 300)) - 150, y = (i * 137) % G.h;
+        ctx.fillStyle = 'rgba(190,170,220,0.05)'; ctx.beginPath(); ctx.ellipse(x, y, 160, 40, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+
+  function drawCrows(f, now) {
+    const t = f.age / 2.6;
+    for (let i = 0; i < 9; i++) {
+      const a = now / 300 + i * (Math.PI * 2 / 9), r = f.r * (1.4 - t * 0.6);
+      const x = f.x + Math.cos(a) * r, y = f.y - f.r * 0.8 + Math.sin(a) * r * 0.5;
+      const flap = Math.sin(now / 60 + i) * 2;
+      ctx.strokeStyle = `rgba(10,8,14,${1 - t * 0.7})`; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(x - 3, y - flap); ctx.lineTo(x, y); ctx.lineTo(x + 3, y - flap); ctx.stroke();
     }
   }
 
   function draw(now) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#263220'; ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = G ? G.theme.bg : TIMBER; ctx.fillRect(0, 0, cw, ch);
     if (!G) return;
     ctx.translate(ox, oy); ctx.scale(sc, sc);
-    drawScenery();
+    drawScenery(now);
     const spin = reduceMotion ? 0 : now / 1100;
+    const ring = G.theme.ring;
 
-    // Marching orders while aiming.
     if (ptr.down && ptr.moved && sel.size) {
-      ctx.strokeStyle = alpha(C.parchment, 0.75); ctx.lineWidth = 2 / sc; ctx.setLineDash([7 / sc, 6 / sc]);
+      ctx.strokeStyle = alpha(ring, 0.8); ctx.lineWidth = 2 / sc; ctx.setLineDash([7 / sc, 6 / sc]);
       const tx = ptr.hover ? ptr.hover.x : ptr.wx, ty = ptr.hover ? ptr.hover.y : ptr.wy;
       for (const s of sel) { if (s === ptr.hover) continue; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke(); }
       ctx.setLineDash([]);
-      // How many troops this order sends.
       let troops = 0;
       for (const s of sel) if (s !== ptr.hover) troops += Math.floor(s.units * sendPct);
       const msg = `${Math.round(sendPct * 100)}% · ${troops}`;
       const fs = 13 / sc;
       ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
       const lw = ctx.measureText(msg).width + fs, lx = ptr.wx + 14 / sc, ly = ptr.wy - 26 / sc;
-      ctx.fillStyle = alpha(C.timber, 0.85); ctx.beginPath(); ctx.roundRect(lx, ly, lw, fs * 1.6, 3 / sc); ctx.fill();
-      ctx.fillStyle = C.parchment; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = alpha(TIMBER, 0.85); ctx.beginPath(); ctx.roundRect(lx, ly, lw, fs * 1.6, 3 / sc); ctx.fill();
+      ctx.fillStyle = PARCH; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.fillText(msg, lx + fs / 2, ly + fs * 0.85);
     }
 
-    // Selection and target rings sit on the ground under the castles.
     for (const p of G.planets) {
       const targeted = ptr.down && ptr.moved && sel.size && ptr.hover === p && !sel.has(p);
       if (!sel.has(p) && !targeted) continue;
       ctx.save(); ctx.translate(p.x, p.y + p.r * 0.45); ctx.scale(1, 0.5); ctx.rotate(spin);
-      ctx.setLineDash(sel.has(p) ? [8, 6] : []); ctx.strokeStyle = sel.has(p) ? C.parchment : '#fff3d0'; ctx.lineWidth = 3;
+      ctx.setLineDash(sel.has(p) ? [8, 6] : []); ctx.strokeStyle = ring; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(0, 0, p.r * 1.45, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
     }
 
-    // Draw castles and troops back to front so nearer things overlap farther ones.
+    // Castles and troops back to front so nearer things overlap farther ones.
     const items = G.planets.map(p => ({ y: p.y + p.r * 0.55, p }));
     for (const k of G.packets) if (k.delay <= 0) items.push({ y: k.y, k });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) {
       if (it.p) { drawCastle(it.p, now); continue; }
-      const k = it.k, col = COL[k.owner], dir = k.dir || 1;
-      const figures = Math.min(k.n, 3);
-      for (let i = 0; i < figures; i++) soldier(k.x + (i - (figures - 1) / 2) * 4.2, k.y + (i % 2) * 2.5, col, now / 90 + k.phase + i, dir);
+      const k = it.k, dir = k.dir || 1, style = army(k.owner).soldier, isFrozen = frozen(k.owner);
+      const figures = Math.min(Math.ceil(k.n), 3);
+      if (powerOn(k.owner, 'bloodMoon')) {
+        ctx.strokeStyle = alpha(col(k.owner), 0.45); ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(k.x - dir * 4, k.y - 2); ctx.lineTo(k.x - dir * 16, k.y - 2); ctx.stroke();
+      }
+      for (let i = 0; i < figures; i++) soldier(k.x + (i - (figures - 1) / 2) * 4.6, k.y + (i % 2) * 2.5, k.owner, isFrozen ? 0 : now / 90 + k.phase + i, dir, style);
+      if (isFrozen) { ctx.fillStyle = 'rgba(210,235,255,0.45)'; ctx.beginPath(); ctx.ellipse(k.x, k.y - 3, 8, 7, 0, 0, Math.PI * 2); ctx.fill(); }
     }
 
     if (!G.cfg.demo) drawThreats(now);
@@ -760,6 +1260,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
           const ang = a * Math.PI / 2 + 0.6, r1 = 2 + t * 3, r2 = 4 + t * 6;
           ctx.beginPath(); ctx.moveTo(f.x + Math.cos(ang) * r1, f.y - 4 + Math.sin(ang) * r1); ctx.lineTo(f.x + Math.cos(ang) * r2, f.y - 4 + Math.sin(ang) * r2); ctx.stroke();
         }
+      } else if (f.kind === 'crows') {
+        drawCrows(f, now);
       } else {
         const t = f.age / 0.9;
         ctx.save(); ctx.translate(f.x, f.y + f.r * 0.45); ctx.scale(1, 0.5);
@@ -768,27 +1270,78 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       }
     }
 
+    // Map-wide tints while a power is active.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const o of G.owners) {
+      const id = army(o).power.id;
+      if (!powerOn(o, id)) continue;
+      if (id === 'bloodMoon') { ctx.fillStyle = 'rgba(160,20,20,0.10)'; ctx.fillRect(0, 0, cw, ch); }
+      if (id === 'wintersGrip') {
+        const g = ctx.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.3, cw / 2, ch / 2, Math.max(cw, ch) * 0.75);
+        g.addColorStop(0, 'rgba(220,240,255,0)'); g.addColorStop(1, 'rgba(220,240,255,0.55)');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
+      }
+    }
+
     if (!G.cfg.demo && !G.hintDone) {
-      const msg = 'Drag from a blue-banner castle onto another castle to attack';
+      const msg = 'Drag from a castle flying your banner onto another castle to attack';
       ctx.font = '500 14px "Alegreya Sans", system-ui, sans-serif';
       const w = Math.min(cw - 32, ctx.measureText(msg).width + 24);
-      ctx.fillStyle = alpha(C.timber, 0.82); ctx.beginPath(); ctx.roundRect((cw - w) / 2, ch - 44, w, 30, 4); ctx.fill();
-      ctx.fillStyle = C.text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = alpha(TIMBER, 0.82); ctx.beginPath(); ctx.roundRect((cw - w) / 2, ch - 44, w, 30, 4); ctx.fill();
+      ctx.fillStyle = '#ece2c6'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(msg, cw / 2, ch - 29, cw - 48);
     }
   }
 
   // ---------- HUD ----------
   const strengthEl = document.getElementById('strength'), statusEl = document.getElementById('status');
-  let hudTick = 0;
+  const btnPower = document.getElementById('btnPower'), powerText = document.getElementById('powerText'), powerIcon = document.getElementById('powerIcon');
+  const toastEl = document.getElementById('toast');
+  let hudTick = 0, toastTimer = 0;
+
+  function toast(title, detail, color) {
+    toastEl.innerHTML = '';
+    toastEl.append(title);
+    if (detail) { const sm = document.createElement('small'); sm.textContent = detail; toastEl.append(sm); }
+    toastEl.style.setProperty('--toast', color);
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; }, 3200);
+  }
+
   function hud() {
     if (!G) return;
     const totals = G.owners.map(o => [o, totalOf(o)]);
     const sum = totals.reduce((a, [, v]) => a + v, 0) || 1;
-    strengthEl.innerHTML = totals.map(([o, v]) => `<span style="width:${(v / sum * 100).toFixed(1)}%;background:${COL[o]}"></span>`).join('');
-    const label = G.cfg.demo ? 'Two kingdoms at war' : G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name}` : `Skirmish · ${DIFF_NAME[G.cfg.diff]}`;
-    statusEl.textContent = G.cfg.demo ? label : `${label} · ${fmtTime(G.time)}`;
+    strengthEl.innerHTML = totals.map(([o, v]) => `<span title="${army(o).full}" style="width:${(v / sum * 100).toFixed(1)}%;background:${col(o)}"></span>`).join('');
+    if (G.cfg.demo) {
+      statusEl.textContent = `${army(1).name} vs ${army(2).name}`;
+    } else {
+      const rivals = G.owners.slice(1).map(o => army(o).name).join(' & ');
+      const label = G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name} vs ${rivals}` : `${DIFF_NAME[G.cfg.diff]} · vs ${rivals}`;
+      statusEl.textContent = `${label} · ${fmtTime(G.time)}`;
+    }
+    // Power button.
+    const playing = !G.cfg.demo && !G.over;
+    const A = ARMIES[G.cfg.demo ? myArmy : G.fac[1]];
+    powerIcon.innerHTML = svg(A.emblem);
+    btnPower.classList.remove('ready', 'active');
+    if (!playing) {
+      btnPower.disabled = true; powerText.textContent = A.power.name; btnPower.style.setProperty('--charge', '0%');
+      return;
+    }
+    const pw = G.pw[1], total = pw.until > 0 ? RECHARGE : FIRST_CHARGE;
+    if (G.time < pw.until) {
+      btnPower.classList.add('active'); btnPower.disabled = true;
+      powerText.textContent = `${A.power.name} ${Math.ceil(pw.until - G.time)}s`;
+    } else if (pw.ready > 0) {
+      btnPower.disabled = true;
+      powerText.textContent = `${A.power.name} ${fmtTime(Math.ceil(pw.ready))}`;
+      btnPower.style.setProperty('--charge', `${(100 * (1 - pw.ready / total)).toFixed(1)}%`);
+    } else {
+      btnPower.classList.add('ready'); btnPower.disabled = false;
+      powerText.textContent = `${A.power.name} · Q`;
+    }
   }
 
   // ---------- loop ----------
@@ -825,6 +1378,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
     sel.clear();
   }
+  function playerPower() { if (playable() && usePower(1)) hud(); }
 
   // ---------- send amount ----------
   const PCTS = [0.25, 0.5, 0.75, 1];
@@ -887,6 +1441,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   addEventListener('keydown', e => {
     if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
     else if (e.key >= '1' && e.key <= '4') setSendPct(PCTS[+e.key - 1]);
+    else if (e.key === 'q' || e.key === 'Q') playerPower();
     else if (e.key === 'm' || e.key === 'M') toggleSound();
     else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
     else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }
@@ -896,7 +1451,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   // ---------- menus ----------
   const $ = id => document.getElementById(id);
   const menu = $('menu'), pauseOv = $('pauseOv'), endOv = $('endOv'), btnPause = $('btnPause'), btnAll = $('btnAll');
-  let qDiff = 'medium', qAis = 1;
+  let qDiff = 'medium', qAis = 1, qField = 'theirs', qRival = 'random';
+  let myArmy = ARMY_IDS.includes(store.get('cs-army', 'aldmere')) ? store.get('cs-army', 'aldmere') : 'aldmere';
 
   function segment(id, attr, set) {
     const el = $(id);
@@ -908,28 +1464,86 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   segment('diffSeg', 'diff', v => qDiff = v);
   segment('aiSeg', 'ais', v => qAis = +v);
+  segment('fieldSeg', 'field', v => qField = v);
+  segment('rivalSeg', 'rival', v => qRival = v);
+
+  function setArmyColors(id) {
+    const A = ARMIES[id];
+    document.documentElement.style.setProperty('--army', A.color);
+    document.documentElement.style.setProperty('--army-ink', A.ink);
+  }
+
+  function renderArmies() {
+    $('armyPick').innerHTML = ARMY_IDS.map(id => {
+      const A = ARMIES[id];
+      return `<button data-army="${id}" aria-pressed="${id === myArmy}" style="--c:${A.color}">${svg(A.emblem)}<b>${A.name}</b><small>${A.role}</small></button>`;
+    }).join('');
+    const A = ARMIES[myArmy], st = A.stats;
+    $('dossier').style.setProperty('--c', A.color);
+    $('dossier').innerHTML = `
+      <h3>${A.full}<span class="chip" style="--c:${A.color};--ci:${A.ink}">${A.role}</span></h3>
+      <p>${A.story}</p>
+      <dl>
+        <dt>Strength</dt><dd>${A.strength}</dd>
+        <dt>Power</dt><dd><b>${A.power.name}.</b> ${A.power.desc}</dd>
+        <dt>Homeland</dt><dd>${A.homeland}</dd>
+        <dt>As a rival</dt><dd>${A.personality}</dd>
+      </dl>`;
+    if (qRival !== 'random' && qRival === myArmy) qRival = 'random';
+    $('rivalSeg').innerHTML = `<button data-rival="random" aria-pressed="${qRival === 'random'}">Random</button>` +
+      ARMY_IDS.filter(id => id !== myArmy).map(id => `<button data-rival="${id}" aria-pressed="${qRival === id}">${ARMIES[id].name}</button>`).join('');
+    setArmyColors(myArmy);
+  }
+  $('armyPick').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    myArmy = b.dataset.army; store.set('cs-army', myArmy);
+    renderArmies(); renderLadder();
+  });
+
+  const others = () => ARMY_IDS.filter(id => id !== myArmy);
+  function levelRivals(lv) {
+    const o = others(), L = LEVELS[lv - 1];
+    return L.ais === 1 ? [o[(lv - 1) % 4]] : [o[(lv - 1) % 4], o[lv % 4]];
+  }
 
   function renderLadder() {
     const unlocked = store.get('cs-unlocked', 1), done = store.get('cs-done', []);
-    $('ladder').innerHTML = LEVELS.map((L, i) =>
-      `<button data-level="${i + 1}" ${i + 1 > unlocked ? 'disabled' : ''} class="${done.includes(i + 1) ? 'done' : ''}" title="${L.name} · ${DIFF_NAME[L.diff]}${L.ais > 1 ? ' · three kingdoms' : ''}"><b>${['I','II','III','IV','V','VI','VII','VIII'][i]}</b><small>${i + 1 > unlocked ? 'Locked' : L.name}</small></button>`).join('');
+    $('ladder').innerHTML = LEVELS.map((L, i) => {
+      const rivals = levelRivals(i + 1).map(id => ARMIES[id].name).join(' & ');
+      return `<button data-level="${i + 1}" ${i + 1 > unlocked ? 'disabled' : ''} class="${done.includes(i + 1) ? 'done' : ''}" title="${L.name}: vs ${rivals} · ${DIFF_NAME[L.diff]}"><b>${['I','II','III','IV','V','VI','VII','VIII'][i]}</b><small>${i + 1 > unlocked ? 'Locked' : L.name}</small></button>`;
+    }).join('');
   }
   $('ladder').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || b.disabled) return;
     startLevel(+b.dataset.level);
   });
 
-  function startLevel(lv) { play({ ...LEVELS[lv - 1], level: lv }); }
+  function startLevel(lv) {
+    const rivals = levelRivals(lv);
+    play({ ...LEVELS[lv - 1], level: lv, armies: [myArmy, ...rivals], map: rivals[0] });
+  }
+  function quickCfg() {
+    let rivals = shuffle(others());
+    if (qRival !== 'random') rivals = [qRival, ...rivals.filter(id => id !== qRival)];
+    rivals = rivals.slice(0, qAis);
+    return { seed: Math.floor(Math.random() * 1e9), n: qAis === 1 ? 18 : 19, diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0] };
+  }
   function play(cfg) {
     lastCfg = cfg;
-    menu.hidden = true; endOv.hidden = true; pauseOv.hidden = true;
+    menu.hidden = true; endOv.hidden = true; pauseOv.hidden = true; toastEl.hidden = true;
     btnPause.disabled = false; btnAll.disabled = false; btnPause.textContent = 'Pause';
+    setArmyColors(cfg.armies[0]);
     newGame(cfg);
+    const me = ARMIES[cfg.armies[0]], foes = cfg.armies.slice(1).map(id => ARMIES[id].full).join(' and ');
+    toast(`${ARMIES[cfg.map].homeland}`, `${me.full} against ${foes}`, me.color);
   }
-  function demoCfg() { return { demo: true, seed: Math.floor(Math.random() * 1e9), n: 18, ais: 1, diff: 'medium' }; }
+  function demoCfg() {
+    const pair = shuffle(ARMY_IDS).slice(0, 2);
+    return { demo: true, seed: Math.floor(Math.random() * 1e9), n: 18, diff: 'medium', armies: pair, map: pick(pair) };
+  }
   function toMenu() {
-    renderLadder();
-    menu.hidden = false; endOv.hidden = true; pauseOv.hidden = true;
+    renderArmies(); renderLadder();
+    menu.hidden = false; endOv.hidden = true; pauseOv.hidden = true; toastEl.hidden = true;
     btnPause.disabled = true; btnAll.disabled = true;
     newGame(demoCfg());
   }
@@ -937,7 +1551,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     G.over = true; sel.clear();
     sfx.fanfare(win);
     btnPause.disabled = true; btnAll.disabled = true;
-    const lv = G.cfg.level;
+    const lv = G.cfg.level, me = army(1);
     if (win && lv) {
       store.set('cs-unlocked', Math.max(store.get('cs-unlocked', 1), Math.min(LEVELS.length, lv + 1)));
       store.set('cs-done', [...new Set([...store.get('cs-done', []), lv])]);
@@ -945,8 +1559,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     $('endTitle').textContent = win ? 'Victory' : 'Defeat';
     $('endTitle').className = win ? 'result-win' : 'result-lose';
     $('endText').textContent = win
-      ? (lv === LEVELS.length ? 'The High Throne has fallen. Every banner in the realm is blue.' : lv ? `${LEVELS[lv - 1].name} is yours. ${LEVELS[lv].name} awaits.` : 'Every enemy castle flies your banner.')
-      : 'Your last castle has fallen. Claim more keeps early, and leave a garrison in castles near the enemy.';
+      ? (lv === LEVELS.length ? `The High Throne has fallen. ${me.full} rules the realm.` : lv ? `${LEVELS[lv - 1].name} is yours. ${LEVELS[lv].name} awaits.` : `${me.name} banners fly over every castle in ${G.theme === THEMES[me.map] ? 'your homeland' : ARMIES[G.cfg.map].homeland}.`)
+      : `Your last castle has fallen to ${G.owners.slice(1).map(o => army(o).full).join(' and ')}. Claim more keeps early, and keep your power for the moment it matters.`;
     $('endTime').textContent = fmtTime(G.time);
     $('endCaps').textContent = G.caps;
     $('endPeak').textContent = Math.floor(G.peak);
@@ -954,7 +1568,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     endOv.hidden = false;
   }
 
-  $('btnQuick').addEventListener('click', () => play({ seed: Math.floor(Math.random() * 1e9), n: qAis === 1 ? 18 : 19, ais: qAis, diff: qDiff }));
+  $('btnQuick').addEventListener('click', () => play(quickCfg()));
   $('btnResume').addEventListener('click', () => setPaused(false));
   $('btnQuit').addEventListener('click', toMenu);
   $('btnMenu').addEventListener('click', toMenu);
@@ -962,6 +1576,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   $('btnNext').addEventListener('click', () => startLevel(lastCfg.level + 1));
   btnPause.addEventListener('click', () => setPaused(!G.paused));
   btnAll.addEventListener('click', selectAll);
+  btnPower.addEventListener('click', playerPower);
 
   const btnSound = $('btnSound');
   function toggleSound() {
