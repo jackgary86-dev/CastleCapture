@@ -557,11 +557,21 @@ function routeAiColumns() {
 // ---------- pointer targets ----------
 // At the whole-map view a creature is a few pixels wide, so sprites, bars and hit areas grow as the view zooms out.
 const monsterScale = () => typeof sc === 'number' && sc > 0 ? Math.max(1, 0.8 / sc) : 1;
-// The creature (or bandit camp) under a world point, for dragging troops onto it.
+// What an order or banner calls a creature or the camp.
+function monsterTargetName(t) {
+  const M = monsterData();
+  if (!M) return 'the monster';
+  if (t.camp) return 'the bandit camp';
+  return M.captains ? M.captains[t.idx % M.captains.length] : M.title || M.name;
+}
+// The creature (or bandit camp) under a world point, for dragging troops onto it. Inside the camp's ring the camp
+// itself is the target, even with captains at home, so it can be stormed.
 function monsterAt(w) {
   if (!G || !G.monster) return null;
   const scale = typeof sc === 'number' ? sc : 1, k = monsterScale();
-  const hits = [...liveCreatures(), ...(G.monster.camp ? [G.monster.camp] : [])];
+  const camp = G.monster.camp;
+  if (camp && Math.hypot(camp.x - w.x, (camp.y - w.y) * 0.85) < camp.r * k + 8 / scale) return camp;
+  const hits = liveCreatures();
   let best = null, bd = Infinity;
   for (const c of hits) {
     const d = Math.hypot(c.x - w.x, (c.y - w.y) * 0.85);

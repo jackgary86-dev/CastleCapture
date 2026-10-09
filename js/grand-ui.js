@@ -27,7 +27,8 @@ const waveLabel = document.getElementById('waveLabel');
 
 function orderText(o) {
   if (o.kind === 'send') {
-    const to = o.to.owner === 1 ? 'reinforce your castle' : o.to.owner === 0 ? 'an unclaimed keep' : `${army(o.to.owner).name}`;
+    const to = o.to.monster ? (typeof monsterTargetName === 'function' ? monsterTargetName(o.to) : 'the monster')
+      : o.to.owner === 1 ? 'reinforce your castle' : o.to.owner === 0 ? 'an unclaimed keep' : `${army(o.to.owner).name}`;
     return `${o.n} troops → ${to}`;
   }
   if (o.kind === 'power') return `${army(1).power.name}`;
