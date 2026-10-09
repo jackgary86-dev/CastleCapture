@@ -32,6 +32,7 @@ Run the installer again after pulling new commits to update the game. Saved game
 - **Siege Defense:** hold a five-castle fortress against ever bigger waves from up to three lords, with a score, a daily siege and a best-wave record.
 - **Tutorial:** a guided first battle in seven lessons.
 - **Achievements and records**, kept in your browser.
+- **Renown and a profile**: earn renown in every mode, spend it on banners, roof colours and starting map units, and claim the Grand Campaign maps on a realm map that runs in seasons.
 - **Accessibility:** colour-blind mode, full keyboard play and screen-reader announcements.
 - **Touch and phones:** pinch-zoom, pan and a thumb bar.
 - **The codex:** painted cards and entries for every army and monster.
@@ -155,6 +156,12 @@ Each homeland has its own synthesised theme (no audio files): a lute-like air in
 
 Thirteen achievements, from First Blood and Lightning War (win in under 2 minutes) to Bane of Lords (beat every lord on Warlord) and Conqueror (capture 100 castles). New ones appear on the victory screen. The menu's achievements sheet also keeps your records: battles, wins and losses, fastest wins at each difficulty, castles captured, enemy troops destroyed on the road, Siege Defense games, most waves held and best score, and your record with each army and against each lord. Siege Defense has three of its own, Hold the Line, Unbroken and The Last Bastion, for surviving 10, 20 and 30 waves; they unlock the moment the wave is beaten. Everything is saved in your browser.
 
+## Renown and the profile
+
+Every game pays renown: more for harder difficulties and for longer modes (a Warlord battle won pays 20, a Warlord Grand Campaign won 120), a little for a loss, 15 for each achievement and 10 for the killing blow on a map monster. The victory screen shows what a game paid. A profile that already has achievements and wins starts with renown for those past deeds.
+
+**Profile** on the menu spends it. Banners (any army's banner shape) and roof colours are cosmetic. A starting map unit stands beside your home castle at the start of every skirmish and uses up that battle's one map unit. Winning a Grand Campaign claims its map on the **realm map**: each region claimed this season adds 4 troops to your home castle in later Grand Campaigns, at most 12. Both gameplay unlocks have a switch on the profile page, and the headless balance runner never sees them. Beginning a new season clears the realm map and keeps the old one in the hall of fame. The profile is saved in your browser and can be exported to a file and imported again.
+
 ## Accessibility
 
 - **Colour-blind mode** (menu, or **C**) switches the armies to a colour-blind-safe palette and puts each army's emblem (crown, moon, snowflake, sun, eye) on its garrison plaques and above its marching columns, so kingdoms can be told apart by shape.
@@ -189,6 +196,8 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 | `js/ui.js` | HUD, power panel, treasury, troop types, diplomacy, input, menus, saving, the frame loop, and the listeners that turn simulation events into sound and banners |
 | `js/grand-ui.js` | The Grand Campaign's planning screen, orders list and save slots |
 | `js/achievements.js` | Achievements and personal records |
+| `js/progress.js` | Renown, the unlocks and the realm map's seasons, saved under `cs-progress`. No DOM access |
+| `js/progress-ui.js` | The Profile page (shop, realm map, hall of fame, export and import), the renown line on the end screen, and the banner and roof skins render.js asks for |
 | `js/access.js` | Colour-blind mode, keyboard play and screen-reader announcements |
 | `js/touch.js` | Pinch-zoom and pan camera, larger touch targets and the thumb bar |
 | `js/monsters.js` | Grand Campaign map monsters: movement, fighting, bounties, each monster's special, the lords' hooks, and their drawing. Its simulation half has no DOM access |

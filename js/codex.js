@@ -105,6 +105,7 @@
     { id: 'units', name: 'Map units', sub: 'Ballista, trebuchet, ward' },
     { id: 'powers', name: 'Special powers', sub: 'One per army' },
     { id: 'hill', name: 'King of the Hill', sub: 'A mode: race for the crown' },
+    { id: 'renown', name: 'Renown and the realm map', sub: 'Unlocks, seasons, hall of fame' },
   ];
   const GOLD = '#e9b43b', PALE = '#ece2c6';
   // An army's emblem as plain strokes, the same shapes access.js draws on plaques.
@@ -249,6 +250,16 @@
       const lords = game.lords ? [['kharzul', 'rushes the hill, harder than anyone.'], ['aldmere', 'takes the keeps beside it and strikes the moment someone else has paid to take it.'], ['solmara', 'builds a Ballista Tower next to it.'], ['nyx', 'waits for the holder to bleed, then pounces.'], ['frostmark', "freezes the holder's columns with Winter's Grip while hers close in."]].filter(([aid]) => game.lords[aid]).map(([aid, t]) => `${game.lords[aid].short} ${t}`) : [];
       if (lords.length) html += section('How the lords play it', list(lords));
       html += section('Records', para(`Your best time to ${HILL.goal} is kept for each army under Achievements and records.`));
+    } else if (id === 'renown' && typeof RENOWN !== 'undefined') {
+      const R = RENOWN;
+      html += section('Earning renown', list([
+        `A battle won: ${R.battleWin.easy}, ${R.battleWin.medium} or ${R.battleWin.hard} renown on Squire, Knight or Warlord (${R.battleLoss} for a loss), and ${R.chapter} more for a story chapter.`,
+        `A Grand Campaign won: ${R.grandWin.easy}, ${R.grandWin.medium} or ${R.grandWin.hard}; a lost one pays ${R.grandLoss} and a little more the longer it ran.`,
+        `King of the Hill: ${R.hillWin.easy} to ${R.hillWin.hard} for a win. Siege Defense: ${R.defenseWave} for every wave held.`,
+        `${R.achievement} for every achievement, and ${R.slain} for the killing blow on a map monster.`,
+      ]));
+      html += section('Spending it', para("Open Profile on the menu. Banners and roof colours change how your castles look and nothing else. A starting map unit (Ballista Tower, Siege Trebuchet or Great Ward) stands beside your home castle at the start of every skirmish and uses up that battle's one map unit; it can be switched off."));
+      html += section('The realm map', para(`Winning a Grand Campaign claims its map for the season. Each claimed region adds ${REALM_BONUS.perRegion} troops to your home castle at the start of later Grand Campaigns, at most ${REALM_BONUS.max}, and that can be switched off too. Beginning a new season clears the map and keeps the old one in the hall of fame.`));
     } else {
       html += para('Nothing to show.');
     }

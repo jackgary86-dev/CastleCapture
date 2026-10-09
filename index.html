@@ -421,6 +421,25 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .end-ach-row b { display: block; color: var(--ink); }
 .end-ach-row small { color: var(--ink-soft); }
 .ach-sheet { max-width: 640px; }
+.end-renown { padding: 6px 10px; border: 1px solid #b39d6c; background: rgb(255 250 235 / 0.4); }
+.end-renown b { color: var(--ink); }
+.end-renown ul { margin: 2px 0 0; padding-left: 18px; font-size: 13px; color: var(--ink-soft); }
+.prof-sheet { max-width: 680px; }
+.prof-note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.prof-shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.prof-item { display: flex; gap: 8px; align-items: center; text-align: left; padding: 6px 8px; min-width: 0; }
+.prof-item span:not(.prof-swatch) { flex: 1; min-width: 0; display: grid; }
+.prof-item small { font-size: 12px; color: var(--ink-soft); font-weight: 400; }
+.prof-item em { font-style: normal; font-size: 12px; white-space: nowrap; }
+.prof-item.on { border-color: var(--army); box-shadow: inset 0 0 0 1px var(--army); }
+.prof-swatch { width: 18px; height: 18px; flex: none; border-radius: 3px; border: 1px solid var(--ink); }
+.prof-toggle { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.prof-realm { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.prof-region { padding: 10px; border: 1px dashed #b39d6c; display: grid; gap: 2px; min-height: 64px; align-content: center; }
+.prof-region small { font-size: 12px; color: var(--ink-soft); }
+.prof-region.claimed { border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
+.prof-hall { margin: 0; font-size: 13px; }
+.prof-log { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-soft); }
 .achs { display: grid; gap: 4px; }
 .ach { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 6px 4px; border-bottom: 1px solid rgb(120 90 40 / 0.2); }
 .ach:not(.done) .ach-text { opacity: 0.75; }
@@ -741,6 +760,8 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/ui.js"></script>
 <script src="js/grand-ui.js"></script>
 <script src="js/achievements.js"></script>
+<script src="js/progress.js"></script>
+<script src="js/progress-ui.js"></script>
 <script src="js/access.js"></script>
 <script src="js/touch.js"></script>
 <script src="js/monsters.js"></script>

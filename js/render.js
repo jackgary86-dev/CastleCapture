@@ -221,7 +221,8 @@ function drawFlag(x, y, h, o, now, seed, raise = 1) {
   ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
   if (!o || raise <= 0) return;
   const wave = reduceMotion ? 0 : Math.sin(now / 260 + seed) * 1.6;
-  FLAG[army(o).flag](x, y - h + (1 - raise) * h * 0.7, h, col(o), wave * raise, now);
+  const shape = (o === 1 && typeof playerBannerShape === 'function' && playerBannerShape()) || army(o).flag;   // a banner skin (progress-ui.js)
+  FLAG[shape](x, y - h + (1 - raise) * h * 0.7, h, col(o), wave * raise, now);
 }
 
 const CAPTURE_ANIM = 1.1;   // seconds for the old banner to lower and the new one to rise
@@ -250,7 +251,8 @@ function drawCastle(p, now) {
   }
 
   const style = p.owner ? army(p.owner).castle : G.theme.castle;
-  const roofCol = p.owner ? army(p.owner).roof : '#6f6a5e';
+  let roofCol = p.owner ? army(p.owner).roof : '#6f6a5e';
+  if (p.owner === 1 && typeof playerRoofCol === 'function') roofCol = playerRoofCol(roofCol);   // a roof skin (progress-ui.js)
   const glow = p.owner ? c : '#5a5468';
   const flags = CASTLE[style](p, s, baseY, tier, roofCol, glow);
   if (p.kind) drawKindDetail(p, s, baseY);

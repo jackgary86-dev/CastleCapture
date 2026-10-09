@@ -158,6 +158,37 @@ run('end screen', `
   update(1 / 30); hud(); draw(${clock});
   if (!G.over) throw new Error('battle did not end after the player took every castle');
 `);
+// ---------- 3a. progression (#70): the win paid renown; buy a banner, a roof and a starting unit ----------
+if (run('progression check', `typeof buyUnlock === 'function'`)) run('progression', `{
+  if (!lastRenown || !(lastRenown.total > 0)) throw new Error('winning a battle paid no renown');
+  if (!document.getElementById('endRenown') || document.getElementById('endRenown').hidden) throw new Error('the end screen does not show the renown');
+  const before = career.renown;
+  career.renown += 400;
+  for (const id of ['banner-pennant', 'roof-gilded', 'unit-ballista']) if (!buyUnlock(id)) throw new Error('could not buy ' + id);
+  if (career.renown !== before + 400 - 40 - 60 - 150) throw new Error('buying did not charge the right renown');
+  if (buyUnlock('roof-gilded')) throw new Error('bought the same unlock twice');
+  if (playerBannerShape() !== 'pennant' || playerRoofCol('#000') !== '#d4a537') throw new Error('the skins are not in use');
+  // A fresh skirmish starts with the Ballista Tower beside home, as the battle's one map unit.
+  play({ diff: 'medium', n: 12, map: 'aldmere', armies: ['aldmere', 'kharzul'], seed: 7 });
+  if (typeof startBattle === 'function') startBattle();
+  if (!G.units.some(u => u.owner === 1 && u.type === 'ballista') || !G.bought.has(1)) throw new Error('no starting map unit');
+  for (let i = 0; i < 30; i++) update(1 / 30);
+  hud(); draw(${clock});
+  // Switched off, the next skirmish starts without it; the realm bonus follows a claimed region.
+  career.useUnit = false;
+  play({ diff: 'medium', n: 12, map: 'aldmere', armies: ['aldmere', 'kharzul'], seed: 8 });
+  if (G.units.some(u => u.owner === 1)) throw new Error('the starting unit ignored its switch');
+  career.useUnit = true;
+  career.regions.realm = { army: 'aldmere', diff: 'hard', at: Date.now() };
+  if (realmBonus() !== REALM_BONUS.perRegion) throw new Error('a claimed region gave no realm bonus');
+  newSeason();
+  if (Object.keys(career.regions).length || !career.hall.length) throw new Error('a new season did not move the map to the hall of fame');
+  if (importProfile('{"v":1}') === '' || importProfile(JSON.stringify(career)) !== '') throw new Error('profile import accepted a bad file or refused a good one');
+  document.getElementById('btnProfile').click();
+  if (document.getElementById('profileOv').hidden) throw new Error('the profile page did not open');
+  document.getElementById('profClose').click();
+  toMenu();
+}`);
 // ---------- 3b. King of the Hill (#64): a short race, saved and resumed, then won and lost by points ----------
 const hasHill = run('king of the hill check', `typeof startHill === 'function'`);
 if (hasHill) {
