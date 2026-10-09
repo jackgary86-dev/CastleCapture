@@ -87,6 +87,10 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 #btnMarch:disabled { opacity: 0.85; background: transparent; color: var(--muted); border-color: var(--edge); font-family: var(--ui); font-size: 15px; }
 #minimap { position: absolute; inset: auto 12px 12px auto; width: 168px; height: 168px; z-index: 1; border-radius: 6px; cursor: crosshair;
   border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); background: rgb(23 20 14 / 0.92); touch-action: none; }
+#zoomBar { position: absolute; right: 12px; bottom: 192px; z-index: 1; display: flex; gap: 4px; }
+#zoomBar button { min-width: 40px; height: 36px; padding: 0 10px; font-size: 20px; line-height: 1; background: rgb(23 20 14 / 0.92); }
+#zoomBar button#zoomFit { font-size: 14px; }
+#zoomBar button:disabled { opacity: 0.45; }
 #grandSaveBox { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--edge); display: grid; gap: 8px; text-align: left; }
 #grandSaveSlots { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 #grandSaveSlots button { width: 100%; display: flex; justify-content: space-between; gap: 10px; text-align: left; font-size: 14px; }
@@ -96,6 +100,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 @media (max-width: 560px) {
   #ordersPanel { top: auto; bottom: 64px; max-height: 40%; }
   #minimap { width: 112px; height: 112px; inset: 64px 12px auto auto; }
+  #zoomBar { bottom: auto; top: 184px; }
 }
 #powerPanel { position: absolute; top: 12px; left: 12px; width: min(290px, calc(100% - 24px)); padding: 10px 12px; border-radius: 6px;
   background: rgb(23 20 14 / 0.9); border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); display: grid; gap: 6px; z-index: 1; }
@@ -504,6 +509,11 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
     <canvas id="cv"></canvas>
     <canvas id="menuArt" hidden aria-hidden="true"></canvas>
     <canvas id="minimap" width="168" height="168" hidden aria-label="Realm map: click to look there" role="img"></canvas>
+    <div id="zoomBar" hidden role="group" aria-label="Zoom">
+      <button id="zoomIn" type="button" aria-label="Zoom in" title="Zoom in (+)">+</button>
+      <button id="zoomOut" type="button" aria-label="Zoom out" title="Zoom out (-)">−</button>
+      <button id="zoomFit" type="button" aria-label="Show the whole realm" title="Show the whole realm (0)">Fit</button>
+    </div>
     <div id="ordersPanel" role="region" aria-label="Wave orders" hidden>
       <div class="op-head"><b id="waveLabel">Wave 1</b><span>Your orders</span></div>
       <ul id="ordersList"></ul>
@@ -649,7 +659,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
             <li><b>Free-for-all</b> pits you against all four other armies at once on a bigger map. The rival lords fight each other too.</li>
             <li><b>Map events</b> (optional, under Lord taunts): every minute or two something happens, announced with a banner. <b>Mercenaries</b> fill an unclaimed keep with 30 troops who join whoever takes it (gold ring). <b>Plague</b> takes 30% from a random held castle. <b>Bandits</b> send a grey raiding column at the weakest castle; a castle they overrun is left unclaimed. A <b>harvest</b> makes one kingdom's castles train half again as fast for 30 seconds. In the Grand Campaign one opens every fourth march.</li>
             <li><b>Two players</b> on one screen (the toggle under Fog of war): a second person takes the rival army at the keyboard with <b>W A S D</b>, <b>E</b> (select or send), <b>F</b> (select all), <b>R</b> (power), <b>Shift+1–4</b> (send amount), <b>T</b> (offer or break a truce) and <b>Y</b> / <b>N</b> (answer one). No lord plays that kingdom, fog is off, and the end screen names the winner.</li>
-            <li><b>Grand Campaign:</b> all five armies on one great map, played in <b>waves</b>. In the plan phase nothing moves: drag orders as usual, change or remove them in the orders panel, then press <b>March!</b> (or Enter) and every army's orders play out for 20 seconds before the next plan. Pan with <b>WASD</b> or by dragging empty ground, zoom with the wheel or a pinch, and watch the minimap. Pause to <b>save to one of five slots</b> or export a save file; the campaign is also autosaved every wave and can be continued, loaded or deleted from the menu. Each map has a monster of its own.</li>
+            <li><b>Grand Campaign:</b> all five armies on one great map, played in <b>waves</b>. In the plan phase nothing moves: drag orders as usual, change or remove them in the orders panel, then press <b>March!</b> (or Enter) and every army's orders play out for 20 seconds before the next plan. Pan with <b>WASD</b> or by dragging empty ground, zoom with the <b>+ / −</b> buttons above the minimap (or the + and − keys, the wheel or a pinch; <b>Fit</b> or 0 shows the whole realm), and watch the minimap. Pause to <b>save to one of five slots</b> or export a save file; the campaign is also autosaved every wave and can be continued, loaded or deleted from the menu. Each map has a monster of its own.</li>
             <li><b>King of the Hill</b> (under Modes): a crowned keep stands at the centre of the map. It is big, its walls count 1.5×, and it can't be upgraded. Whoever holds it scores a point a second, shown on the score bar in the header; the first to 300 wins, and after 12 minutes the most points wins. Each kingdom's starting castle (gold pennant) can be emptied but never taken. A banner calls out the leader, and at 250 points every lord turns on them. The lords know the rule: Torvek rushes the hill, Isolde takes the keeps beside it and strikes the moment someone else has paid to take it, Amaru builds a Ballista Tower next to it, Veyra waits for the holder to bleed, and Sigrun freezes the holder's columns with Winter's Grip. Your best time to 300 is kept for each army.</li>
             <li><b>Story campaigns:</b> each army's five chapters set their own objective, shown on a badge at the bottom of the map: take every enemy castle, <b>hold out</b> until the timer runs down, or <b>take the castle ringed in gold</b>. Some chapters start you outnumbered or in a single fortress. Progress is kept per army.</li>
             <li><b>Map monsters</b> roam the Grand Campaign maps and bite any column that strays within reach. Drag troops onto one to fight it: whoever lands the <b>final blow</b> takes the whole coin bounty, and its health bar shows every army's share of the damage. The lords ignore a healthy monster and swarm it once it is nearly dead.</li>

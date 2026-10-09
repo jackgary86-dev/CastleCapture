@@ -300,6 +300,22 @@ grandImportFile.addEventListener('change', () => {
   f.text().then(t => { const err = importGrandSave(t); grandSaveNote.textContent = err; if (!err) renderSaveBox(); });
 });
 
+// ---------- zoom buttons (above the minimap) ----------
+// Click to zoom in or out about the middle of the board; Fit shows the whole realm. The + and - keys do the same.
+const ZOOM_STEP = 1.4;
+const zoomBar = document.getElementById('zoomBar'), zoomInBtn = document.getElementById('zoomIn');
+const zoomOutBtn = document.getElementById('zoomOut'), zoomFitBtn = document.getElementById('zoomFit');
+const zoomBy = f => { if (isGrand() && !G.cfg.demo) { zoomAt(f, cw / 2, ch / 2); mmLast = -1e9; } };
+zoomInBtn.addEventListener('click', () => zoomBy(ZOOM_STEP));
+zoomOutBtn.addEventListener('click', () => zoomBy(1 / ZOOM_STEP));
+zoomFitBtn.addEventListener('click', () => { if (isGrand()) { resetCamera(); mmLast = -1e9; } });
+addEventListener('keydown', e => {
+  if (!isGrand() || G.cfg.demo || e.ctrlKey || e.metaKey || e.altKey || (e.target.closest && e.target.closest('input, select, textarea'))) return;
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomBy(ZOOM_STEP); }
+  else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(1 / ZOOM_STEP); }
+  else if (e.key === '0') { e.preventDefault(); resetCamera(); mmLast = -1e9; }
+});
+
 // ---------- minimap ----------
 // The whole realm in the corner: castles in their owners' colours (as the player knows them under
 // fog of war) and a frame round the part on screen. Click or drag on it to look somewhere else.
@@ -313,6 +329,8 @@ const mmFrame = () => {
 function drawMinimap(now) {
   const show = isGrand() && !G.cfg.demo && !G.over;
   minimap.hidden = !show;
+  zoomBar.hidden = !show;
+  if (show) { zoomInBtn.disabled = cam.z >= CAM_MAX - 0.001; zoomOutBtn.disabled = zoomFitBtn.disabled = cam.z <= 1.001; }
   if (!show || (now - mmLast < 120 && now >= mmLast)) return;
   mmLast = now;
   const { W, H, k, x0, y0 } = mmFrame();
