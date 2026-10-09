@@ -193,6 +193,7 @@
     noteEl.hidden = !notes.length;
     beginBtn.disabled = !ready;
     mapsEl.classList.toggle('single', list.length === 1);
+    mapsEl.classList.toggle('two-col', list.length === 4);   // four maps sit two by two, not three and an orphan
   }
   function paintAll() {
     for (const b of mapsEl.querySelectorAll('button[data-map]')) {
