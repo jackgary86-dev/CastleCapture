@@ -152,7 +152,11 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 
 ## Music
 
-Each homeland has its own synthesised theme (no audio files): a lute-like air in the Vale of Aldmere, droning saws and frame drums on the Red Steppe, slow bells in the Frostmark Fjords, a Hijaz melody and hand drums in the Sunscorched Sands, and a beating drone in Nyxhollow Mire. The music swells with the fighting, adding drums and quicker, higher lines when armies are on the march, clashing, or using a special power. The Music button or **N** turns it on or off, separately from the sound effects.
+Each homeland has its own synthesised theme (no audio files): a lute-like air in the Vale of Aldmere, droning saws and frame drums on the Red Steppe, slow bells in the Frostmark Fjords, a Hijaz melody and hand drums in the Sunscorched Sands, and a beating drone in Nyxhollow Mire. The music swells with the fighting, adding drums and quicker, higher lines when armies are on the march, clashing, or using a special power. A snare joins on the backbeat once the fighting is real, with tom rolls when it is fiercest, and the main menu has a stately theme of its own. The Music button or **N** turns it on or off, separately from the sound effects, and the **Sound** sliders on the menu and the pause sheet set the overall, effects and music volume.
+
+## Feel
+
+Each army sounds like itself: Aldmere's steel rings, Kharzul's horde clatters on hoof and horn, Frostmark's shields thud, Solmara's brass is bright and Nyxhollow's notes slide, both in a clash and in the call that sounds when a castle changes hands. Marching columns kick up dust, a captured castle throws sparks in its new colours as the banner changes, walls crack and rubble falls as a garrison runs low, and scaffolding goes up round a castle being upgraded. Big clashes you are part of shake the board a little, and in the Grand Campaign the camera glides to the monster when it strikes somewhere off screen. Every battle ends with a short cinematic (the winning army's banner unfurls, its lord appears and has a last word; click or press a key to skip) and the end screen shows a sparkline of your share of all troops from start to finish. With reduced motion set in your system, the dust, sparks, shake, camera glides and animation are all left out.
 
 ## Achievements and records
 
@@ -215,6 +219,7 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 | `js/twoplayer.js` | Two players on one screen: player 2's keyboard controls, panel and truce cards |
 | `js/codex.js` | The Armies and monsters cards and codex entries |
 | `js/tutorial.js` | The guided first battle |
+| `js/juice.js` | Feel and juice: the shake on big clashes, the Grand camera following the monster, the victory and defeat cinematic, the end-screen sparkline and the volume sliders. Dust, sparks, cracks and scaffolding are drawn in `render.js` |
 
 `data.js`, `campaigns.js`, `sim.js`, `grand.js`, `hill.js`, `defense.js`, `crown.js` and the simulation half of `monsters.js` never touch the DOM, so the headless tools in `tools/` load them directly. The files after `ui.js` only hook into what loads before them.
 

@@ -42,7 +42,7 @@ function taunt(o, kind, force = false) {
 }
 
 // What the simulation reports, turned into sound, banners and lord lines.
-on('newGame', () => { sel.clear(); resize(); sfx.music.setTheme(ARMIES[G.cfg.map].map); });
+on('newGame', () => { sel.clear(); resize(); sfx.music.setTheme(G.cfg.demo ? 'menu' : ARMIES[G.cfg.map].map); });   // the menu has its own theme (#69)
 on('power', ({ o, army: A }) => {
   if (G.cfg.demo) return;
   toast(o === 1 ? `You ${A.power.call}!` : `${A.full} ${A.power.they}!`, o === 1 ? A.power.desc : A.power.desc.replace(/\byour\b/g, 'their'), A.color);
@@ -114,10 +114,11 @@ on('weather', ({ kind, prev }) => {
   toast(W.name, W.desc + (home ? ` ${home === 1 ? 'Your troops are' : army(home).full + ' are'} used to it and unaffected.` : ''), '#cbbb92');
 });
 on('taunt', ({ o, kind, force }) => taunt(o, kind, force));
-on('clash', ({ attacker, defender, road }) => { if (!G.cfg.demo && (road || attacker === 1 || defender === 1)) sfx.clash(); });
+// Steel rings in the attacker's voice; a castle taken or lost sounds the taker's call (#69).
+on('clash', ({ attacker, defender, road }) => { if (!G.cfg.demo && (road || attacker === 1 || defender === 1)) sfx.clash(G.fac[attacker]); });
 on('capture', ({ o, was, castle }) => {
   if (was === 1) sel.delete(castle);
-  if (!G.cfg.demo && (o === 1 || was === 1)) sfx.horn(o === 1);
+  if (!G.cfg.demo && (o === 1 || was === 1)) sfx.capture(G.fac[o], o === 1);
 });
 // Taking a special castle for the first time explains what it does.
 on('capture', ({ o, castle }) => {
@@ -323,7 +324,7 @@ function playerSend(t, owner = 1) {
     return;
   }
   if (send(owner, [...s].filter(x => x !== t), t, pctOf(owner), owner === 1 ? unitType : 'foot')) {
-    sfx.drum();
+    sfx.march(G.fac[owner]);
     if (!G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
   }
   s.clear();

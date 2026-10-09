@@ -235,6 +235,93 @@ function bannerState(p) {
   return [p.owner, (t - half) / (CAPTURE_ANIM - half)];
 }
 
+// ---------- juice (#69): dust, capture sparks, cracked walls and scaffolding ----------
+// Drawn from the battle as it stands and from sim events, on the screen's clock, so none of it can
+// change what happens. Reduced motion turns off the moving parts (dust, sparks); cracks and scaffolding
+// are still pictures, so they stay.
+const juiceFx = { parts: [], scaffold: new Map(), last: 0, dustAt: new Map() };
+const JUICE_MAX_PARTS = 260, SCAFFOLD_MS = 2600;
+on('newGame', () => { juiceFx.parts.length = 0; juiceFx.scaffold.clear(); juiceFx.dustAt.clear(); });
+// A taken castle throws up sparks in its new owner's colour as the banner changes.
+on('capture', ({ o, castle }) => {
+  if (reduceMotion || !G || G.cfg.demo) return;
+  for (let i = 0; i < 16 && juiceFx.parts.length < JUICE_MAX_PARTS; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = 30 + Math.random() * 50;
+    juiceFx.parts.push({ kind: 'spark', x: castle.x, y: castle.y - castle.r * 0.8, vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, life: 0.6 + Math.random() * 0.4, col: col(o) });
+  }
+});
+// An upgrade puts scaffolding up round the castle for a moment.
+on('upgrade', ({ castle }) => { if (G && !G.cfg.demo) juiceFx.scaffold.set(castle.id, performance.now()); });
+
+// Moves and ages the particles, and kicks up dust behind marching columns. ground: dust, under the troops;
+// otherwise the sparks, over them.
+function drawJuice(now, ground) {
+  if (ground) {
+    const dt = G.paused || G.over ? 0 : Math.min(0.05, Math.max(0, (now - (juiceFx.last || now)) / 1000));
+    juiceFx.last = now;
+    if (!reduceMotion && dt > 0) {
+      for (const k of G.packets) {
+        if (k.delay > 0 || frozen(k.owner) || (k.owner !== 1 && !G.cfg.demo && !seesAt(1, k.x, k.y))) continue;
+        const every = k.type === 'horse' ? 0.07 : 0.14, t = juiceFx.dustAt.get(k) ?? 0;
+        if (now / 1000 - t < every || juiceFx.parts.length >= JUICE_MAX_PARTS) continue;
+        juiceFx.dustAt.set(k, now / 1000);
+        const dir = k.dir || 1;
+        juiceFx.parts.push({ kind: 'dust', x: k.x - dir * (5 + Math.random() * 3), y: k.y + 2 + Math.random() * 2, vx: -dir * 6, vy: -4, age: 0, life: 0.7, r: 1.5 + Math.min(2, k.n / 30) + Math.random() });
+      }
+      if (juiceFx.dustAt.size > 400) juiceFx.dustAt.clear();
+    }
+    for (const q of juiceFx.parts) { q.age += dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.kind === 'spark') q.vy += 90 * dt; }
+    juiceFx.parts = juiceFx.parts.filter(q => q.age < q.life);
+  }
+  for (const q of juiceFx.parts) {
+    const t = q.age / q.life;
+    if (ground && q.kind === 'dust') {
+      ctx.fillStyle = alpha(G.theme.dust || '#b8a888', 0.42 * (1 - t));
+      ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * (1 + t * 1.5), q.r * (0.6 + t * 0.8), 0, 0, Math.PI * 2); ctx.fill();
+    } else if (!ground && q.kind === 'spark') {
+      ctx.fillStyle = alpha(q.col, 1 - t);
+      ctx.fillRect(q.x - 1, q.y - 1, 2.2, 2.2);
+    }
+  }
+}
+
+// Cracks in the walls as the garrison drops below 40% of what the castle holds: one crack per tenth below,
+// in the same places each time (seeded by the castle), and rubble at the foot of a badly breached keep.
+function drawWallWear(p, s, baseY) {
+  if (!p.owner) return;
+  const left = p.units / Math.max(1, capOf(p));
+  if (left >= 0.4) return;
+  const cracks = Math.min(4, Math.ceil((0.4 - left) / 0.1));
+  ctx.strokeStyle = 'rgba(24,18,10,0.75)'; ctx.lineWidth = Math.max(0.8, s * 0.05); ctx.lineJoin = 'miter';
+  for (let i = 0; i < cracks; i++) {
+    let x = p.x + (hash01(p.id, i) - 0.5) * s * 1.2, y = baseY - s * (0.35 + hash01(p.id, i + 9) * 0.5);
+    ctx.beginPath(); ctx.moveTo(x, y);
+    for (let j = 0; j < 3; j++) { x += (hash01(p.id * 7 + i, j) - 0.5) * s * 0.3; y += s * (0.08 + hash01(p.id + i, j + 3) * 0.08); ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  if (left < 0.15) {
+    ctx.fillStyle = 'rgba(110,98,80,0.9)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(p.x + (hash01(p.id, i + 20) - 0.5) * s * 1.6, baseY - s * 0.08 + hash01(p.id, i + 30) * s * 0.12, s * 0.12, s * 0.08);
+  }
+}
+
+// Scaffolding that goes up round a castle being upgraded, then comes down.
+function drawScaffold(p, s, baseY) {
+  const t0 = juiceFx.scaffold.get(p.id);
+  if (t0 === undefined) return;
+  const t = (performance.now() - t0) / SCAFFOLD_MS;
+  if (t >= 1) { juiceFx.scaffold.delete(p.id); return; }
+  const rise = reduceMotion ? 1 : Math.min(1, t * 2.5), a = t < 0.8 ? 1 : (1 - t) / 0.2, h = s * 1.4 * rise;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  for (const dx of [-0.85, -0.3, 0.3, 0.85]) { ctx.moveTo(p.x + dx * s, baseY); ctx.lineTo(p.x + dx * s, baseY - h); }
+  for (let y = baseY - s * 0.35; y > baseY - h; y -= s * 0.35) { ctx.moveTo(p.x - s * 0.95, y); ctx.lineTo(p.x + s * 0.95, y); }
+  if (h > s * 0.5) { ctx.moveTo(p.x - s * 0.85, baseY); ctx.lineTo(p.x - s * 0.3, baseY - Math.min(h, s * 0.7)); }
+  // Pale new timber with a dark edge, so it reads against stone and palisades alike.
+  ctx.strokeStyle = alpha(INK, 0.8 * a); ctx.lineWidth = Math.max(1.6, s * 0.11); ctx.stroke();
+  ctx.strokeStyle = alpha('#e2c27e', a); ctx.lineWidth = Math.max(0.9, s * 0.06); ctx.stroke();
+}
+
 function drawCastle(p, now) {
   const s = p.r, baseY = p.y + s * 0.55;
   const tier = s < 18 ? 1 : s < 26 ? 2 : 3;
@@ -256,6 +343,8 @@ function drawCastle(p, now) {
   const glow = p.owner ? c : '#5a5468';
   const flags = CASTLE[style](p, s, baseY, tier, roofCol, glow);
   if (p.kind) drawKindDetail(p, s, baseY);
+  drawWallWear(p, s, baseY);
+  drawScaffold(p, s, baseY);
   const [flagOwner, raise] = bannerState(p);
   for (const [fx, fy] of flags) drawFlag(fx, fy, s * 0.6, flagOwner, now, p.id, raise);
 
@@ -793,6 +882,7 @@ function drawCrows(f, now) {
 }
 
 function draw(now) {
+  if (typeof juicePanStep === 'function') juicePanStep(now);   // the Grand camera gliding to the monster (juice.js)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = G ? G.theme.bg : TIMBER; ctx.fillRect(0, 0, cw, ch);
   if (!G) return;
@@ -847,6 +937,7 @@ function draw(now) {
   for (const u of G.units) items.push({ y: u.y, u });
   if (G.monster) for (const m of G.monster.creatures) if (!m.dead && (G.cfg.demo || seesAt(1, m.x, m.y))) items.push({ y: m.y + 8, m });
   items.sort((a, b) => a.y - b.y);
+  drawJuice(now, true);
   for (const it of items) {
     if (it.u) { drawUnit(it.u, now); continue; }
     if (it.m) { drawMonster(it.m, now); continue; }
@@ -868,6 +959,7 @@ function draw(now) {
     if (isFrozen) { ctx.fillStyle = 'rgba(210,235,255,0.45)'; ctx.beginPath(); ctx.ellipse(k.x, k.y - 3, 8, 7, 0, 0, Math.PI * 2); ctx.fill(); }
   }
 
+  drawJuice(now, false);
   if (G.monster) drawMonsterBars(now);
   if (!G.cfg.demo) drawThreats(now);
   if (G.cfg.fog && !G.cfg.demo) drawFog();

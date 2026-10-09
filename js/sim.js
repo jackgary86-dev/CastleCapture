@@ -1385,7 +1385,7 @@ function arrive(k, t) {
   const A = strikeOf(k.owner, t) * (k.str || 1) * unitOf(k).siege, D = defAt(t);
   t.units -= k.n * A / D;
   G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
-  emit('clash', { attacker: k.owner, defender: t.owner });
+  emit('clash', { attacker: k.owner, defender: t.owner, n: k.n });
   // King of the Hill (#64): a kingdom's seat (its starting castle) can be emptied but never taken.
   if (t.units < 0 && t.seat && G.mode === 'hill') t.units = 0;
   if (t.units < 0) {

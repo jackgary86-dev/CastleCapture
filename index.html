@@ -104,6 +104,34 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 #zoomBar button { min-width: 40px; height: 36px; padding: 0 10px; font-size: 20px; line-height: 1; background: rgb(23 20 14 / 0.92); }
 #zoomBar button#zoomFit { font-size: 14px; }
 #zoomBar button:disabled { opacity: 0.45; }
+/* Feel and juice (#69): the victory cinematic, the end-screen sparkline and the volume sliders. */
+#cinema { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; cursor: pointer;
+  background: radial-gradient(circle at 50% 40%, rgb(30 24 14 / 0.82), rgb(8 6 4 / 0.94)); }
+#cinema[hidden] { display: none; }
+.cine-stage { display: grid; justify-items: center; gap: 8px; padding: 0 22px 20px; width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: hidden; text-align: center; color: #f3ead6;
+  background: rgb(22 18 11 / 0.92); border: 1px solid color-mix(in srgb, var(--c) 55%, #000); border-radius: 8px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.6); }
+.cine-banner { position: relative; width: 84px; height: 118px; transform-origin: top center; animation: cine-unfurl 0.9s cubic-bezier(.2,.8,.3,1) both; }
+.cine-banner svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.5)); }
+.cine-emblem { position: absolute; inset: 22% 22% auto; color: #fff8e6; }
+.cine-emblem svg { width: 100%; height: auto; }
+.cine-lord { width: 88px; height: 88px; animation: cine-rise 0.6s 0.6s ease-out both; }
+.cine-lord .portrait, .cine-lord .portrait svg { display: block; width: 88px; height: 88px; }
+.cine-stage h2 { margin: 0; font-family: var(--display); font-size: 36px; animation: cine-rise 0.6s 0.8s ease-out both; }
+.cine-name { margin: 0; font-weight: 700; color: #d9cba6; animation: cine-rise 0.6s 0.9s ease-out both; }
+.cine-quote { margin: 4px 0 0; font-family: var(--display); font-size: 20px; line-height: 1.35; animation: cine-rise 0.7s 1.2s ease-out both; }
+.cine-skip { color: #a8997a; animation: cine-rise 0.5s 1.8s ease-out both; }
+.cine-stage.still * { animation: none !important; }
+@keyframes cine-unfurl { from { transform: scaleY(0.05); opacity: 0.3; } to { transform: scaleY(1); opacity: 1; } }
+@keyframes cine-rise { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #cinema * { animation: none !important; } }
+.end-spark { margin: 4px auto 10px; display: grid; justify-items: center; gap: 2px; }
+.end-spark svg { max-width: 100%; height: auto; }
+.end-spark .spark-mid { stroke: currentColor; opacity: 0.25; stroke-dasharray: 3 4; }
+.end-spark figcaption { font-size: 12px; color: var(--muted); }
+.volume-box { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 14px; margin-top: 12px; text-align: left; }
+.volume-box label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
+.volume-box output { font-weight: 400; color: var(--muted); }
+.volume-box input { width: 100%; }
 #grandSaveBox { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--edge); display: grid; gap: 8px; text-align: left; }
 #grandSaveSlots { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 #grandSaveSlots button { width: 100%; display: flex; justify-content: space-between; gap: 10px; text-align: left; font-size: 14px; }
@@ -792,3 +820,4 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/twoplayer.js"></script>
 <script src="js/codex.js"></script>
 <script src="js/tutorial.js"></script>
+<script src="js/juice.js"></script>
