@@ -123,6 +123,8 @@
       : target ? `<b>Objective</b>Take the castle ringed in gold (${Math.floor(target.units)} inside)`
       : `<b>Objective</b>Take every enemy castle`;
     if (text !== badgeText) { badge.innerHTML = text; badgeText = text; }
+    // Until the first send, the drag hint is painted at the bottom centre too; sit above it.
+    badge.classList.toggle('above-hint', !G.hintDone);
     if (badge.hidden) badge.hidden = false;
     if (!target || target.owner === 1) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.translate(ox, oy); ctx.scale(sc, sc);

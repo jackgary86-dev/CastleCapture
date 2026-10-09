@@ -511,7 +511,7 @@ addEventListener('keydown', e => {
   else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
   else if ((e.key === 'b' || e.key === 'B') && playable()) { if (G.placing) cancelPlacing(); else if (!G.bought.has(1)) setShop(!shopOpen); }
   else if (e.key === 'Escape' && G && G.placing) cancelPlacing();
-  else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }
+  else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (sels[2] && sels[2].size) sels[2].clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }   // player 2's selection too (#12)
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
 
