@@ -62,6 +62,7 @@ const UNIT_TYPES = {
 const UNIT_IDS = Object.keys(UNIT_TYPES);
 const unitOf = k => UNIT_TYPES[k.type] || UNIT_TYPES.foot;
 const AI_SIEGE = false;         // the AI may field catapults (with a foot escort); false keeps it to foot and cavalry
+const RAID_MARCH = 6;          // seconds of foot marching beyond which an AI lord raids a nearly empty castle with cavalry
 const SIEGE_ESCORT = 0.4;       // share of an AI catapult force sent as foot marching alongside at catapult pace
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
 // Grand Campaign (#46): a wave-based mode with all five armies on one large map.

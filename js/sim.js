@@ -959,8 +959,10 @@ function aiThink(ai) {
   for (const t of candidates) {
     const srcs = mine.filter(s => s.units >= pz.keep / 20 * s.r && (!exposed(s) || s.units * (1 - pz.sendFrac) >= s.r * 0.4)).sort((a, b) => travel(a, t) - travel(b, t));
     const chosen = [];
-    let sum = 0, sumAll = 0, far = 0, need = Infinity, needS = Infinity;
+    let sum = 0, sumAll = 0, far = 0, need = Infinity, needS = Infinity, needH = Infinity;
     const siegeOk = AI_SIEGE && t.owner && d !== 'easy' && id !== 'kharzul';
+    // A cavalry raid on a nearly empty enemy castle: weak against walls, but it lands before help can.
+    const raidOk = t.owner && d !== 'easy' && t.units < t.r * 0.6;
     // Amaru avoids even fights against other kingdoms.
     const margin0 = pz.margin * (id === 'solmara' && t.owner && bold === 1 ? 1.15 : 1);
     const margin = margin0 - Math.max(0, margin0 - 1) * ease;
@@ -973,12 +975,15 @@ function aiThink(ai) {
       far = Math.max(far, travel(s, t));
       need = needAt(t, far, inc, me, s) * margin;
       if (siegeOk) needS = siegeNeed(t, far, inc, me, s) * margin;
+      if (raidOk) needH = needAt(t, far / UNIT_TYPES.horse.speed, inc, me, s) / UNIT_TYPES.horse.siege * margin;
       if (sum >= Math.min(need, needS)) break;
     }
     if (!chosen.length || need <= 2) continue;
     // Catapults (with an escort) when they make the attack possible, or need clearly fewer troops than foot.
     let type = 'foot';
     if (siegeOk && sum >= needS && (sum < need || needS < need * 0.7)) { type = 'siege'; need = needS; far /= UNIT_TYPES.siege.speed; }
+    // Raid with cavalry when it is affordable and the march is long enough for speed to matter.
+    else if (raidOk && sum >= needH && far / speedOf(me) >= RAID_MARCH) { type = 'horse'; need = needH; far /= UNIT_TYPES.horse.speed; }
     // Within 20% of affordable: commit 80% of each chosen garrison rather than give up.
     let frac = null;
     if (sum < need) { if (sum >= need * 0.8 && sumAll >= need) frac = 0.8; else continue; }
