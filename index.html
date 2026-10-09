@@ -787,7 +787,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const defOf = o => o ? army(o).stats.def * (powerOn(o, 'stoneOath') ? 2 : 1) : 1;
   const speedOf = o => SPEED * army(o).stats.speed * (powerOn(o, 'bloodMoon') ? 2 : 1);
   const roadOf = o => atkOf(o) * army(o).stats.road;
-  const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1);
+  // Amaru, as an AI rival, bribes the garrisons of unclaimed keeps in his first minute: they count 1.6×.
+  const bribes = (o, t) => t.owner === 0 && G.fac[o] === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
+  const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1) * bribes(o, t);
   const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
   const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o && dist(u, p) <= MAP_UNITS.ward.range);
   // Upkeep: a castle feeding a big garrison trains slower, which stops one castle hoarding an army forever.
@@ -951,7 +953,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
 
     // Amaru expands faster than anyone in the first minute.
-    if (id === 'solmara' && G.time < 60) { pz.neutralBias *= 2; pz.sendFrac = 0.55; }
+    const amaruRush = id === 'solmara' && G.time < 60;
+    if (amaruRush) { pz.neutralBias *= 3; pz.sendFrac = 0.55; }
 
     // Defend castles about to fall. Defensive armies react earlier; Torvek never does.
     if (id !== 'kharzul') {
@@ -1002,13 +1005,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     let candidates = P.filter(t => t.owner !== me);
     // Sigrun holds her army home early, taking only neutrals and near-empty castles.
     if (id === 'frostmark' && G.time < 100 && bold === 1) candidates = candidates.filter(t => t.owner === 0 || t.units < 5);
+    // Amaru's first minute: claim every keep on his side of the map, and nothing that brings him close to a rival.
+    if (amaruRush) candidates = candidates.filter(t => (t.owner === 0 && nearestOf(t, mine) <= nearestOf(t, enemyCastles)) || (t.owner && t.units < 5));
     // Isolde advances one castle at a time once she outnumbers you two to one.
     if (id === 'aldmere' && myTotal > enemyTotal * 2) candidates = candidates.sort((a, b) => nearestOf(a, mine) - nearestOf(b, mine)).slice(0, 3);
 
     let best = null;
-    const maxSrc = d === 'hard' ? 4 : 1;
+    const maxSrc = d === 'hard' ? 4 : amaruRush ? 2 : 1;
+    // While rushing, Amaru's castles within reach of a rival keep at least 10 troops home.
+    const exposed = s => amaruRush && nearestOf(s, enemyCastles) < 300;
     for (const t of candidates) {
-      const srcs = mine.filter(s => s.units >= pz.keep).sort((a, b) => dist(a, t) - dist(b, t));
+      const srcs = mine.filter(s => s.units >= pz.keep && (!exposed(s) || s.units * (1 - pz.sendFrac) >= 10)).sort((a, b) => dist(a, t) - dist(b, t));
       const chosen = [];
       let sum = 0, far = 0, need = Infinity;
       // Amaru avoids even fights against other kingdoms.
@@ -1217,7 +1224,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       ai.timer -= dt;
       if (ai.timer <= 0) {
         // Amaru moves quickly while there are keeps to claim.
-        const hurry = G.fac[ai.id] === 'solmara' && G.time < 60 ? 0.75 : 1;
+        const hurry = G.fac[ai.id] === 'solmara' && G.time < 60 ? 0.6 : 1;
         ai.timer = intervals[ai.diff] * army(ai.id).ai.thinkMul * hurry * (0.8 + Math.random() * 0.4);
         aiThink(ai);
       }

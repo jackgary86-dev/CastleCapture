@@ -29,7 +29,7 @@ Each army is commanded by a named lord when it's your rival. They introduce them
 | **Queen Isolde Varr**, the Mason Queen | Aldmere | Keeps her front-line castles topped up before attacking, saves Stone Oath until two castles are under attack, and advances one castle at a time once she outnumbers you 2 to 1. |
 | **Khagan Torvek Ash-Mane**, the Red Wind | Kharzul | Hammers the strongest rival's biggest castle, opens his attacks with Blood Moon Charge, and never reinforces. |
 | **Jarl Sigrun Ironfrost**, the White Wall | Frostmark | Holds her army home early, freezes big attacks with Winter's Grip and then counter-attacks the castles they came from, and intercepts columns marching on nearby keeps. |
-| **Sultan Amaru al-Zahir**, the Golden Hand | Solmara | Expands fast in the first minute, opens the treasury right after a wave of captures, and avoids even fights. |
+| **Sultan Amaru al-Zahir**, the Golden Hand | Solmara | Expands fastest in the first minute, bribing unclaimed keeps (they count 1.6×) and claiming only keeps on his side of the map, opens the treasury right after a wave of captures, and avoids even fights. |
 | **The Hollow Matron Veyra**, Mother of Crows | Nyxhollow | Pounces on castles you've just emptied, looses the crows right before her main attack, and takes keeps near you to box you in. |
 
 ## Coins and map units
