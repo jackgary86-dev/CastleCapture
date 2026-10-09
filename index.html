@@ -224,6 +224,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 @media (max-width: 560px) {
   #taunt { bottom: 156px; right: 14px; padding: 6px 10px 6px 6px; }
   body.touchui #taunt { left: 112px; }
+  /* The Grand Campaign orders panel clears the thumb bar and the drag hint (#60). */
+  body.touchui #ordersPanel { left: 112px; width: calc(100% - 124px); max-height: calc(100% - 300px); }
   #taunt .portrait { width: 36px; height: 36px; }
   #taunt q { font-size: 15px; }
 }

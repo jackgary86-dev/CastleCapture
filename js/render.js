@@ -921,7 +921,8 @@ function draw(now) {
     }
   }
 
-  if (!G.cfg.demo && !G.hintDone) {
+  // The Grand Campaign's orders panel explains its own dragging, and on phones would cover this (#60).
+  if (!G.cfg.demo && !G.hintDone && G.mode !== 'grand') {
     const msg = 'Drag from a castle flying your banner onto another castle to attack';
     ctx.font = '500 14px "Alegreya Sans", system-ui, sans-serif';
     // On phones the treasury and objective badge sit along the bottom edge, so the hint goes above them,
