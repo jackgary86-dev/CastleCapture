@@ -286,6 +286,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Rivals surrender</b> when they're down to a tenth of the troops on the map and two castles or fewer. Against one rival, their castles open their gates to you.</li>
+            <li><b>Rally points:</b> right-drag (or Shift-drag, or long-press then drag on a touchscreen) from one of your castles to another. New troops then march there automatically, leaving 5 at home. Right-click the castle, or drag and release on empty ground, to clear it.</li>
             <li><b>Upkeep:</b> a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when. Spread big armies out or put them to work.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
             <li><b>Space</b> selects all your castles. <b>[</b> and <b>]</b> change the game speed (1×, 1.5× or 2×). <b>P</b> pauses. <b>M</b> mutes.</li>
@@ -340,6 +341,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const FIRST_CHARGE = 45;      // seconds before a special power is first ready
   const RECHARGE = 300;         // seconds a special power takes to recharge after use
   const COIN_PER_MIN = [0, 1, 2, 3]; // coins per minute from a small, medium and large castle
+  const RALLY_EVERY = 2;        // seconds between rally-point sends
+  const RALLY_KEEP = 5;         // troops a rallying castle keeps at home
   const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
   const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
   const MAP_UNITS = {
@@ -773,7 +776,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       caps: 0, peak: 0, hintDone: cfg.demo || store.get('cs-hint', false),
       intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {}, weakSince: {}, surrendered: new Set(),
       coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
-      roadPts: roadSamples(map.roads),
+      roadPts: roadSamples(map.roads), rallyClock: 0,
     };
     sel.clear();
     resize();
@@ -1212,6 +1215,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
 
     roadBattles();
+    G.rallyClock += dt;
+    if (G.rallyClock >= RALLY_EVERY) {
+      G.rallyClock = 0;
+      for (const p of G.planets) {
+        if (!p.rally) continue;
+        if (p.owner !== 1 || p.rally.owner !== 1) { p.rally = null; continue; }
+        const surplus = Math.floor(p.units - RALLY_KEEP);
+        if (surplus >= 3) send(1, [p], p.rally, surplus / p.units);
+      }
+    }
     for (const o of G.owners) G.coins[o] += incomeOf(o) / 60 * dt;
     mapUnits(dt);
 
@@ -1810,6 +1823,29 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
   }
 
+  function rallyArrow(a, bx, by, color, now) {
+    const ang = Math.atan2(by - a.y, bx - a.x), len = Math.hypot(bx - a.x, by - a.y);
+    const x0 = a.x + Math.cos(ang) * a.r, y0 = a.y + Math.sin(ang) * a.r, x1 = a.x + Math.cos(ang) * (len - 14), y1 = a.y + Math.sin(ang) * (len - 14);
+    ctx.strokeStyle = alpha(color, 0.7); ctx.lineWidth = 2.2; ctx.setLineDash([5, 7]);
+    ctx.lineDashOffset = reduceMotion ? 0 : -now / 60;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    poly([[x1 + Math.cos(ang) * 7, y1 + Math.sin(ang) * 7], [x1 + Math.cos(ang + 2.5) * 7, y1 + Math.sin(ang + 2.5) * 7], [x1 + Math.cos(ang - 2.5) * 7, y1 + Math.sin(ang - 2.5) * 7]], alpha(color, 0.85));
+  }
+  function drawRallies(now) {
+    for (const p of G.planets) if (p.rally && p.owner === 1) rallyArrow(p, p.rally.x, p.rally.y, col(1), now);
+    if (rallyDrag.from) {
+      const h = ptr.hover && ptr.hover.owner === 1 && ptr.hover !== rallyDrag.from ? ptr.hover : null;
+      rallyArrow(rallyDrag.from, h ? h.x : ptr.wx, h ? h.y : ptr.wy, G.theme.ring, now);
+      const msg = h ? 'Rally here' : 'Release on one of your castles';
+      const fs = 12 / sc;
+      ctx.font = `700 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
+      const w = ctx.measureText(msg).width + fs, lx = ptr.wx + 14 / sc, ly = ptr.wy - 26 / sc;
+      ctx.fillStyle = alpha(TIMBER, 0.85); ctx.beginPath(); ctx.roundRect(lx, ly, w, fs * 1.6, 3 / sc); ctx.fill();
+      ctx.fillStyle = PARCH; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(msg, lx + fs / 2, ly + fs * 0.85);
+    }
+  }
+
   function drawScenery(now) {
     const T = G.theme;
     ctx.fillStyle = T.field; ctx.fillRect(0, 0, G.w, G.h);
@@ -1863,6 +1899,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ctx.translate(ox + shakeX, oy + shakeY); ctx.scale(sc, sc);
     drawScenery(now);
     for (const u of G.units) drawUnitRange(u, now, col(u.owner));
+    drawRallies(now);
     const spin = reduceMotion ? 0 : now / 1100;
     const ring = G.theme.ring;
 
@@ -2177,11 +2214,25 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }, { passive: false });
   setSendPct(sendPct);
 
+  // ---------- rally points ----------
+  const rallyDrag = { from: null, timer: 0 };
+  function beginRally(p) { rallyDrag.from = p; sel.clear(); ptr.down = false; ptr.hover = null; }
+  cv.addEventListener('contextmenu', e => { if (playable()) e.preventDefault(); });
+
   cv.addEventListener('pointerdown', e => {
     if (!playable()) return;
     if (placeAt(e)) return;
     cv.setPointerCapture(e.pointerId);
     const w = toWorld(e), p = planetAt(w);
+    clearTimeout(rallyDrag.timer);
+    if (p && p.owner === 1 && (e.button === 2 || e.shiftKey)) {
+      ptr.wx = w.x; ptr.wy = w.y;
+      beginRally(p);
+      return;
+    }
+    if (e.pointerType === 'touch' && p && p.owner === 1) {
+      rallyDrag.timer = setTimeout(() => { if (ptr.down && !ptr.moved && ptr.start === p) beginRally(p); }, 450);
+    }
     Object.assign(ptr, { down: true, moved: false, sx: w.sx, sy: w.sy, wx: w.x, wy: w.y, start: p, wasSel: !!p && sel.has(p), hover: p });
     if (!p) { sel.clear(); return; }
     if (p.owner === 1) sel.add(p);
@@ -2189,6 +2240,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   });
   cv.addEventListener('pointermove', e => {
     if (G && G.placing && playable()) { const w = toWorld(e); ptr.wx = w.x; ptr.wy = w.y; ptr.placeHover = true; return; }
+    if (rallyDrag.from && playable()) { const w = toWorld(e); ptr.wx = w.x; ptr.wy = w.y; ptr.hover = planetAt(w); return; }
     if (!ptr.down || !playable()) return;
     const w = toWorld(e);
     ptr.wx = w.x; ptr.wy = w.y;
@@ -2198,6 +2250,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (ptr.moved && p && p.owner === 1 && ptr.start && ptr.start.owner === 1) sel.add(p);
   });
   cv.addEventListener('pointerup', e => {
+    clearTimeout(rallyDrag.timer);
+    if (rallyDrag.from) {
+      const from = rallyDrag.from, q = playable() ? planetAt(toWorld(e)) : null;
+      rallyDrag.from = null; ptr.hover = null;
+      // Release on another of your castles to set the route; anywhere else clears it.
+      from.rally = q && q.owner === 1 && q !== from ? q : null;
+      return;
+    }
     if (!ptr.down) return;
     ptr.down = false;
     if (!playable()) return;
@@ -2211,7 +2271,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
     ptr.hover = null;
   });
-  cv.addEventListener('pointercancel', () => { ptr.down = false; ptr.hover = null; });
+  cv.addEventListener('pointercancel', () => { ptr.down = false; ptr.hover = null; rallyDrag.from = null; clearTimeout(rallyDrag.timer); });
 
   function selectAll() { if (playable()) G.planets.forEach(p => p.owner === 1 && sel.add(p)); }
   function setPaused(v) {
