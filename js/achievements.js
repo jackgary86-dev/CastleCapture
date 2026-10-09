@@ -32,6 +32,10 @@ const ACHIEVEMENTS = [
   { id: 'hillWin', name: 'King of the Hill', desc: 'Win a King of the Hill race.' },
   { id: 'hillFast', name: 'Unshaken', desc: `Reach ${HILL.goal} points in King of the Hill within ${Math.round(HILL.goal * 1.4 / 60)} minutes.` },
   { id: 'hillAll', name: 'Every Crown', desc: 'Win King of the Hill with every army.', goal: 5, progress: r => r.hillArmiesWon.length },
+  // Siege Defense (#65): waves held, unlocked the moment the wave is beaten.
+  { id: 'defense10', name: 'Hold the Line', desc: 'Survive 10 waves of Siege Defense.', goal: 10, progress: r => r.defenseBestWave },
+  { id: 'defense20', name: 'Unbroken', desc: 'Survive 20 waves of Siege Defense.', goal: 20, progress: r => r.defenseBestWave },
+  { id: 'defense30', name: 'The Last Bastion', desc: 'Survive 30 waves of Siege Defense.', goal: 30, progress: r => r.defenseBestWave },
 ];
 function grandMapCount() { return typeof GRAND_MAPS === 'object' ? Object.keys(GRAND_MAPS).length : 1; }
 
@@ -40,6 +44,7 @@ const blankRecords = () => ({
   byArmy: {}, byLord: {}, best: {}, armiesWon: [], lordsBeatenHard: [],
   grandPlayed: 0, grandWon: 0, grandMapsWon: [], slain: 0,
   hillPlayed: 0, hillWon: 0, hillArmiesWon: [], hillBest: {},   // hillBest: fastest time to the goal, by army
+  defensePlayed: 0, defenseBestWave: 0, defenseBestScore: 0,
 });
 function loadAchievements() {
   const d = store.get(ACH_KEY, null);
@@ -141,10 +146,34 @@ on('monster', e => {
   }, 3300 * (i + 1)));
 });
 
+// Siege Defense (#65): the best wave counts as soon as it is beaten, with a banner, since a long siege
+// can run a while; at the end the game counts towards the career totals but not battles won and lost.
+on('defense', e => {
+  if (e.kind !== 'cleared' || !G || G.cfg.demo) return;
+  const r = ach.rec;
+  r.defenseBestWave = Math.max(r.defenseBestWave, e.wave);   // the best score waits for the end: losing castles lowers it
+  const fresh = unlockEarned();
+  if (!fresh.length) return;
+  refreshAchButton();
+  fresh.forEach((a, i) => setTimeout(() => {
+    if (G && !G.over) { toast(`Achievement unlocked: ${a.name}`, a.desc, army(1).color); sfx.chime(); }
+  }, 3300 * (i + 1)));
+});
+function defenseEnded() {
+  const r = ach.rec;
+  r.defensePlayed++;
+  r.castles += G.caps;
+  r.ambushed += ambushedThisBattle();
+  r.defenseBestWave = Math.max(r.defenseBestWave, G.def.held);
+  r.defenseBestScore = Math.max(r.defenseBestScore, G.def.score);
+  showUnlocks(unlockEarned());
+}
+
 on('end', ({ win }) => {
   if (!G || G.cfg.demo || G.cfg.tutorial) return;
   if (G.mode === 'grand') { grandEnded(win); return; }
   if (G.mode === 'hill') { hillEnded(win); return; }
+  if (G.mode === 'defense') { defenseEnded(); return; }
   if ((G.cfg.humans || 1) > 1) return;   // beating a friend at the other keyboard isn't beating a lord
   const r = ach.rec, me = G.fac[1], rivals = G.owners.slice(1).map(o => G.fac[o]), diff = G.cfg.diff;
   r.battles++;
@@ -262,6 +291,7 @@ function renderAchievements() {
     ['Fastest win, Squire', best('easy')], ['Fastest win, Knight', best('medium')], ['Fastest win, Warlord', best('hard')],
     ['Grand Campaigns', r.grandPlayed], ['Grand Campaigns won', r.grandWon], ['Map monsters slain', r.slain],
     ['King of the Hill races', r.hillPlayed], ['King of the Hill won', r.hillWon],
+    ['Siege Defense games', r.defensePlayed], ['Most waves held', r.defenseBestWave], ['Best Siege Defense score', r.defenseBestScore],
   ];
   const dl = document.getElementById('achRecords');
   dl.innerHTML = '';

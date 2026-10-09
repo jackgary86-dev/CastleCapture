@@ -9,8 +9,9 @@
 //   node tools/balance.js --mode grand --games 4   # Grand Campaign: five AI lords play waves to the end
 //   node tools/balance.js --mode grand --map scorched   # ...on one map (realm, scorched, fells, blackwood); 'all' cycles them
 //   node tools/balance.js --mode hill --games 16   # King of the Hill (#64): every pairing races for the crowned keep
+//   node tools/balance.js --mode defense --games 8   # Siege Defense: the AI holds the fortress; median waves per army
 //
-// Only js/data.js, js/sim.js, js/grand.js, js/hill.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
+// Only js/data.js, js/sim.js, js/grand.js, js/hill.js, js/defense.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
 // dependencies. Math.random is seeded per game, so the same arguments always give the same result.
 
 const fs = require('fs');
@@ -36,13 +37,13 @@ const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
-const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/monsters.js']
+const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/defense.js', 'js/monsters.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8'))
   .join('\n;\n');
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, HILL, newGame, update, totalOf, march, on, hillCfg,
+  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, newGame, update, totalOf, march, on, hillCfg, defenseCfg,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
@@ -58,6 +59,7 @@ for (const pair of (opt('set', '') || '').split(',').filter(Boolean)) {
 }
 if (MODE === 'grand') { runGrand(); process.exit(0); }
 if (MODE === 'hill') process.exit(runHill() ? 1 : 0);
+if (MODE === 'defense') process.exit(runDefense() ? 0 : 1);
 
 const stat = Object.fromEntries(ids.map(id => [id, { games: 0, decided: 0, wins: 0, powers: 0, units: 0, surrenders: 0 }]));
 const lengths = [];
@@ -256,4 +258,42 @@ function runHill() {
   const failed = fails > 0 || rows.some(r => r.outside);
   if (failed && !JSON_OUT) console.log('\nFAILED: ' + (fails ? `${fails} crash(es)` : 'an army is outside the win band'));
   return failed;
+}
+
+// ---------- Siege Defense ----------
+// The AI defends the fortress (the hard AI by default, as the Grand runner seats it) against the scripted
+// waves, once per seed for every army. Reports the median waves survived per defending army, and fails if
+// any army's median sits more than --spread (default 40%) above or below the median of all games.
+function runDefense() {
+  const SPREAD = +opt('spread', 0.4), CAP = api.DEFENSE.waveCap, rows = [], all = [];
+  let crashes = 0;
+  ids.forEach((id, i) => {
+    const waves = [], scores = [], lengths = [];
+    for (let g = 0; g < GAMES; g++) {
+      const seed = SEED0 + g * 31 + i * 1000;
+      api.seedRandom(seed);
+      api.newGame(api.defenseCfg(id, DIFF, null, seed));
+      const G = api.G;
+      G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+      try {
+        while (!G.over && G.def.wave <= CAP) api.update(DT);
+      } catch (e) {
+        crashes++;
+        console.error(`crash in defense ${id} seed ${seed}: ${e.stack}`);
+        continue;
+      }
+      waves.push(G.def.held); scores.push(G.def.score); lengths.push(G.time); all.push(G.def.held);
+    }
+    const med = xs => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[s.length >> 1] : null; };
+    rows.push({ army: id, games: waves.length, medianWaves: med(waves), medianScore: med(scores), minutes: Math.round(med(lengths) / 6) / 10, waves });
+  });
+  const sorted = [...all].sort((a, b) => a - b), median = sorted.length ? sorted[sorted.length >> 1] : 0;
+  for (const r of rows) r.outside = r.medianWaves === null || Math.abs(r.medianWaves - median) > median * SPREAD;
+  const ok = !crashes && !rows.some(r => r.outside);
+  if (JSON_OUT) { console.log(JSON.stringify({ mode: 'defense', diff: DIFF, games: GAMES, medianWaves: median, spread: SPREAD, crashes, rows }, null, 2)); return ok; }
+  console.log(`Castle Siege Siege Defense: ${DIFF} AI defending, ${GAMES} games per army, waves cap ${CAP}`);
+  console.log('army        games  median waves  median score  median length  waves per game');
+  for (const r of rows) console.log(`${r.army.padEnd(11)} ${String(r.games).padStart(5)}  ${String(r.medianWaves).padStart(12)}  ${String(r.medianScore).padStart(12)}  ${(r.minutes + ' min').padStart(13)}  ${r.waves.join(' ')}${r.outside ? '   <-- outside the spread' : ''}`);
+  console.log(`\nmedian ${median} waves over all games (target 8-15); every army within ${Math.round(SPREAD * 100)}% of it${ok ? '' : ' -- FAILED'}${crashes ? `; ${crashes} crash(es)` : ''}`);
+  return ok;
 }

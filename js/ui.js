@@ -347,11 +347,13 @@ function renderTreasury() {
   const coins = G.coins[1], income = incomeOf(1);
   document.getElementById('coinCount').textContent = Math.floor(coins);
   document.getElementById('coinRate').textContent = coins >= coinCap() ? 'Treasury full' : `+${income}/min`;
-  const owned = G.units.find(u => u.owner === 1);
+  // Siege Defense (#65, js/defense.js) allows another map unit after each wave, so there only this break's purchase closes the shop.
+  const defense = G.mode === 'defense', mine = G.units.filter(u => u.owner === 1);
+  const owned = defense ? (G.bought.has(1) ? mine[mine.length - 1] : null) : mine[0];
   btnShop.hidden = !!owned || !!G.placing;
   if (owned) {
     shopEl.hidden = true; trNote.hidden = false;
-    trNote.innerHTML = `Your <b>${MAP_UNITS[owned.type].name}</b> stands on the field. One map unit per battle.`;
+    trNote.innerHTML = `Your <b>${MAP_UNITS[owned.type].name}</b> stands on the field. ${defense ? `You can build another after each wave, up to ${DEFENSE.maxUnits} standing.` : 'One map unit per battle.'}`;
     return;
   }
   if (G.placing) {
@@ -374,7 +376,7 @@ function renderTreasury() {
       <span class="u-top"><span class="u-name">${U.name}</span><span class="u-kind">${U.kind}</span><span class="u-price">${U.price} coins</span></span>
       <span class="u-desc">${U.desc} Range ${U.range}.</span>
       <span class="u-when"></span></button>`;
-  }).join('') + '<p class="tr-note">You can buy <b>one</b> map unit per battle.</p>';
+  }).join('') + `<p class="tr-note">You can buy <b>one</b> map unit ${G.mode === 'defense' ? 'each wave' : 'per battle'}.</p>`;
   // The countdowns tick in place; the buttons are only rebuilt when one becomes affordable or not, so a click
   // that starts on a button isn't lost to a rebuild before it ends.
   if (html !== lastShopHtml) { shopEl.innerHTML = html; lastShopHtml = html; }

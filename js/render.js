@@ -361,8 +361,12 @@ function drawKindBadge(p, x, y, size) {
     ctx.lineWidth = size * 0.12; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx + r, cy - r); ctx.moveTo(cx + r, cy + r); ctx.lineTo(cx - r, cy - r); ctx.stroke();
     ctx.lineCap = 'butt';
-  } else {
+  } else if (p.kind === 'village') {
     ctx.beginPath(); ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx - r, cy - r * 0.1); ctx.lineTo(cx, cy - r * 1.05); ctx.lineTo(cx + r, cy - r * 0.1); ctx.lineTo(cx + r, cy + r); ctx.closePath(); ctx.fill();
+  } else {
+    // A Siege Defense camp (js/defense.js): a war banner on a pole.
+    ctx.fillRect(cx - r * 0.8, cy - r * 1.1, Math.max(1, size * 0.1), r * 2.2);
+    ctx.beginPath(); ctx.moveTo(cx - r * 0.7, cy - r * 1.1); ctx.lineTo(cx + r, cy - r * 0.6); ctx.lineTo(cx - r * 0.7, cy - r * 0.1); ctx.closePath(); ctx.fill();
   }
 }
 

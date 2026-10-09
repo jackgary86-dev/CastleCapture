@@ -307,6 +307,77 @@ if (hasGrand) {
     hud(); draw(${clock});
   }`));
 }
+// ---------- 6. Siege Defense (#65): three waves through the menu path, a save and resume, then the fall ----------
+const hasDefense = run('siege defense check', `typeof startDefense === 'function'`);
+if (hasDefense) {
+  run('siege defense start', `{
+    Math.random = mulberry(${SEED});
+    startDefense(false);
+    startBattle();
+    if (G.mode !== 'defense' || G.def.phase !== 'break') throw new Error('Siege Defense did not open in a break before wave 1');
+    if (G.planets.filter(p => p.owner === 1).length !== 5) throw new Error('the fortress is not five castles');
+    if (G.planets.filter(p => p.camp).length !== 3) throw new Error('there are not three siege camps');
+    hud(); draw(${clock});
+  }`);
+  run('siege defense waves', `{
+    // The player's seat is played by the hard AI so the fortress is defended; the first three waves must be beaten.
+    G.ais.unshift({ id: 1, diff: 'hard', timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+    let saved = false;
+    for (let i = 0; i < 30 * 400 && G.def.held < 3 && !G.over; i++) {
+      update(1 / 30);
+      if (i % 150 === 0) { hud(); renderTreasury(); draw(${clock}); }
+      // Mid-wave 2: save, resume and play on, so the wave state survives a reload.
+      if (!saved && G.def.wave === 2 && G.def.phase === 'wave') {
+        saved = true;
+        const wave = G.def.wave, attackers = G.packets.filter(k => k.owner !== 1).length;
+        saveBattle(); resumeBattle(); setPaused(false);
+        if (G.mode !== 'defense' || G.def.wave !== wave || G.def.phase !== 'wave') throw new Error('the wave did not survive a save and resume');
+        if (G.packets.filter(k => k.owner !== 1).length !== attackers) throw new Error('attacking columns lost on resume');
+        G.ais.unshift({ id: 1, diff: 'hard', timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+      }
+    }
+    if (G.over || G.def.held < 3) throw new Error('the fortress did not hold three waves (held ' + G.def.held + ')');
+    if (G.def.score !== G.def.held + G.planets.filter(p => p.owner === 1).length) throw new Error('score is not waves held + castles held');
+    if (!G.def.plan || G.def.plan.wave !== G.def.wave + 1) throw new Error('no plan for the next wave during the break');
+    // Coins buy walls between waves, and the Next wave button's call starts the wave early.
+    const p = G.planets.find(q => q.owner === 1), w0 = lvl(p, 'walls');
+    G.coins[1] = 500;
+    if (!defenseBuyUpgrade(1, p, 'walls') || lvl(p, 'walls') !== w0 + 1) throw new Error('coins did not buy a Walls level');
+    sel.clear(); sel.add(p); hud();
+    if (!defenseCallWave()) throw new Error('could not call the next wave early');
+    update(1 / 30);
+    if (G.def.phase !== 'wave' || G.def.wave !== 4) throw new Error('calling the wave did not start wave 4');
+    if (!G.packets.some(k => k.owner !== 1 && k.type === 'siege')) throw new Error('wave 4 brought no catapults');
+    sel.clear(); hud(); draw(${clock});
+  }`);
+  run('siege defense end', `{
+    // Every lord hurls an overwhelming column at each castle: the last one falls and the game ends with a score.
+    G.ais = [];
+    const locked = G.def.score, camps = G.planets.filter(p => p.camp);
+    for (const p of G.planets.filter(q => q.owner === 1)) launch(camps[0].owner, camps[0], p, 2000, 'foot');
+    for (let i = 0; i < 30 * 120 && !G.over; i++) { update(1 / 30); if (i % 300 === 0) { hud(); draw(${clock}); } }
+    if (!G.over) throw new Error('the game did not end when the last castle fell');
+    if (G.planets.some(p => p.owner === 1)) throw new Error('the game ended with castles still held');
+    if (G.def.score !== locked || G.def.score < 3) throw new Error('the final score is not the score after the last wave beaten');
+    if (document.getElementById('endTitle').textContent !== 'The fortress has fallen') throw new Error('no Siege Defense end screen');
+    hud(); draw(${clock});
+  }`);
+  run('siege defense daily', `{
+    startDefense(true);
+    startBattle();
+    const day = defenseDay();
+    if (!G.cfg.daily || G.cfg.seed !== defenseDailySeed(day)) throw new Error('the daily siege is not on the seed of the day');
+    const lords = G.cfg.armies.join();
+    startDefense(true);
+    if (G.cfg.armies.join() !== lords) throw new Error('the daily siege drew different lords on a replay');
+    startBattle();
+    G.planets.forEach(p => { if (p.owner === 1) p.owner = 0; });
+    update(1 / 30);
+    if (!G.over) throw new Error('the daily siege did not end');
+    const rec = store.get('cs-defense-daily', {})[day];
+    if (!rec || rec.score !== 0) throw new Error('the daily score was not stored');
+  }`);
+}
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', and four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', and a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}.`);

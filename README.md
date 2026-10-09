@@ -29,6 +29,7 @@ Run the installer again after pulling new commits to update the game. Saved game
 - **Two players on one screen:** player 2 takes the rival army on the keyboard.
 - **Story campaigns:** five chapters for each army, with objectives and parchment story screens.
 - **Grand Campaign:** all five armies on one great map, played in waves of planning and marching, with four maps, a roaming **map monster** on each, and save slots.
+- **Siege Defense:** hold a five-castle fortress against ever bigger waves from up to three lords, with a score, a daily siege and a best-wave record.
 - **Tutorial:** a guided first battle in seven lessons.
 - **Achievements and records**, kept in your browser.
 - **Accessibility:** colour-blind mode, full keyboard play and screen-reader announcements.
@@ -73,6 +74,7 @@ The lords reinforce and intercept with cavalry. Under fog of war they play by th
 - **Grand Campaign:** all five armies on one great map, played in waves. In the plan phase nothing moves while you queue orders (sends, your power, map units); press **March** and every kingdom's orders launch at once for a 20-second march. Rival realms surrender once they fall below a fifth of the strongest realm's troops (not before wave 20). The treasury has no cap. Save to five slots, or export and import a save file, from the pause menu; **Continue** on the menu picks up the latest.
   - **Map monsters:** four maps, each with a monster (`js/monsters.js`, data in `MONSTERS` and `GRAND_MAPS`): the Wyrm of the Wastes on the Five Realms; the **Red Dragon** of the Scorched Reach, which flies between its lair and the keeps and breathes fire on the nearest column or castle where it lands; the **Cyclops** of the Giant's Fells, which follows the roads (its route is drawn a wave ahead) and smashes a castle it walks into, losing it 30% of its garrison and an upgrade level, and sleeps where it stops (troops that catch it asleep strike 1.5×); and the **Bandit Gang** of the Blackwood Marches, five captains who ambush columns among the trees, raid castles for a quarter of their coins, and heal at a camp that a big enough force can overrun. A monster wanders between the castles during each march, stands still between waves, and bites any column that strays within reach. Drag troops onto it to fight it: every troop deals 1 damage a second and the monster kills troops at its own rate, shared across everyone fighting it. Its health bar shows each army's share of the damage, and **whoever lands the final blow takes the whole bounty** (150–220 coins; the others get 10% of their damage back). It regenerates when left alone, respawns ten waves after a kill with a warning the wave before, and the lords ignore it while healthy, hunt it only with troops to spare, and swarm it below a quarter health.
 - **King of the Hill** (under **Modes** on the menu): a short race of five to ten minutes against 1, 2 or all 4 AI lords. A crowned keep stands at the centre of the map (on dry ground: no rivers in this mode). It is large, its walls count 1.5×, and it can't be upgraded. Whoever holds it scores a point a second, shown for every realm on a score bar in the header; the first to 300 wins, and after 12 minutes the most points wins. Each kingdom's starting castle is its seat (gold pennant): it can be emptied but never taken, so nobody is knocked out of the race and nobody surrenders. A banner calls out the leader, and at 250 points every lord turns on them. The lords know the rule: **Torvek** rushes the hill, **Isolde** takes the keeps beside it and counter-takes it right after someone else has paid for it, **Amaru** builds a Ballista Tower next to it, **Veyra** waits for the holder to bleed and then strikes, and **Sigrun** freezes the holder's columns with Winter's Grip while hers close in. Records keep your best time to 300 for each army. Rules in `js/hill.js`, the menu, score bar and crown in `js/hill-ui.js`; `node tools/balance.js --mode hill` checks every army's win rate.
+- **Siege Defense** (under **Modes** on the menu): a solo survival mode. You hold a fortress of five castles on the west edge; up to three rival lords muster at siege camps on the east edge (they can't be taken) and attack in timed waves, a second lord joining at wave 4 and a third at wave 7. Every wave is bigger than the last and adds a trick: **catapults** with a foot escort from wave 4, a **cavalry flank** against the castle furthest from the main blow from wave 6, and from wave 10 a **siege beast**, one huge column whose every soldier strikes three times as hard, aimed at your biggest garrison. Castles the lords take send most of their garrison with the next wave. After each wave you beat come **20 seconds** (or press **Next wave**) and a **coin payout**, more for each unclaimed keep you hold, to spend on **Walls** and **Barracks** (with coins, from the castle panel, or troops as usual) and **map units** (another after every wave, up to two standing). The **score** is the waves survived plus the castles you held when the last of them was beaten; the siege ends when your last castle falls. The **Daily siege** uses a fixed seed for the calendar day (the same homeland and waves for everyone, at Knight; the lords are drawn from the day and your army) and keeps your best score for each day in this browser. The menu card shows your most waves held, and achievements unlock at waves 10, 20 and 30. Rules in `js/defense.js`, interface in `js/defense-ui.js`.
 - **Learn to play:** the tutorial (see below).
 
 ## Controls
@@ -151,7 +153,7 @@ Each homeland has its own synthesised theme (no audio files): a lute-like air in
 
 ## Achievements and records
 
-Thirteen achievements, from First Blood and Lightning War (win in under 2 minutes) to Bane of Lords (beat every lord on Warlord) and Conqueror (capture 100 castles). New ones appear on the victory screen. The menu's achievements sheet also keeps your records: battles, wins and losses, fastest wins at each difficulty, castles captured, enemy troops destroyed on the road, and your record with each army and against each lord. Everything is saved in your browser.
+Thirteen achievements, from First Blood and Lightning War (win in under 2 minutes) to Bane of Lords (beat every lord on Warlord) and Conqueror (capture 100 castles). New ones appear on the victory screen. The menu's achievements sheet also keeps your records: battles, wins and losses, fastest wins at each difficulty, castles captured, enemy troops destroyed on the road, Siege Defense games, most waves held and best score, and your record with each army and against each lord. Siege Defense has three of its own, Hold the Line, Unbroken and The Last Bastion, for surviving 10, 20 and 30 waves; they unlock the moment the wave is beaten. Everything is saved in your browser.
 
 ## Accessibility
 
@@ -182,6 +184,7 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 | `js/sim.js` | Map generation and terrain, battle state, army stats and powers, fog of war, weather, truces, the AI lords, coins and map units, and the simulation step. No DOM access: it reports what happens through `emit()` |
 | `js/grand.js` | The Grand Campaign's rules: the five-realm map and the wave loop. No DOM access |
 | `js/hill.js` | King of the Hill rules: scoring the crowned keep, seats, the race's end, and each lord's tactics for the hill. No DOM access |
+| `js/defense.js` | Siege Defense's rules: the fortress map, the waves and their twists, payouts, coin upgrades and the daily seed. No DOM access |
 | `js/render.js` | Canvas drawing and the view state the input writes (`ptr`, `sel`) |
 | `js/ui.js` | HUD, power panel, treasury, troop types, diplomacy, input, menus, saving, the frame loop, and the listeners that turn simulation events into sound and banners |
 | `js/grand-ui.js` | The Grand Campaign's planning screen, orders list and save slots |
@@ -193,13 +196,14 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 | `js/menu-art.js` | Paints the launch background behind the main menu |
 | `js/grand-menu.js` | The menu's Grand Campaign section: map cards, Begin, Continue and the saved-games sheet |
 | `js/hill-ui.js` | King of the Hill menu entry (under Modes), the header score bar, leader banners, the crown over the keep and the end screen |
+| `js/defense-ui.js` | Siege Defense in the browser: the Modes menu card, wave line, Next wave button, coin upgrades, siege beast and end screen |
 | `js/events.js` | Random map events and their menu toggle |
 | `js/story.js` | The story campaign ladder, story screens, objective badge and progress |
 | `js/twoplayer.js` | Two players on one screen: player 2's keyboard controls, panel and truce cards |
 | `js/codex.js` | The Armies and monsters cards and codex entries |
 | `js/tutorial.js` | The guided first battle |
 
-`data.js`, `campaigns.js`, `sim.js`, `grand.js`, `hill.js` and the simulation half of `monsters.js` never touch the DOM, so the headless tools in `tools/` load them directly. The files after `ui.js` only hook into what loads before them.
+`data.js`, `campaigns.js`, `sim.js`, `grand.js`, `hill.js`, `defense.js` and the simulation half of `monsters.js` never touch the DOM, so the headless tools in `tools/` load them directly. The files after `ui.js` only hook into what loads before them.
 
 | Folder | What it holds |
 |---|---|
@@ -214,11 +218,11 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 node tools/balance.js --games 8
 ```
 
-Options: `--games N` per pairing, `--diff easy|medium|hard`, `--seconds` cap per battle, `--band 0.25,0.75`, `--json`. `--mode hill` races every pairing for the crowned keep of King of the Hill instead (each race ends at 300 points or the 12-minute cap, so every game counts), and `--mode grand` plays Grand Campaigns. Runs are seeded, so the same arguments always give the same result. GitHub Actions runs it on every push and pull request (`.github/workflows/balance.yml`).
+Options: `--games N` per pairing, `--diff easy|medium|hard`, `--seconds` cap per battle, `--band 0.25,0.75`, `--json`. `--mode hill` races every pairing for the crowned keep of King of the Hill instead (each race ends at 300 points or the 12-minute cap, so every game counts); `--mode defense` seats the AI in the Siege Defense fortress for every army and reports the median waves survived per army (it fails if any army's median is more than `--spread`, default 40%, from the overall median; the target is 8–15 waves on Warlord); and `--mode grand` plays Grand Campaigns. Runs are seeded, so the same arguments always give the same result. GitHub Actions runs it on every push and pull request (`.github/workflows/balance.yml`).
 
 ## Smoke test
 
-The balance test only loads the simulation files (`js/data.js`, `js/sim.js`, `js/grand.js`, `js/hill.js`, `js/monsters.js`), so it can't see mistakes in the UI files. `tools/smoke.js` loads every script `index.html` loads, in the same order and sharing one global scope, with stand-in browser objects. It then plays two battles through the menu path, draws frames, saves, resumes and finishes a battle, plays a short King of the Hill race to its end, and fails on any exception. That catches using a name before the file that defines it has run, two files declaring the same top-level name, and HUD or drawing code that throws.
+The balance test only loads the simulation files (`js/data.js`, `js/sim.js`, `js/grand.js`, `js/hill.js`, `js/defense.js`, `js/monsters.js`), so it can't see mistakes in the UI files. `tools/smoke.js` loads every script `index.html` loads, in the same order and sharing one global scope, with stand-in browser objects. It then plays two battles through the menu path, draws frames, saves, resumes and finishes a battle, plays a short King of the Hill race to its end, plays Grand Campaign waves, and plays a Siege Defense through three waves, a save and resume, and the fall of the last castle, and fails on any exception. That catches using a name before the file that defines it has run, two files declaring the same top-level name, and HUD or drawing code that throws.
 
 ```bash
 node tools/smoke.js
