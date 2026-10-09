@@ -252,4 +252,6 @@
   }
 
   root.paintLaunchBackground = paint;
+  // The castle and banner painters, shared with art/gallery.js.
+  root.launchArt = { stone, palisade, longhouse, domes, spires, flag, ARMY };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

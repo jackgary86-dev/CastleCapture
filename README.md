@@ -125,3 +125,5 @@ CI runs it before the balance test. It still isn't a substitute for opening the 
 ## Art
 
 `art/launch-bg.js` paints the launch background procedurally (a dusk valley with the five homelands' castles), seeded so it renders identically everywhere. Open `art/launch-bg.html` to see it fill the window, or export PNGs with `node tools/render-art.js` after a one-off `npm install @napi-rs/canvas`. The exported `art/launch-bg.png` (1920×1080) and `art/launch-bg-3840x2160.png` are checked in.
+
+`art/gallery.html` shows one painted panel for each army, homeland, Grand Campaign map and monster (`art/gallery.js`); `node tools/render-art.js --gallery` exports them to `art/gallery/` plus the contact sheet `art/gallery.png`. The renderer needs the canvas package's `icudtl.dat` next to the working directory or the Node binary for text to render.
