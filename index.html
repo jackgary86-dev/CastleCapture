@@ -480,6 +480,11 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
                 <input id="setSeed" inputmode="numeric" autocomplete="off" placeholder="Random"></label>
             </div>
           </details>
+          <span class="sublabel">Fog of war</span>
+          <div class="seg" id="fogSeg">
+            <button data-fog="off" aria-pressed="true">Off</button>
+            <button data-fog="on">On</button>
+          </div>
           <span class="sublabel">Lord taunts</span>
           <div class="seg" id="tauntSeg">
             <button data-taunts="on" aria-pressed="true">On</button>
@@ -509,6 +514,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
             <li><b>Saving:</b> an unfinished battle is saved in this browser when you close or hide the tab, and every 10 seconds. Resume it from the top of this menu. Retreating to the menu abandons it.</li>
             <li><b>Upkeep:</b> a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when. Spread big armies out or put them to work.</li>
             <li><b>Rivers</b> can only be crossed at bridges, so bridges become chokepoints. <b>Forests</b> slow marching troops. While aiming, the dashed line shows the route each column will take.</li>
+            <li><b>Fog of war</b> (optional): you only see near your own castles and marching columns. Castles out of sight show what you last saw, greyed. Send troops out to scout. The rival lords play by the same rules.</li>
             <li><b>Free-for-all</b> pits you against all four other armies at once on a bigger map. The rival lords fight each other too.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
             <li><b>Space</b> selects all your castles. <b>[</b> and <b>]</b> change the game speed (1×, 1.5× or 2×). <b>P</b> pauses. <b>M</b> mutes sound effects and <b>N</b> the music.</li>

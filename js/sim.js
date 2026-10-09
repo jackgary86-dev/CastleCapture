@@ -344,7 +344,8 @@ function newGame(cfg, portrait = false) {
     caps: 0, peak: 0, hintDone: !!cfg.demo, portrait,
     intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {}, weakSince: {}, surrendered: new Set(),
     coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
-    roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0,
+    roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0, sight: {}, sightClock: 0,
+    seen: Object.fromEntries(owners.map(o => [o, map.planets.map(p => ({ owner: p.owner, units: p.units }))])),
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
   };
   emit('newGame', G);
@@ -511,6 +512,42 @@ function send(owner, sources, target, frac = 0.5) {
   return launched;
 }
 
+// ---------- fog of war ----------
+// With cfg.fog on, a kingdom sees only near its own castles and its own marching columns. Everywhere
+// else it knows what it last saw: G.seen[o][castleId] = { owner, units }. The AI plans from the same
+// knowledge as the player.
+const SIGHT_CASTLE = 200, SIGHT_COLUMN = 85, SIGHT_EVERY = 0.2;
+function updateSight() {
+  for (const o of G.owners) {
+    const src = [];
+    for (const p of G.planets) if (p.owner === o) src.push({ x: p.x, y: p.y, r: SIGHT_CASTLE + p.r });
+    for (const k of G.packets) if (k.owner === o && k.delay <= 0) src.push({ x: k.x, y: k.y, r: SIGHT_COLUMN });
+    G.sight[o] = src;
+    const mem = G.seen[o];
+    for (const p of G.planets) if (seesAt(o, p.x, p.y)) mem[p.id] = { owner: p.owner, units: p.units };
+  }
+}
+const seesAt = (o, x, y) => !G.cfg.fog || !G.sight || !G.sight[o] || G.sight[o].some(s => (s.x - x) ** 2 + (s.y - y) ** 2 < s.r * s.r);
+// What kingdom o believes about castle p: the castle itself when o can see it, otherwise o's memory of it.
+// You always know which of your own castles you hold, and which ones you have lost.
+function knownOf(o, p) {
+  if (!G.cfg.fog || p.owner === o || seesAt(o, p.x, p.y)) return p;
+  const m = G.seen[o][p.id];
+  if (!m || m.owner === o) return p;
+  return { ...p, owner: m.owner, units: m.units, ghostOf: p };
+}
+// Troops o believes kingdom q has: remembered garrisons plus columns o can see.
+const knownTotal = (o, q) =>
+  G.planets.reduce((a, p) => { const k = knownOf(o, p); return a + (k.owner === q ? k.units : 0); }, 0) +
+  G.packets.reduce((a, k) => a + (k.owner === q && seesAt(o, k.x, k.y) ? k.n : 0), 0);
+// incomingTable as kingdom o can see it: its own columns, and others only where o has sight.
+function incomingFor(o) {
+  if (!G.cfg.fog) return incomingTable();
+  const inc = G.planets.map(() => new Array(G.owners.length + 1).fill(0));
+  for (const k of G.packets) if (k.owner === o || seesAt(o, k.x, k.y)) inc[k.to.id][k.owner] += k.n;
+  return inc;
+}
+
 function incomingTable() {
   const inc = G.planets.map(() => new Array(G.owners.length + 1).fill(0));
   for (const k of G.packets) inc[k.to.id][k.owner] += k.n;
@@ -560,7 +597,7 @@ function aiPower(ai, inc, mine) {
       break;
     case 'nyx':
       // Veyra looses the crows just before her main attack (see aiThink); this is a fallback.
-      use = waited > 60 && G.planets.some(p => p.owner && p.owner !== me && p.units >= 30);
+      use = waited > 60 && G.planets.some(p => { const k = knownOf(me, p); return k.owner && k.owner !== me && k.units >= 30; });
       break;
   }
   if (use) usePower(me);
@@ -572,11 +609,15 @@ const MUSTER_TIME = 25;
 const mustering = () => G.owners.length > 2 && G.time < MUSTER_TIME;
 
 function aiThink(ai) {
-  const me = ai.id, id = G.fac[me], P = G.planets, d = ai.diff;
+  const me = ai.id, id = G.fac[me], d = ai.diff;
+  // Under fog of war, castles out of sight are stand-ins carrying this lord's memory of them;
+  // orders always go to the real castle (t.ghostOf).
+  const P = G.cfg.fog ? G.planets.map(p => knownOf(me, p)) : G.planets;
+  const real = t => t.ghostOf || t;
   const pz = { ...army(me).ai };
   const mine = P.filter(p => p.owner === me);
   if (!mine.length) return;
-  const inc = incomingTable();
+  const inc = incomingFor(me);
   const enemyCastles = P.filter(p => p.owner && p.owner !== me);
   // Marching distance to the nearest castle in a list: rivers and forests count, not just the crow's flight.
   const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => travel(p, q))) : Infinity;
@@ -590,7 +631,7 @@ function aiThink(ai) {
     if (targets.length) {
       const t = targets[0];
       const srcs = mine.filter(s => s.units > 8).sort((a, b) => travel(a, t) - travel(b, t)).slice(0, 4);
-      if (send(me, srcs, t, 0.6)) { lordSays(me, 'counter', true); return; }
+      if (send(me, srcs, real(t), 0.6)) { lordSays(me, 'counter', true); return; }
     }
   }
 
@@ -604,7 +645,7 @@ function aiThink(ai) {
     const enemies = ts.filter(t => t.owner), neutrals = ts.filter(t => !t.owner);
     if (pz.enemyBias > 1.5 && enemies.length) ts = enemies;
     else if (pz.enemyBias < 1 && neutrals.length) ts = neutrals;
-    if (ts.length) send(me, [s], pick(ts), pz.sendFrac);
+    if (ts.length) send(me, [s], real(pick(ts)), pz.sendFrac);
     return;
   }
 
@@ -639,25 +680,27 @@ function aiThink(ai) {
   // Sigrun intercepts columns marching on unclaimed keeps near her lands when her shieldwall would win.
   if (id === 'frostmark' && Math.random() < 0.6) {
     for (const nt of P.filter(p => p.owner === 0 && nearestOf(p, mine) < 220)) {
-      const enemyIn = G.packets.filter(k => k.to === nt && k.owner !== me);
+      const enemyIn = G.packets.filter(k => k.to === real(nt) && k.owner !== me && seesAt(me, k.x, k.y));
       if (!enemyIn.length || inc[nt.id][me] > 0) continue;
       const strength = enemyIn.reduce((a, k) => a + k.n * roadOf(k.owner), 0);
       const h = mine.filter(s => s.units > 10).sort((a, b) => travel(a, nt) - travel(b, nt))[0];
-      if (h && Math.floor(h.units * 0.5) * roadOf(me) > strength) { send(me, [h], nt, 0.5); return; }
+      if (h && Math.floor(h.units * 0.5) * roadOf(me) > strength) { send(me, [h], real(nt), 0.5); return; }
     }
   }
 
   // Defensive armies turn bold once they clearly outnumber everyone.
   const myTotal = totalOf(me);
-  const enemyTotal = Math.max(1, ...G.owners.filter(o => o !== me).map(totalOf));
+  const theirTotal = o => G.cfg.fog ? knownTotal(me, o) : totalOf(o);
+  const enemyTotal = Math.max(1, ...G.owners.filter(o => o !== me).map(theirTotal));
   const bold = myTotal > enemyTotal * pz.boldAt ? 2 : 1;
 
   // Torvek fixes on the strongest rival's biggest castle and keeps hammering it.
-  if (id === 'kharzul' && (!ai.focus || ai.focus.owner === me || ai.focus.owner === 0)) {
+  if (id === 'kharzul' && (!ai.focus || knownOf(me, ai.focus).owner === me || knownOf(me, ai.focus).owner === 0)) {
     // Strongest rival first; on a tie (as at the start), the nearest one, rather than always the player.
     const near = o => Math.min(...P.filter(p => p.owner === o).map(p => nearestOf(p, mine)), Infinity);
-    const rivals = G.owners.filter(o => o !== me && P.some(p => p.owner === o)).sort((a, b) => (totalOf(b) - totalOf(a)) || (near(a) - near(b)));
-    ai.focus = P.filter(p => p.owner === rivals[0]).sort((a, b) => b.units - a.units)[0] || null;
+    const rivals = G.owners.filter(o => o !== me && P.some(p => p.owner === o)).sort((a, b) => (theirTotal(b) - theirTotal(a)) || (near(a) - near(b)));
+    const f = P.filter(p => p.owner === rivals[0]).sort((a, b) => b.units - a.units)[0];
+    ai.focus = f ? real(f) : null;
   }
 
   if (aiUpgrade(ai, mine, enemyCastles, inc, pz)) return;
@@ -696,7 +739,7 @@ function aiThink(ai) {
       if (t.kind === 'village') worth *= 1 + 0.3 * mine.filter(m => dist(m, t) <= CASTLE_KINDS.village.aura).length;
     }
     if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
-    if (id === 'kharzul' && t === ai.focus) worth *= 2.5;
+    if (id === 'kharzul' && real(t) === ai.focus) worth *= 2.5;
     if (id === 'nyx') {
       // Veyra pounces on castles that were just emptied, and boxes rivals in with nearby keeps.
       const prev = ai.snap.get(t.id);
@@ -712,7 +755,7 @@ function aiThink(ai) {
     const big = best.t.owner && (best.sum >= 20 || (id === 'kharzul' && best.sum >= 10));
     // Veyra drops the crows before her main attack lands; Torvek charges alongside his.
     if (id === 'nyx' && big && G.pw[me].ready === 0) usePower(me);
-    send(me, best.chosen, best.t, pz.sendFrac);
+    send(me, best.chosen, real(best.t), pz.sendFrac);
     if (id === 'kharzul' && big && G.pw[me].ready === 0) usePower(me);
     return;
   }
@@ -849,6 +892,7 @@ function aiBuyUnit(ai, mine) {
 // ---------- simulation ----------
 function update(dt) {
   G.time += dt;
+  if (G.cfg.fog && (G.sightClock += dt) >= SIGHT_EVERY) { G.sightClock = 0; updateSight(); }
   for (const p of G.planets) p.units += rate(p) * dt;
   for (const o of G.owners) {
     const pw = G.pw[o], was = pw.ready;

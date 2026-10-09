@@ -89,7 +89,8 @@ const castleName = p => {
   const kind = KIND_NAME[p.kind] || (p.owner === 0 ? 'keep' : 'castle');
   return p.owner === 0 ? `Unclaimed ${kind}` : p.owner === 1 ? `Your ${kind}` : `${army(p.owner).name} ${kind}`;
 };
-const describe = p => `${castleName(p)}, ${Math.floor(p.units)} troops${sel.has(p) ? ', selected' : ''}`;
+// Under fog, a castle out of sight is described as last seen.
+const describe = p => { const k = G.cfg.fog ? knownOf(1, p) : p; return `${castleName(k)}, ${Math.floor(k.units)} troops${k !== p ? ' when last seen' : ''}${sel.has(p) ? ', selected' : ''}`; };
 
 function moveFocus(p) { kbFocus = p; announce(describe(p)); }
 function cycleOwn(back) {
@@ -144,7 +145,7 @@ draw = function (now) {
   drawBase(now);
   if (!G) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.translate(ox, oy); ctx.scale(sc, sc);
-  if (cbMode) for (const k of G.packets) if (k.delay <= 0 && k.n >= 1) badge(G.fac[k.owner], k.x, k.y - 15, 5.5);
+  if (cbMode) for (const k of G.packets) if (k.delay <= 0 && k.n >= 1 && (k.owner === 1 || seesAt(1, k.x, k.y))) badge(G.fac[k.owner], k.x, k.y - 15, 5.5);
   if (kbFocus && playable()) {
     const p = kbFocus, pulse = reduceMotion ? 0 : Math.sin(now / 180) * 2;
     ctx.save(); ctx.translate(p.x, p.y);

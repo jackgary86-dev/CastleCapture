@@ -81,7 +81,8 @@ on('end', ({ win }) => endGame(win));
 
 function hud() {
   if (!G) return;
-  const totals = G.owners.map(o => [o, totalOf(o)]);
+  // Under fog the bar shows rivals as the player knows them: remembered garrisons and columns in sight.
+  const totals = G.owners.map(o => [o, o === 1 || !G.cfg.fog || G.cfg.demo ? totalOf(o) : knownTotal(1, o)]);
   const sum = totals.reduce((a, [, v]) => a + v, 0) || 1;
   strengthEl.innerHTML = totals.map(([o, v]) => `<span title="${army(o).full}" style="width:${(v / sum * 100).toFixed(1)}%;background:${col(o)}"></span>`).join('');
   if (G.cfg.demo) {
@@ -427,6 +428,9 @@ segment('aiSeg', 'ais', v => qAis = +v);
 segment('fieldSeg', 'field', v => qField = v);
 segment('rivalSeg', 'rival', v => qRival = v);
 segment('tauntSeg', 'taunts', v => { tauntsOn = v === 'on'; store.set('cs-taunts', tauntsOn); });
+let fogOn = store.get('cs-fog', false);
+segment('fogSeg', 'fog', v => { fogOn = v === 'on'; store.set('cs-fog', fogOn); });
+$('fogSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.fog === 'on') === fogOn)));
 $('tauntSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.taunts === 'on') === tauntsOn)));
 
 function setArmyColors(id) {
@@ -545,7 +549,7 @@ function quickCfg() {
   return {
     seed: fixed ? c.seed : Math.floor(Math.random() * 1e9), fixedSeed: fixed,
     n: qAis === 4 ? Math.round(c.castles * 1.75) : c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge,
-    diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0],
+    diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0], fog: fogOn,
   };
 }
 // ---------- save and resume ----------
@@ -553,7 +557,7 @@ function quickCfg() {
 // Anything that can be rebuilt (the map, scenery, effects) is left out; resume rebuilds the
 // same map from its seed, then lays the saved state over it. Castle references are stored as ids.
 const SAVE_KEY = 'cs-save', SAVE_VERSION = 2;
-const SAVE_SKIP = new Set(['theme', 'roadPts', 'fx', 'shots', 'roads', 'meadows', 'trees', 'pools', 'rocks', 'planets', 'placing', 'shake', 'paused', 'terrain', 'paths']);
+const SAVE_SKIP = new Set(['theme', 'roadPts', 'fx', 'shots', 'roads', 'meadows', 'trees', 'pools', 'rocks', 'planets', 'placing', 'shake', 'paused', 'terrain', 'paths', 'sight']);
 function enc(v) {
   if (v === null || typeof v !== 'object') return v;
   if (G.planets.includes(v)) return { $p: v.id };

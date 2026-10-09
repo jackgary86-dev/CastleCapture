@@ -407,8 +407,41 @@ function soldier(x, y, o, t, dir, style) {
 }
 
 // Red banners over the player's castles that enemy troops are marching on.
+// ---------- fog of war ----------
+// A castle out of sight is drawn as the player last saw it: last known owner and garrison, no live
+// capture animation. The fog layer drawn over the map then greys it.
+function drawRemembered(p, now) {
+  const k = knownOf(1, p);
+  if (k === p) { drawCastle(p, now); return; }
+  const keep = { owner: p.owner, units: p.units, capturedAt: p.capturedAt };
+  p.owner = k.owner; p.units = k.units; p.capturedAt = -99;
+  try { drawCastle(p, now); } finally { Object.assign(p, keep); }
+}
+
+// Darkens everything the player can't see, with soft edges round each castle's and column's sight.
+const fogCv = document.createElement('canvas'), fogCtx = fogCv.getContext('2d');
+function drawFog() {
+  const src = G.sight[1];
+  // Nothing to draw on a board with no size (a hidden or collapsed window).
+  if (!src || !cv.width || !cv.height) return;
+  if (fogCv.width !== cv.width || fogCv.height !== cv.height) { fogCv.width = cv.width; fogCv.height = cv.height; }
+  const f = fogCtx;
+  f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, fogCv.width, fogCv.height);
+  f.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * ox, dpr * oy);
+  f.globalCompositeOperation = 'source-over';
+  f.fillStyle = 'rgba(14,12,22,0.55)'; f.fillRect(-40, -40, G.w + 80, G.h + 80);
+  f.globalCompositeOperation = 'destination-out';
+  for (const s of src) {
+    const g = f.createRadialGradient(s.x, s.y, s.r * 0.7, s.x, s.y, s.r);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    f.fillStyle = g; f.beginPath(); f.arc(s.x, s.y, s.r, 0, Math.PI * 2); f.fill();
+  }
+  f.globalCompositeOperation = 'source-over';
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(fogCv, 0, 0); ctx.restore();
+}
+
 function drawThreats(now) {
-  const inc = incomingTable();
+  const inc = incomingFor(1);
   for (const p of G.planets) {
     if (p.owner !== 1) continue;
     const threat = inc[p.id].reduce((a, v, o) => o > 1 ? a + v : a, 0);
@@ -519,6 +552,7 @@ function drawUnit(u, now) {
 
 function drawShots() {
   for (const sh of G.shots) {
+    if (G.cfg.fog && !G.cfg.demo && !seesAt(1, sh.t.x, sh.t.y) && !seesAt(1, sh.u.x, sh.u.y)) continue;
     const t = Math.min(1, sh.age / sh.dur);
     const x0 = sh.u.x, y0 = sh.u.y - 26, x1 = sh.t.x, y1 = sh.t.y - sh.t.r * 0.6;
     const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t - Math.sin(Math.PI * t) * 80;
@@ -691,12 +725,13 @@ function draw(now) {
 
   // Castles and troops back to front so nearer things overlap farther ones.
   const items = G.planets.map(p => ({ y: p.y + p.r * 0.55, p }));
-  for (const k of G.packets) if (k.delay <= 0) items.push({ y: k.y, k });
+  // Under fog, enemy columns out of sight aren't drawn.
+  for (const k of G.packets) if (k.delay <= 0 && (k.owner === 1 || G.cfg.demo || seesAt(1, k.x, k.y))) items.push({ y: k.y, k });
   for (const u of G.units) items.push({ y: u.y, u });
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.u) { drawUnit(it.u, now); continue; }
-    if (it.p) { drawCastle(it.p, now); continue; }
+    if (it.p) { if (G.cfg.fog && !G.cfg.demo) drawRemembered(it.p, now); else drawCastle(it.p, now); continue; }
     const k = it.k, dir = k.dir || 1, style = army(k.owner).soldier, isFrozen = frozen(k.owner);
     const figures = Math.min(Math.ceil(k.n), 3);
     if (powerOn(k.owner, 'bloodMoon')) {
@@ -713,6 +748,7 @@ function draw(now) {
   }
 
   if (!G.cfg.demo) drawThreats(now);
+  if (G.cfg.fog && !G.cfg.demo) drawFog();
   drawShots();
   drawPlacement(now);
 
