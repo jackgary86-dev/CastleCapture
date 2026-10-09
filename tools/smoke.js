@@ -159,9 +159,13 @@ run('end screen', `
   if (!G.over) throw new Error('battle did not end after the player took every castle');
 `);
 // ---------- 4. a few waves of a Grand Campaign, if the mode is in the build ----------
+// Grand Campaigns start on a random seed and the AI lords roll dice, so seed Math.random first (as
+// tools/balance.js does) to make every run play the same campaign. SMOKE_SEED picks another one.
+const SEED = +process.env.SMOKE_SEED || 1;
 const hasGrand = run('grand campaign check', `typeof startGrand === 'function'`);
 if (hasGrand) {
   run('grand campaign start', `
+    Math.random = mulberry(${SEED});
     startGrand('realm', 'aldmere', 'hard');
     if (typeof startBattle === 'function') startBattle();
     if (G.mode !== 'grand' || G.phase !== 'plan') throw new Error('Grand Campaign did not open in its plan phase');
@@ -216,7 +220,8 @@ if (hasGrand) {
 if (hasGrand) {
   const maps = run('grand maps', `Object.keys(GRAND_MAPS)`);
   // Braces keep each script's consts out of the shared context.
-  for (const map of maps) run(`Grand Campaign on ${map}`, `{
+  maps.forEach((map, m) => run(`Grand Campaign on ${map}`, `{
+    Math.random = mulberry(${SEED * 100 + m});
     startGrand('${map}', 'aldmere', 'hard');
     if (typeof startBattle === 'function') startBattle();
     G.ais.unshift({ id: 1, diff: 'hard', timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
@@ -238,12 +243,18 @@ if (hasGrand) {
     for (let i = 0; i < 5; i++) update(1 / 30);
     if (marching && !G.packets.some(k => k.to === r)) throw new Error('columns lost their monster target on load');
     // A few more waves: the lords swarm a monster this low, and the kill schedules its return.
-    for (let w = 0; w < 6 && !r.dead; w++) { if (G.phase === 'plan') march(); for (let i = 0; i < 700 && !r.dead; i++) update(1 / 30); }
+    // The player's seat sent half of every garrison at the monster and can fall to the rival lords meanwhile;
+    // as in tools/balance.js, the other lords play on rather than the campaign ending.
+    for (let w = 0; w < 6 && !r.dead; w++) {
+      G.over = false;
+      if (G.phase === 'plan') march();
+      for (let i = 0; i < 700 && !r.dead; i++) { G.over = false; update(1 / 30); }
+    }
     if (!r.dead) throw new Error('a monster at a fifth of its health was not finished off within six waves');
     if (G.monster.creatures.every(x => x.dead) && G.monster.respawnWave === null) throw new Error('no respawn scheduled after the kill');
     deleteGrandSlot(4);
     hud(); draw(${clock});
-  }`);
+  }`));
 }
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
