@@ -135,7 +135,25 @@ on('surrender', ({ o, heir }) => {
   taunt(o, 'surrender', true);
   sfx.horn(true);
 });
+// Who took the player's castles most recently, for the defeat text.
+let lastTaker = null;
+on('newGame', () => { lastTaker = null; });
+on('capture', ({ o, was }) => { if (was === 1 && o !== 1) lastTaker = o; });
 on('end', ({ win }) => endGame(win));
+// "A", "A and B", "A, B and C".
+const andList = xs => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+// The defeat line: who took the last castle, and which other rivals are still in the fight.
+function defeatText() {
+  const name = o => army(o).full || army(o).name;
+  const standing = G.owners.slice(1).filter(o => !G.surrendered.has(o) && (G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o)));
+  const taker = lastTaker != null && !G.surrendered.has(lastTaker) ? lastTaker : standing[0];
+  const others = standing.filter(o => o !== taker).map(name);
+  const tip = 'Claim more keeps early, and keep your power for the moment it matters.';
+  if (G.surrendered.has(1)) return `Your realm has surrendered${taker != null ? ` to ${name(taker)}` : ''}. ${tip}`;
+  if (taker == null) return `Your last castle has fallen. ${tip}`;
+  const rest = others.length ? ` ${andList(others)} ${others.length > 1 ? 'fight' : 'fights'} on without you.` : '';
+  return `Your last castle has fallen to ${name(taker)}.${rest} ${tip}`;
+}
 
 function hud() {
   if (!G) return;
@@ -872,7 +890,7 @@ function endGame(win) {
   $('endTitle').className = win ? 'result-win' : 'result-lose';
   $('endText').textContent = win
     ? (lv === LEVELS.length ? `The High Throne has fallen. ${me.full} rules the realm.` : lv ? `${LEVELS[lv - 1].name} is yours. ${LEVELS[lv].name} awaits.` : `${me.name} banners fly over every castle in ${G.theme === THEMES[me.map] ? 'your homeland' : ARMIES[G.cfg.map].homeland}.`)
-    : `Your last castle has fallen to ${G.owners.slice(1).map(o => army(o).full).join(' and ')}. Claim more keeps early, and keep your power for the moment it matters.`;
+    : defeatText();
   // The rival lord has the last word: the strongest survivor if you lost, the last one standing if you won.
   const lordO = win ? G.owners[G.owners.length - 1] : G.owners.slice(1).sort((a, b) => totalOf(b) - totalOf(a))[0];
   const L = lordOf(lordO);
