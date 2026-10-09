@@ -1,0 +1,786 @@
+<title>Castle Siege</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Alegreya+Sans:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: a dark timber command bar over a full-height painted field map; menus are parchment sheets over a live AI-vs-AI siege. */
+:root {
+  --timber: #17140e;
+  --field: #33432a;
+  --field-lit: #3d5031;
+  --road: #8d7a55;
+  --stone: #bdb3a0;
+  --stone-dark: #807563;
+  --parchment: #dccba2;
+  --ink: #2a2014;
+  --ink-soft: #5e4f37;
+  --text: #ece2c6;
+  --muted: #a99d80;
+  --line: #3a3324;
+  --blue: #4f8ff0;
+  --red: #d9443e;
+  --gold: #e9b43b;
+  --neutral: #8c8676;
+  --display: "IM Fell English SC", "Palatino Linotype", Georgia, serif;
+  --ui: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html { height: 100%; box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
+body { height: 100%; margin: 0; background: var(--timber); color: var(--text); font-family: var(--ui); font-size: 15px; overflow: hidden; }
+#app { height: 100%; display: flex; flex-direction: column; gap: 10px; padding-inline: 16px; padding-block: 10px; }
+header { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: 0.04em; white-space: nowrap; line-height: 1; }
+#strength { flex: 1 1 140px; min-width: 120px; height: 10px; display: flex; gap: 2px; border-radius: 2px; overflow: hidden; background: var(--line); border: 1px solid #4a412e; }
+#strength span { height: 100%; transition: width 0.4s ease; }
+#status { color: var(--muted); font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.sendctl { display: flex; align-items: center; gap: 0; border: 1px solid #4a412e; border-radius: 4px; overflow: hidden; }
+.sendctl span { padding: 0 8px; font-size: 13px; color: var(--muted); }
+.sendctl button { border: 0; border-left: 1px solid #4a412e; border-radius: 0; padding: 5px 9px; font-variant-numeric: tabular-nums; }
+.sendctl button[aria-pressed="true"] { background: var(--blue); color: #08142a; font-weight: 800; }
+.sendctl button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-right: 3px; }
+button { font: inherit; font-weight: 500; color: var(--text); background: transparent; border: 1px solid #4a412e; border-radius: 4px; padding: 5px 12px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button:disabled { opacity: 0.35; cursor: not-allowed; }
+#board { flex: 1; position: relative; min-height: 0; border: 2px solid #4a412e; border-radius: 6px; overflow: hidden; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: rgb(23 20 14 / 0.45); }
+
+/* Parchment sheets */
+.sheet { width: 100%; max-width: 470px; color: var(--ink); background: var(--parchment);
+  background-image: radial-gradient(ellipse at 30% 20%, rgb(255 248 225 / 0.35), transparent 60%), radial-gradient(ellipse at 80% 90%, rgb(120 90 40 / 0.18), transparent 55%);
+  border: 1px solid #a8925f; border-radius: 3px; padding: 22px 24px; display: flex; flex-direction: column; gap: 16px;
+  box-shadow: 0 0 0 4px rgb(220 203 162 / 0.25), 0 24px 60px rgb(0 0 0 / 0.55); }
+.sheet h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 36px; line-height: 1; text-wrap: balance; }
+.sheet p { margin: 0; color: var(--ink-soft); line-height: 1.5; }
+.sheet button { color: var(--ink); border-color: #9c8656; background: rgb(255 250 235 / 0.25); }
+.sheet button:hover:not(:disabled) { border-color: var(--ink); }
+.sheet button.primary { background: #2f5ea8; border-color: #23477f; color: #f4ecd6; font-weight: 700; }
+.sheet button.primary:hover { background: #3669b8; }
+.sheet button:focus-visible { outline-color: #2f5ea8; }
+.label { font-family: var(--display); font-size: 17px; color: var(--ink); border-bottom: 1px solid #b39d6c; padding-bottom: 3px; }
+.group { display: flex; flex-direction: column; gap: 8px; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--parchment); }
+.ladder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ladder button { padding: 6px 2px; display: flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.2; min-width: 0; }
+.ladder b { font-family: var(--display); font-weight: 400; font-size: 18px; }
+.ladder small { font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.ladder button.done b::after { content: " \2691"; color: #2f5ea8; font-size: 13px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row button { flex: 1; }
+.rules { margin: 0; padding-left: 18px; color: var(--ink-soft); line-height: 1.55; font-size: 14px; }
+.rules b { color: var(--ink); }
+.result-win { color: #2f5ea8; }
+.result-lose { color: #9e2a25; }
+.stats { display: flex; gap: 22px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.stats div { display: flex; flex-direction: column; }
+.stats span { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.08em; }
+.stats strong { font-size: 22px; font-weight: 800; }
+@media (max-width: 520px) {
+  h1 { font-size: 20px; }
+  .sheet { padding: 18px; gap: 13px; }
+  .sheet h2 { font-size: 30px; }
+}
+</style>
+
+<div id="app">
+  <header>
+    <h1>Castle Siege</h1>
+    <div id="strength" aria-label="Army strength by kingdom"></div>
+    <span id="status">Demo</span>
+    <div class="tools">
+      <button id="btnAll" title="Select all your castles (Space)" disabled>All</button>
+      <button id="btnPause" title="Pause (P)" disabled>Pause</button>
+    </div>
+  </header>
+  <div id="board">
+    <canvas id="cv"></canvas>
+
+    <div class="overlay" id="menu">
+      <div class="sheet">
+        <h2>Castle Siege</h2>
+        <p>Take every enemy castle. Drag from a castle flying your blue banner to march half its garrison anywhere on the map.</p>
+        <div class="group">
+          <span class="label">Skirmish</span>
+          <div class="seg" id="diffSeg">
+            <button data-diff="easy">Squire</button>
+            <button data-diff="medium" aria-pressed="true">Knight</button>
+            <button data-diff="hard">Warlord</button>
+          </div>
+          <div class="seg" id="aiSeg">
+            <button data-ais="1" aria-pressed="true">1 rival kingdom</button>
+            <button data-ais="2">2 rivals</button>
+          </div>
+          <button class="primary" id="btnQuick">March to war</button>
+        </div>
+        <div class="group">
+          <span class="label">Campaign</span>
+          <div class="ladder" id="ladder"></div>
+        </div>
+        <div class="group">
+          <span class="label">Rules of war</span>
+          <ul class="rules">
+            <li><b>Drag</b> from your castle to any castle to send half its troops.</li>
+            <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
+            <li><b>Bigger castles</b> train troops faster. Grey, unclaimed keeps never grow.</li>
+            <li><b>Space</b> selects all your castles. <b>P</b> pauses.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="pauseOv" hidden>
+      <div class="sheet">
+        <h2>Truce</h2>
+        <p>The armies rest in place.</p>
+        <div class="row">
+          <button class="primary" id="btnResume">Resume the siege</button>
+          <button id="btnQuit">Retreat to menu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="endOv" hidden>
+      <div class="sheet">
+        <h2 id="endTitle">Victory</h2>
+        <p id="endText"></p>
+        <div class="stats">
+          <div><span>Time</span><strong id="endTime">0:00</strong></div>
+          <div><span>Castles taken</span><strong id="endCaps">0</strong></div>
+          <div><span>Largest army</span><strong id="endPeak">0</strong></div>
+        </div>
+        <div class="row">
+          <button class="primary" id="btnNext">Next battle</button>
+          <button id="btnRetry">Fight again</button>
+          <button id="btnMenu">Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const css = getComputedStyle(document.documentElement);
+  const tok = n => css.getPropertyValue(n).trim();
+  const COL = { 0: tok('--neutral'), 1: tok('--blue'), 2: tok('--red'), 3: tok('--gold') };
+  const C = {
+    timber: tok('--timber'), field: tok('--field'), fieldLit: tok('--field-lit'), road: tok('--road'),
+    stone: tok('--stone'), stoneDark: tok('--stone-dark'), text: tok('--text'), parchment: tok('--parchment'), ink: tok('--ink'),
+  };
+  const SPEED = 80;             // marching speed, world units per second
+  const PROD = 0.055;           // troops per second per unit of castle size
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const LEVELS = [
+    { seed: 11, n: 12, diff: 'easy',   ais: 1, name: 'Thornbury' },
+    { seed: 23, n: 14, diff: 'easy',   ais: 1, name: 'Ashford' },
+    { seed: 37, n: 16, diff: 'medium', ais: 1, name: 'Ravenmoor' },
+    { seed: 41, n: 18, diff: 'medium', ais: 1, name: 'Coldwater' },
+    { seed: 59, n: 18, diff: 'hard',   ais: 1, name: 'Greyhelm' },
+    { seed: 61, n: 20, diff: 'hard',   ais: 1, name: 'Wolfden' },
+    { seed: 73, n: 19, diff: 'hard',   ais: 2, name: 'Three Crowns' },
+    { seed: 89, n: 22, diff: 'hard',   ais: 2, name: 'High Throne', aiBonus: 25 },
+  ];
+  const DIFF_NAME = { easy: 'Squire', medium: 'Knight', hard: 'Warlord' };
+
+  // ---------- utilities ----------
+  const mulberry = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const alpha = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
+  const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+
+  // ---------- map generation ----------
+  function genMap(seed, n, players, portrait, aiBonus = 0) {
+    const rnd = mulberry(seed);
+    const W = 1000, H = 640, cx = W / 2, cy = H / 2;
+    const pts = [];
+    const fits = (x, y, r) => x - r > 40 && x + r < W - 40 && y - r * 1.3 > 30 && y + r * 1.3 < H - 30 &&
+      pts.every(p => Math.hypot(p.x - x, p.y - y) > p.r + r + 34);
+    const garrison = r => Math.round(r * 0.45 + rnd() * r * 0.7);
+
+    if (players === 2) {
+      pts.push({ x: 130, y: cy, r: 28, owner: 1, units: 40 });
+      pts.push({ x: W - 130, y: cy, r: 28, owner: 2, units: 40 + aiBonus });
+      if (n % 2 === 1) pts.push({ x: cx, y: cy, r: 32, owner: 0, units: 45 });
+      let tries = 0;
+      while (pts.length < n && tries++ < 4000) {
+        const r = 13 + rnd() * 19, x = 60 + rnd() * (cx - 60), y = 50 + rnd() * (H - 100);
+        const mx = W - x, my = H - y;
+        if (Math.hypot(mx - x, my - y) < 2 * r + 34) continue;
+        if (!fits(x, y, r) || !fits(mx, my, r)) continue;
+        const u = garrison(r);
+        pts.push({ x, y, r, owner: 0, units: u }, { x: mx, y: my, r, owner: 0, units: u });
+      }
+    } else {
+      const ax = 430, ay = 260;
+      for (let k = 0; k < 3; k++) {
+        const a = Math.PI + k * 2 * Math.PI / 3;
+        pts.push({ x: cx + Math.cos(a) * ax * 0.92, y: cy + Math.sin(a) * ay * 0.92, r: 26, owner: k + 1, units: k ? 40 + aiBonus : 40 });
+      }
+      pts.push({ x: cx, y: cy, r: 33, owner: 0, units: 60 });
+      let tries = 0;
+      while (pts.length < n && tries++ < 4000) {
+        const r = 13 + rnd() * 17, a0 = rnd() * 2 * Math.PI / 3, rr = 0.28 + rnd() * 0.7;
+        const trio = [0, 1, 2].map(k => { const a = a0 + k * 2 * Math.PI / 3; return { x: cx + Math.cos(a) * ax * rr, y: cy + Math.sin(a) * ay * rr }; });
+        const ok = trio.every((p, i) => fits(p.x, p.y, r) && trio.every((q, j) => i === j || Math.hypot(p.x - q.x, p.y - q.y) > 2 * r + 34));
+        if (!ok) continue;
+        const u = garrison(r);
+        trio.forEach(p => pts.push({ ...p, r, owner: 0, units: u }));
+      }
+    }
+    // Portrait screens: rotate the map so the player starts at the bottom.
+    const rot = p => portrait ? { x: p.y, y: W - p.x } : { x: p.x, y: p.y };
+    const planets = pts.map((p, id) => ({ id, ...rot(p), r: p.r, owner: p.owner, units: p.units }));
+    const w = portrait ? H : W, h = portrait ? W : H;
+
+    // Scenery: roads between neighbouring castles, meadows and woods.
+    const roads = [], seen = new Set();
+    for (const a of planets) {
+      planets.filter(b => b !== a).sort((b, c) => dist(a, b) - dist(a, c)).slice(0, 2).forEach(b => {
+        const key = Math.min(a.id, b.id) + '-' + Math.max(a.id, b.id);
+        if (seen.has(key)) return;
+        seen.add(key);
+        const mx = (a.x + b.x) / 2 + (rnd() - 0.5) * 50, my = (a.y + b.y) / 2 + (rnd() - 0.5) * 50;
+        roads.push({ a, b, mx, my });
+      });
+    }
+    const meadows = Array.from({ length: 9 }, () => ({ x: rnd() * w, y: rnd() * h, rx: 80 + rnd() * 140, ry: 50 + rnd() * 90 }));
+    const trees = [];
+    for (let i = 0; i < 400 && trees.length < 90; i++) {
+      // Trees grow in clumps around a few seeds.
+      const base = trees.length && rnd() < 0.7 ? trees[Math.floor(rnd() * trees.length)] : { x: rnd() * w, y: rnd() * h };
+      const x = base.x + (rnd() - 0.5) * 60, y = base.y + (rnd() - 0.5) * 60;
+      if (x < 8 || y < 8 || x > w - 8 || y > h - 8) continue;
+      if (planets.some(p => Math.hypot(p.x - x, p.y - y) < p.r + 30)) continue;
+      trees.push({ x, y, s: 5 + rnd() * 4, shade: rnd() });
+    }
+    trees.sort((a, b) => a.y - b.y);
+    return { planets, w, h, roads, meadows, trees };
+  }
+
+  // ---------- game state ----------
+  let G = null, lastCfg = null;
+  const sel = new Set();
+
+  function newGame(cfg) {
+    const portrait = board.clientHeight > board.clientWidth * 1.1;
+    const players = cfg.ais + 1;
+    const map = genMap(cfg.seed, cfg.n, players, portrait, cfg.aiBonus || 0);
+    const aiIds = cfg.demo ? [1, 2] : (players === 2 ? [2] : [2, 3]);
+    G = {
+      cfg, ...map, packets: [], fx: [], time: 0, over: false, paused: false,
+      owners: players === 2 ? [1, 2] : [1, 2, 3],
+      ais: aiIds.map((id, i) => ({ id, diff: cfg.demo ? 'medium' : cfg.diff, timer: 1.4 + i * 0.35 })),
+      caps: 0, peak: 0, hintDone: cfg.demo || store.get('cs-hint', false),
+    };
+    sel.clear();
+    resize();
+  }
+
+  const rate = p => p.owner ? p.r * PROD : 0;
+
+  function send(owner, sources, target) {
+    let launched = false;
+    for (const s of sources) {
+      if (s === target || s.owner !== owner) continue;
+      const n = Math.floor(s.units / 2);
+      if (n < 1) continue;
+      s.units -= n;
+      launched = true;
+      const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
+      const ang = Math.atan2(target.y - s.y, target.x - s.x);
+      for (let i = 0; i < k; i++) {
+        const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
+        const off = (Math.random() - 0.5) * s.r * 1.1;
+        G.packets.push({
+          owner, to: target, n: cnt, delay: i * 0.06, phase: Math.random() * 6.28,
+          x: s.x + Math.cos(ang) * s.r * 0.8 - Math.sin(ang) * off,
+          y: s.y + Math.sin(ang) * s.r * 0.8 + Math.cos(ang) * off,
+        });
+      }
+    }
+    return launched;
+  }
+
+  function incomingTable() {
+    const inc = G.planets.map(() => [0, 0, 0, 0]);
+    for (const k of G.packets) inc[k.to.id][k.owner] += k.n;
+    return inc;
+  }
+
+  // ---------- AI ----------
+  function needAt(t, far, inc, me) {
+    let def = t.units;
+    if (t.owner !== 0) def += rate(t) * (far / SPEED) + inc[t.id][t.owner];
+    def -= inc[t.id][me];
+    return Math.ceil(def + 2);
+  }
+
+  function aiThink(ai) {
+    const me = ai.id, P = G.planets, d = ai.diff;
+    const mine = P.filter(p => p.owner === me);
+    if (!mine.length) return;
+
+    if (d === 'easy') {
+      if (Math.random() < 0.45) return;
+      const srcs = mine.filter(p => p.units >= 14);
+      if (!srcs.length) return;
+      const s = pick(srcs);
+      const ts = P.filter(p => p.owner !== me).sort((a, b) => dist(s, a) - dist(s, b)).slice(0, 4);
+      if (ts.length) send(me, [s], pick(ts));
+      return;
+    }
+
+    const inc = incomingTable();
+    // Reinforce castles that are about to fall.
+    for (const p of mine) {
+      const threat = inc[p.id].reduce((a, v, o) => o !== me ? a + v : a, 0);
+      if (threat > p.units + inc[p.id][me] + rate(p) * 1.5) {
+        const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => dist(a, p) - dist(b, p));
+        if (helpers.length) {
+          send(me, d === 'hard' ? helpers.slice(0, 2) : [helpers[0]], p);
+          if (d === 'medium') return;
+        }
+      }
+    }
+    // Attack or expand where the return per troop spent is best.
+    let best = null;
+    const maxSrc = d === 'hard' ? 4 : 1;
+    for (const t of P) {
+      if (t.owner === me) continue;
+      const srcs = mine.filter(s => s.units >= 6).sort((a, b) => dist(a, t) - dist(b, t));
+      const chosen = [];
+      let sum = 0, far = 0, need = Infinity;
+      for (const s of srcs) {
+        if (chosen.length >= maxSrc) break;
+        chosen.push(s);
+        sum += Math.floor(s.units / 2);
+        far = Math.max(far, dist(s, t));
+        need = needAt(t, far, inc, me);
+        if (sum >= need) break;
+      }
+      if (!chosen.length || need <= 2 || sum < need) continue;
+      const worth = (t.r * PROD + 0.4) * (t.owner === 0 ? 1 : d === 'hard' ? 1.7 : 1.3);
+      const score = worth / (need + far * 0.06);
+      if (!best || score > best.score) best = { score, chosen, t };
+    }
+    if (best) send(me, best.chosen, best.t);
+  }
+
+  // ---------- simulation ----------
+  function update(dt) {
+    G.time += dt;
+    for (const p of G.planets) p.units += rate(p) * dt;
+
+    for (let i = G.packets.length - 1; i >= 0; i--) {
+      const k = G.packets[i];
+      if (k.delay > 0) { k.delay -= dt; continue; }
+      const t = k.to, dx = t.x - k.x, dy = t.y - k.y, dd = Math.hypot(dx, dy);
+      if (dd <= t.r * 0.8) {
+        G.packets.splice(i, 1);
+        if (t.owner === k.owner) t.units += k.n;
+        else {
+          t.units -= k.n;
+          G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
+          if (t.units < 0) {
+            const was = t.owner;
+            t.owner = k.owner; t.units = -t.units;
+            if (k.owner === 1) G.caps++;
+            if (was === 1) sel.delete(t);
+            G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: COL[k.owner], age: 0 });
+          }
+        }
+        continue;
+      }
+      const step = Math.min(dd, SPEED * dt);
+      k.x += dx / dd * step; k.y += dy / dd * step;
+      k.dir = dx < 0 ? -1 : 1;
+    }
+
+    for (const f of G.fx) f.age += dt;
+    G.fx = G.fx.filter(f => f.age < (f.kind === 'capture' ? 0.9 : 0.35));
+
+    const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
+    for (const ai of G.ais) {
+      ai.timer -= dt;
+      if (ai.timer <= 0) { ai.timer = intervals[ai.diff] * (0.8 + Math.random() * 0.4); aiThink(ai); }
+    }
+
+    const alive = o => G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o);
+    G.ais = G.ais.filter(ai => alive(ai.id));
+    G.peak = Math.max(G.peak, totalOf(1));
+
+    if (G.cfg.demo) {
+      if (!alive(1) || !alive(2) || G.time > 150) newGame(demoCfg());
+      return;
+    }
+    if (!alive(1)) endGame(false);
+    else if (G.owners.slice(1).every(o => !alive(o))) endGame(true);
+  }
+
+  function totalOf(o) {
+    let s = 0;
+    for (const p of G.planets) if (p.owner === o) s += p.units;
+    for (const k of G.packets) if (k.owner === o) s += k.n;
+    return s;
+  }
+
+  // ---------- rendering ----------
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const board = document.getElementById('board');
+  let dpr = 1, cw = 0, ch = 0, sc = 1, ox = 0, oy = 0;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cw = board.clientWidth; ch = board.clientHeight;
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    if (G) { sc = Math.min(cw / G.w, ch / G.h); ox = (cw - G.w * sc) / 2; oy = (ch - G.h * sc) / 2; }
+  }
+  new ResizeObserver(resize).observe(board);
+
+  const ptr = { down: false, moved: false, sx: 0, sy: 0, wx: 0, wy: 0, start: null, wasSel: false, hover: null };
+
+  function crenels(x, y, w, size) {
+    const n = Math.max(2, Math.round(w / (size * 2)));
+    const step = w / (n * 2 - 1);
+    for (let i = 0; i < n; i++) ctx.fillRect(x + i * step * 2, y - size, step, size);
+  }
+
+  function flag(x, y, h, col, now, seed) {
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
+    const wave = reduceMotion ? 0 : Math.sin(now / 260 + seed) * 1.6;
+    const fw = h * 0.75, fh = h * 0.45, top = y - h;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.quadraticCurveTo(x + fw * 0.5, top + wave, x + fw, top + fh * 0.15 + wave * 0.5);
+    ctx.lineTo(x + fw * 0.82, top + fh * 0.5);
+    ctx.lineTo(x + fw, top + fh * 0.85 - wave * 0.5);
+    ctx.quadraticCurveTo(x + fw * 0.5, top + fh - wave, x, top + fh);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawCastle(p, now) {
+    const s = p.r, col = COL[p.owner], baseY = p.y + s * 0.55;
+    const tier = s < 18 ? 1 : s < 26 ? 2 : 3;
+    // Claimed land under the castle.
+    ctx.beginPath(); ctx.ellipse(p.x, baseY - s * 0.1, s * 1.25, s * 0.62, 0, 0, Math.PI * 2);
+    ctx.fillStyle = p.owner ? alpha(col, 0.28) : 'rgba(20,18,12,0.22)'; ctx.fill();
+    if (p.owner) { ctx.strokeStyle = alpha(col, 0.7); ctx.lineWidth = 1.5; ctx.stroke(); }
+
+    const block = (x, y, w, h, shade) => {
+      ctx.fillStyle = shade ? C.stoneDark : C.stone;
+      ctx.fillRect(x, y, w, h);
+      crenels(x, y, w, Math.max(2, s * 0.12));
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fillRect(x + w * 0.62, y, w * 0.38, h);
+    };
+    const flags = [];
+    if (tier === 1) {
+      const w = s * 0.9, h = s * 1.45;
+      block(p.x - w / 2, baseY - h, w, h);
+      flags.push([p.x, baseY - h - s * 0.12]);
+    } else {
+      const ww = s * (tier === 2 ? 1.7 : 2), wh = s * 0.75;
+      const tw = s * 0.5, th = s * (tier === 2 ? 1.25 : 1.15);
+      block(p.x - ww / 2 - tw * 0.3, baseY - th, tw, th, true);
+      block(p.x + ww / 2 - tw * 0.7, baseY - th, tw, th, true);
+      if (tier === 3) {
+        const kw = s * 0.75, kh = s * 1.6;
+        block(p.x - ww / 2 + tw * 0.4, baseY - wh, ww - tw * 0.8, wh);
+        block(p.x - kw / 2, baseY - kh, kw, kh);
+        flags.push([p.x, baseY - kh - s * 0.12]);
+      } else {
+        block(p.x - ww / 2 + tw * 0.4, baseY - wh, ww - tw * 0.8, wh);
+        flags.push([p.x - ww / 2 + tw * 0.2, baseY - th - s * 0.1]);
+      }
+      // Gate.
+      ctx.fillStyle = C.ink;
+      const gw = s * 0.36, gh = s * 0.46;
+      ctx.beginPath(); ctx.moveTo(p.x - gw / 2, baseY); ctx.lineTo(p.x - gw / 2, baseY - gh + gw / 2);
+      ctx.arc(p.x, baseY - gh + gw / 2, gw / 2, Math.PI, 0); ctx.lineTo(p.x + gw / 2, baseY); ctx.fill();
+    }
+    for (const [fx, fy] of flags) {
+      if (p.owner) flag(fx, fy, s * 0.7, col, now, p.id);
+      else { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - s * 0.45); ctx.stroke(); }
+    }
+
+    // Garrison plaque.
+    const label = String(Math.floor(p.units));
+    const fs = Math.max(11, s * 0.5);
+    ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
+    const tw = ctx.measureText(label).width + fs * 0.8, th = fs * 1.2, py = baseY + s * 0.22;
+    ctx.fillStyle = p.owner ? col : C.parchment;
+    ctx.beginPath(); ctx.roundRect(p.x - tw / 2, py, tw, th, 3); ctx.fill();
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = p.owner ? '#fff8e6' : C.ink;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, p.x, py + th / 2 + 1);
+  }
+
+  function soldier(x, y, col, t, dir) {
+    const step = reduceMotion ? 0 : Math.sin(t);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 1); ctx.lineTo(x - 1.4 * step, y + 2.6);
+    ctx.moveTo(x, y - 1); ctx.lineTo(x + 1.4 * step, y + 2.6);
+    ctx.moveTo(x + 2 * dir, y + 1.5); ctx.lineTo(x + 2 * dir, y - 7.5);
+    ctx.stroke();
+    ctx.fillStyle = col; ctx.fillRect(x - 1.5, y - 4.6, 3, 4);
+    ctx.fillStyle = '#e8c9a0'; ctx.beginPath(); ctx.arc(x, y - 5.8, 1.3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawScenery() {
+    ctx.fillStyle = C.field; ctx.fillRect(0, 0, G.w, G.h);
+    ctx.fillStyle = C.fieldLit;
+    for (const m of G.meadows) { ctx.beginPath(); ctx.ellipse(m.x, m.y, m.rx, m.ry, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.lineCap = 'round';
+    for (const [w, a] of [[9, 0.25], [5, 0.55]]) {
+      ctx.strokeStyle = alpha(C.road, a); ctx.lineWidth = w;
+      for (const r of G.roads) { ctx.beginPath(); ctx.moveTo(r.a.x, r.a.y + r.a.r * 0.5); ctx.quadraticCurveTo(r.mx, r.my, r.b.x, r.b.y + r.b.r * 0.5); ctx.stroke(); }
+    }
+    ctx.lineCap = 'butt';
+    for (const t of G.trees) {
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(t.x + 2, t.y + t.s * 0.7, t.s, t.s * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = t.shade < 0.5 ? '#1f2c18' : '#26361d'; ctx.beginPath(); ctx.arc(t.x, t.y, t.s, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(160,190,110,0.18)'; ctx.beginPath(); ctx.arc(t.x - t.s * 0.3, t.y - t.s * 0.35, t.s * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function draw(now) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#263220'; ctx.fillRect(0, 0, cw, ch);
+    if (!G) return;
+    ctx.translate(ox, oy); ctx.scale(sc, sc);
+    drawScenery();
+    const spin = reduceMotion ? 0 : now / 1100;
+
+    // Marching orders while aiming.
+    if (ptr.down && ptr.moved && sel.size) {
+      ctx.strokeStyle = alpha(C.parchment, 0.75); ctx.lineWidth = 2 / sc; ctx.setLineDash([7 / sc, 6 / sc]);
+      const tx = ptr.hover ? ptr.hover.x : ptr.wx, ty = ptr.hover ? ptr.hover.y : ptr.wy;
+      for (const s of sel) { if (s === ptr.hover) continue; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke(); }
+      ctx.setLineDash([]);
+    }
+
+    // Selection and target rings sit on the ground under the castles.
+    for (const p of G.planets) {
+      const targeted = ptr.down && ptr.moved && sel.size && ptr.hover === p && !sel.has(p);
+      if (!sel.has(p) && !targeted) continue;
+      ctx.save(); ctx.translate(p.x, p.y + p.r * 0.45); ctx.scale(1, 0.5); ctx.rotate(spin);
+      ctx.setLineDash(sel.has(p) ? [8, 6] : []); ctx.strokeStyle = sel.has(p) ? C.parchment : '#fff3d0'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, p.r * 1.45, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
+
+    // Draw castles and troops back to front so nearer things overlap farther ones.
+    const items = G.planets.map(p => ({ y: p.y + p.r * 0.55, p }));
+    for (const k of G.packets) if (k.delay <= 0) items.push({ y: k.y, k });
+    items.sort((a, b) => a.y - b.y);
+    for (const it of items) {
+      if (it.p) { drawCastle(it.p, now); continue; }
+      const k = it.k, col = COL[k.owner], dir = k.dir || 1;
+      const figures = Math.min(k.n, 3);
+      for (let i = 0; i < figures; i++) soldier(k.x + (i - (figures - 1) / 2) * 4.2, k.y + (i % 2) * 2.5, col, now / 90 + k.phase + i, dir);
+    }
+
+    for (const f of G.fx) {
+      if (f.kind === 'clash') {
+        const t = f.age / 0.35;
+        ctx.strokeStyle = alpha('#fff3d0', 1 - t); ctx.lineWidth = 1.2;
+        for (let a = 0; a < 4; a++) {
+          const ang = a * Math.PI / 2 + 0.6, r1 = 2 + t * 3, r2 = 4 + t * 6;
+          ctx.beginPath(); ctx.moveTo(f.x + Math.cos(ang) * r1, f.y - 4 + Math.sin(ang) * r1); ctx.lineTo(f.x + Math.cos(ang) * r2, f.y - 4 + Math.sin(ang) * r2); ctx.stroke();
+        }
+      } else {
+        const t = f.age / 0.9;
+        ctx.save(); ctx.translate(f.x, f.y + f.r * 0.45); ctx.scale(1, 0.5);
+        ctx.beginPath(); ctx.arc(0, 0, f.r * 1.3 + t * 40, 0, Math.PI * 2);
+        ctx.strokeStyle = alpha(f.col, 1 - t); ctx.lineWidth = 6 * (1 - t) + 1; ctx.stroke(); ctx.restore();
+      }
+    }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!G.cfg.demo && !G.hintDone) {
+      const msg = 'Drag from a blue-banner castle onto another castle to attack';
+      ctx.font = '500 14px "Alegreya Sans", system-ui, sans-serif';
+      const w = Math.min(cw - 32, ctx.measureText(msg).width + 24);
+      ctx.fillStyle = alpha(C.timber, 0.82); ctx.beginPath(); ctx.roundRect((cw - w) / 2, ch - 44, w, 30, 4); ctx.fill();
+      ctx.fillStyle = C.text; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(msg, cw / 2, ch - 29, cw - 48);
+    }
+  }
+
+  // ---------- HUD ----------
+  const strengthEl = document.getElementById('strength'), statusEl = document.getElementById('status');
+  let hudTick = 0;
+  function hud() {
+    if (!G) return;
+    const totals = G.owners.map(o => [o, totalOf(o)]);
+    const sum = totals.reduce((a, [, v]) => a + v, 0) || 1;
+    strengthEl.innerHTML = totals.map(([o, v]) => `<span style="width:${(v / sum * 100).toFixed(1)}%;background:${COL[o]}"></span>`).join('');
+    const label = G.cfg.demo ? 'Two kingdoms at war' : G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name}` : `Skirmish · ${DIFF_NAME[G.cfg.diff]}`;
+    statusEl.textContent = G.cfg.demo ? label : `${label} · ${fmtTime(G.time)}`;
+  }
+
+  // ---------- loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (G && !G.over && !G.paused) update(dt);
+    for (const s of [...sel]) if (s.owner !== 1) sel.delete(s);
+    draw(now);
+    if ((hudTick += dt) > 0.2) { hudTick = 0; hud(); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- input ----------
+  function toWorld(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left - ox) / sc, y: (e.clientY - r.top - oy) / sc, sx: e.clientX, sy: e.clientY };
+  }
+  function planetAt(w) {
+    let best = null, bd = Infinity;
+    for (const p of G.planets) {
+      // Castles are taller than wide, so measure from their visual middle.
+      const d = Math.hypot(p.x - w.x, (p.y - w.y) * 0.85);
+      if (d < p.r * 1.2 + 12 / sc && d < bd) { best = p; bd = d; }
+    }
+    return best;
+  }
+  const playable = () => G && !G.cfg.demo && !G.over && !G.paused;
+
+  function playerSend(t) {
+    if (send(1, [...sel].filter(s => s !== t), t) && !G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
+    sel.clear();
+  }
+
+  cv.addEventListener('pointerdown', e => {
+    if (!playable()) return;
+    cv.setPointerCapture(e.pointerId);
+    const w = toWorld(e), p = planetAt(w);
+    Object.assign(ptr, { down: true, moved: false, sx: w.sx, sy: w.sy, wx: w.x, wy: w.y, start: p, wasSel: !!p && sel.has(p), hover: p });
+    if (!p) { sel.clear(); return; }
+    if (p.owner === 1) sel.add(p);
+    else if (sel.size) { playerSend(p); ptr.down = false; }
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!ptr.down || !playable()) return;
+    const w = toWorld(e);
+    ptr.wx = w.x; ptr.wy = w.y;
+    if (Math.hypot(w.sx - ptr.sx, w.sy - ptr.sy) > 6) ptr.moved = true;
+    const p = planetAt(w);
+    ptr.hover = p;
+    if (ptr.moved && p && p.owner === 1 && ptr.start && ptr.start.owner === 1) sel.add(p);
+  });
+  cv.addEventListener('pointerup', e => {
+    if (!ptr.down) return;
+    ptr.down = false;
+    if (!playable()) return;
+    const p = planetAt(toWorld(e));
+    if (ptr.moved) {
+      if (p && sel.size) playerSend(p);
+      else if (!p) sel.clear();
+    } else if (ptr.start && ptr.start.owner === 1 && ptr.wasSel) {
+      if (sel.size > 1) playerSend(ptr.start);
+      else sel.delete(ptr.start);
+    }
+    ptr.hover = null;
+  });
+  cv.addEventListener('pointercancel', () => { ptr.down = false; ptr.hover = null; });
+
+  function selectAll() { if (playable()) G.planets.forEach(p => p.owner === 1 && sel.add(p)); }
+  function setPaused(v) {
+    if (!G || G.cfg.demo || G.over) return;
+    G.paused = v; pauseOv.hidden = !v;
+    btnPause.textContent = v ? 'Resume' : 'Pause';
+  }
+  addEventListener('keydown', e => {
+    if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
+    else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
+    else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
+
+  // ---------- menus ----------
+  const $ = id => document.getElementById(id);
+  const menu = $('menu'), pauseOv = $('pauseOv'), endOv = $('endOv'), btnPause = $('btnPause'), btnAll = $('btnAll');
+  let qDiff = 'medium', qAis = 1;
+
+  function segment(id, attr, set) {
+    const el = $(id);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      el.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      set(b.dataset[attr]);
+    });
+  }
+  segment('diffSeg', 'diff', v => qDiff = v);
+  segment('aiSeg', 'ais', v => qAis = +v);
+
+  function renderLadder() {
+    const unlocked = store.get('cs-unlocked', 1), done = store.get('cs-done', []);
+    $('ladder').innerHTML = LEVELS.map((L, i) =>
+      `<button data-level="${i + 1}" ${i + 1 > unlocked ? 'disabled' : ''} class="${done.includes(i + 1) ? 'done' : ''}" title="${L.name} · ${DIFF_NAME[L.diff]}${L.ais > 1 ? ' · three kingdoms' : ''}"><b>${['I','II','III','IV','V','VI','VII','VIII'][i]}</b><small>${i + 1 > unlocked ? 'Locked' : L.name}</small></button>`).join('');
+  }
+  $('ladder').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || b.disabled) return;
+    startLevel(+b.dataset.level);
+  });
+
+  function startLevel(lv) { play({ ...LEVELS[lv - 1], level: lv }); }
+  function play(cfg) {
+    lastCfg = cfg;
+    menu.hidden = true; endOv.hidden = true; pauseOv.hidden = true;
+    btnPause.disabled = false; btnAll.disabled = false; btnPause.textContent = 'Pause';
+    newGame(cfg);
+  }
+  function demoCfg() { return { demo: true, seed: Math.floor(Math.random() * 1e9), n: 18, ais: 1, diff: 'medium' }; }
+  function toMenu() {
+    renderLadder();
+    menu.hidden = false; endOv.hidden = true; pauseOv.hidden = true;
+    btnPause.disabled = true; btnAll.disabled = true;
+    newGame(demoCfg());
+  }
+  function endGame(win) {
+    G.over = true; sel.clear();
+    btnPause.disabled = true; btnAll.disabled = true;
+    const lv = G.cfg.level;
+    if (win && lv) {
+      store.set('cs-unlocked', Math.max(store.get('cs-unlocked', 1), Math.min(LEVELS.length, lv + 1)));
+      store.set('cs-done', [...new Set([...store.get('cs-done', []), lv])]);
+    }
+    $('endTitle').textContent = win ? 'Victory' : 'Defeat';
+    $('endTitle').className = win ? 'result-win' : 'result-lose';
+    $('endText').textContent = win
+      ? (lv === LEVELS.length ? 'The High Throne has fallen. Every banner in the realm is blue.' : lv ? `${LEVELS[lv - 1].name} is yours. ${LEVELS[lv].name} awaits.` : 'Every enemy castle flies your banner.')
+      : 'Your last castle has fallen. Claim more keeps early, and leave a garrison in castles near the enemy.';
+    $('endTime').textContent = fmtTime(G.time);
+    $('endCaps').textContent = G.caps;
+    $('endPeak').textContent = Math.floor(G.peak);
+    $('btnNext').hidden = !(win && lv && lv < LEVELS.length);
+    endOv.hidden = false;
+  }
+
+  $('btnQuick').addEventListener('click', () => play({ seed: Math.floor(Math.random() * 1e9), n: qAis === 1 ? 18 : 19, ais: qAis, diff: qDiff }));
+  $('btnResume').addEventListener('click', () => setPaused(false));
+  $('btnQuit').addEventListener('click', toMenu);
+  $('btnMenu').addEventListener('click', toMenu);
+  $('btnRetry').addEventListener('click', () => play(lastCfg.level ? lastCfg : { ...lastCfg, seed: Math.floor(Math.random() * 1e9) }));
+  $('btnNext').addEventListener('click', () => startLevel(lastCfg.level + 1));
+  btnPause.addEventListener('click', () => setPaused(!G.paused));
+  btnAll.addEventListener('click', selectAll);
+
+  resize();
+  toMenu();
+  requestAnimationFrame(frame);
+})();
+</script>
