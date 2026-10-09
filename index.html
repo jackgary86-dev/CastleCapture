@@ -167,6 +167,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .ladder small { font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .ladder button.done b::after { content: " \2691"; color: #2f5ea8; font-size: 13px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.resume { display: flex; gap: 8px 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border: 1px solid #9c8656; border-left: 4px solid #2f5ea8; background: rgb(255 250 235 / 0.35); }
+.resume div { flex: 1 1 220px; display: grid; gap: 2px; min-width: 0; }
+.resume b { font-family: var(--display); font-weight: 400; font-size: 19px; }
+.resume span { font-size: 13px; color: var(--ink-soft); }
 .row button { flex: 1; }
 .rules { margin: 0; padding-left: 18px; color: var(--ink-soft); line-height: 1.55; font-size: 14px; }
 .rules b { color: var(--ink); }
@@ -269,6 +273,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       <div class="sheet">
         <h2>Castle Siege</h2>
         <p>Five kingdoms war over the realm. Choose an army, then take every enemy castle by marching troops along the roads.</p>
+        <div class="resume" id="resumeBox" hidden>
+          <div><b>Unfinished battle</b><span id="resumeText"></span></div>
+          <button class="primary" id="btnResumeSave">Resume battle</button>
+          <button id="btnDiscard">Discard</button>
+        </div>
         <div class="group">
           <span class="label">Choose your army</span>
           <div class="armies" id="armyPick"></div>
@@ -340,6 +349,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Rivals surrender</b> when they're down to a tenth of the troops on the map and two castles or fewer. Against one rival, their castles open their gates to you.</li>
             <li><b>Rally points:</b> right-drag (or Shift-drag, or long-press then drag on a touchscreen) from one of your castles to another. New troops then march there automatically, leaving 5 at home. Right-click the castle, or drag and release on empty ground, to clear it.</li>
+            <li><b>Saving:</b> an unfinished battle is saved in this browser when you close or hide the tab, and every 10 seconds. Resume it from the top of this menu. Retreating to the menu abandons it.</li>
             <li><b>Upkeep:</b> a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when. Spread big armies out or put them to work.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
             <li><b>Space</b> selects all your castles. <b>[</b> and <b>]</b> change the game speed (1×, 1.5× or 2×). <b>P</b> pauses. <b>M</b> mutes sound effects and <b>N</b> the music.</li>
@@ -896,8 +906,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   let G = null, lastCfg = null;
   const sel = new Set();
 
-  function newGame(cfg) {
-    const portrait = board.clientHeight > board.clientWidth * 1.1;
+  function newGame(cfg, keepPortrait) {
+    const portrait = keepPortrait ?? board.clientHeight > board.clientWidth * 1.1;
     const players = cfg.armies.length;
     const theme = THEMES[ARMIES[cfg.map].map];
     sfx.music.setTheme(ARMIES[cfg.map].map);
@@ -2598,7 +2608,73 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0],
     };
   }
+  // ---------- save and resume ----------
+  // A battle is saved to the browser when the tab is hidden or closed, and every 10 seconds.
+  // Anything that can be rebuilt (the map, scenery, effects) is left out; resume rebuilds the
+  // same map from its seed, then lays the saved state over it. Castle references are stored as ids.
+  const SAVE_KEY = 'cs-save', SAVE_VERSION = 1;
+  const SAVE_SKIP = new Set(['theme', 'roadPts', 'fx', 'shots', 'roads', 'meadows', 'trees', 'pools', 'rocks', 'planets', 'placing', 'shake', 'paused']);
+  function enc(v) {
+    if (v === null || typeof v !== 'object') return v;
+    if (G.planets.includes(v)) return { $p: v.id };
+    if (v instanceof Set) return { $set: [...v].map(enc) };
+    if (v instanceof Map) return { $map: [...v].map(([k, x]) => [enc(k), enc(x)]) };
+    if (Array.isArray(v)) return v.map(enc);
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, enc(x)]));
+  }
+  function dec(v) {
+    if (v === null || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map(dec);
+    if ('$p' in v) return G.planets[v.$p];
+    if ('$set' in v) return new Set(v.$set.map(dec));
+    if ('$map' in v) return new Map(v.$map.map(([k, x]) => [dec(k), dec(x)]));
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, dec(x)]));
+  }
+  const savable = () => G && !G.cfg.demo && !G.over && !G.intro;
+  function saveBattle() {
+    if (!savable()) return;
+    const state = Object.fromEntries(Object.entries(G).filter(([k]) => !SAVE_SKIP.has(k)).map(([k, v]) => [k, enc(v)]));
+    const planets = G.planets.map(p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, k === 'id' ? v : enc(v)])));
+    store.set(SAVE_KEY, { v: SAVE_VERSION, savedAt: Date.now(), cfg: G.cfg, portrait: G.h > G.w, state, planets });
+  }
+  const clearSave = () => { try { localStorage.removeItem(SAVE_KEY); } catch {} };
+  const loadSave = () => { const d = store.get(SAVE_KEY, null); return d && d.v === SAVE_VERSION && d.cfg && d.state ? d : null; };
+  function resumeBattle() {
+    const d = loadSave();
+    if (!d) { renderResume(); return; }
+    try {
+      lastCfg = d.cfg;
+      shopOpen = false; btnShop.setAttribute('aria-expanded', 'false');
+      menu.hidden = true; endOv.hidden = true; toastEl.hidden = true; tauntEl.hidden = true; lordOv.hidden = true;
+      btnPause.disabled = false; btnAll.disabled = false;
+      setArmyColors(d.cfg.armies[0]);
+      newGame(d.cfg, d.portrait);
+      for (const [k, v] of Object.entries(d.state)) G[k] = dec(v);
+      for (const sp of d.planets) Object.assign(G.planets[sp.id], dec(sp));
+      G.intro = false; G.over = false; G.paused = false;
+      setPaused(true);
+      toast('Battle resumed', 'Press Resume the siege when you are ready.', army(1).color);
+    } catch (err) {
+      // A save from an older version of the game can't always be restored; drop it rather than crash.
+      clearSave();
+      toMenu();
+    }
+  }
+  function renderResume() {
+    const d = loadSave(), box = $('resumeBox');
+    box.hidden = !d;
+    if (!d) return;
+    const me = ARMIES[d.cfg.armies[0]], foes = d.cfg.armies.slice(1).map(id => ARMIES[id].name).join(' & ');
+    const mins = Math.round((Date.now() - d.savedAt) / 60000);
+    const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
+    $('resumeText').textContent = `${me.name} vs ${foes} in ${ARMIES[d.cfg.map].homeland}, ${fmtTime(d.state.time || 0)} in. Saved ${ago}.`;
+  }
+  addEventListener('pagehide', saveBattle);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveBattle(); });
+  setInterval(() => { if (G && !G.paused) saveBattle(); }, 10000);
+
   function play(cfg) {
+    clearSave();
     lastCfg = cfg;
     shopOpen = false; btnShop.setAttribute('aria-expanded', 'false');
     menu.hidden = true; endOv.hidden = true; pauseOv.hidden = true; toastEl.hidden = true;
@@ -2629,6 +2705,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     return { demo: true, seed: Math.floor(Math.random() * 1e9), n: 18, diff: 'medium', armies: pair, map: pick(pair) };
   }
   function toMenu() {
+    renderResume();
     renderArmies(); renderLadder();
     menu.hidden = false; endOv.hidden = true; pauseOv.hidden = true; toastEl.hidden = true; tauntEl.hidden = true; lordOv.hidden = true;
     btnPause.disabled = true; btnAll.disabled = true;
@@ -2763,6 +2840,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   $('endChart').addEventListener('pointerleave', chartLeave);
 
   function endGame(win) {
+    clearSave();
     G.over = true; sel.clear();
     sfx.fanfare(win);
     btnPause.disabled = true; btnAll.disabled = true;
@@ -2802,7 +2880,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   $('btnQuick').addEventListener('click', () => play(quickCfg()));
   $('btnResume').addEventListener('click', () => setPaused(false));
-  $('btnQuit').addEventListener('click', toMenu);
+  $('btnQuit').addEventListener('click', () => { clearSave(); toMenu(); });
+  $('btnResumeSave').addEventListener('click', resumeBattle);
+  $('btnDiscard').addEventListener('click', () => { clearSave(); renderResume(); });
   $('btnMenu').addEventListener('click', toMenu);
   $('btnRetry').addEventListener('click', () => play(lastCfg.level || lastCfg.fixedSeed ? lastCfg : { ...lastCfg, seed: Math.floor(Math.random() * 1e9) }));
   $('btnNext').addEventListener('click', () => startLevel(lastCfg.level + 1));

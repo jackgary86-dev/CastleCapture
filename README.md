@@ -54,6 +54,7 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 - **Red banners** over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.
 - **Rivals surrender** when they hold under 10% of all troops and two castles or fewer for 8 seconds (after the first minute). Against one rival their castles open their gates to you; with two rivals they fall back to neutral.
 - **Rally points:** right-drag (or Shift-drag, or long-press then drag on touch) from one of your castles to another, and its new troops march there automatically, leaving 5 at home. Right-click the castle to clear it; the route also breaks if either castle is lost.
+- **Saving:** an unfinished battle is saved in your browser when you close or hide the tab, and every 10 seconds. Resume it from the banner at the top of the menu, or discard it. Retreating to the menu abandons the battle.
 - **Upkeep:** a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when.
 - **Bigger castles** train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.
 - **Space** selects all your castles. **[** and **]** (or the Speed buttons) change the game speed: 1×, 1.5× or 2×. **P** pauses. **M** mutes sound effects and **N** the music.
