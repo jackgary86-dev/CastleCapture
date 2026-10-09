@@ -132,6 +132,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
           <ul class="rules">
             <li><b>Drag</b> from your castle to any castle to send troops. Keys <b>1–4</b> or the <b>scroll wheel</b> choose how many: 25%, 50%, 75% or all.</li>
             <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
+            <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Bigger castles</b> train troops faster. Grey, unclaimed keeps never grow.</li>
             <li><b>Space</b> selects all your castles. <b>P</b> pauses.</li>
           </ul>
@@ -546,6 +547,35 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ctx.fillStyle = '#e8c9a0'; ctx.beginPath(); ctx.arc(x, y - 5.8, 1.3, 0, Math.PI * 2); ctx.fill();
   }
 
+  // Red banners over the player's castles that enemy troops are marching on.
+  function drawThreats(now) {
+    const inc = incomingTable();
+    for (const p of G.planets) {
+      if (p.owner !== 1) continue;
+      const threat = inc[p.id][2] + inc[p.id][3];
+      if (!threat) continue;
+      const falls = threat > p.units + inc[p.id][1];
+      if (falls) {
+        const pulse = reduceMotion ? 0.6 : 0.45 + 0.4 * Math.sin(now / 160);
+        ctx.save(); ctx.translate(p.x, p.y + p.r * 0.45); ctx.scale(1, 0.5);
+        ctx.beginPath(); ctx.arc(0, 0, p.r * 1.6, 0, Math.PI * 2);
+        ctx.strokeStyle = alpha(COL[2], pulse); ctx.lineWidth = 5; ctx.stroke(); ctx.restore();
+      }
+      const label = String(Math.ceil(threat)), fs = 12;
+      ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
+      const w = ctx.measureText(label).width + 24, h = 17, x = p.x - w / 2, y = p.y - p.r * 1.95 - h;
+      ctx.fillStyle = falls ? COL[2] : alpha(COL[2], 0.8);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(p.x + 4, y + h); ctx.lineTo(p.x, y + h + 5); ctx.lineTo(p.x - 4, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.stroke();
+      // Crossed swords.
+      const ix = x + 9, iy = y + h / 2;
+      ctx.strokeStyle = '#fff8e6'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(ix - 4, iy - 4); ctx.lineTo(ix + 4, iy + 4); ctx.moveTo(ix + 4, iy - 4); ctx.lineTo(ix - 4, iy + 4); ctx.stroke();
+      ctx.fillStyle = '#fff8e6'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, x + 16, iy + 1);
+    }
+  }
+
   function drawScenery() {
     ctx.fillStyle = C.field; ctx.fillRect(0, 0, G.w, G.h);
     ctx.fillStyle = C.fieldLit;
@@ -608,6 +638,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       const figures = Math.min(k.n, 3);
       for (let i = 0; i < figures; i++) soldier(k.x + (i - (figures - 1) / 2) * 4.2, k.y + (i % 2) * 2.5, col, now / 90 + k.phase + i, dir);
     }
+
+    if (!G.cfg.demo) drawThreats(now);
 
     for (const f of G.fx) {
       if (f.kind === 'clash') {
