@@ -125,6 +125,35 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #toast small { display: block; font-family: var(--ui); font-size: 13px; color: var(--muted); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: rgb(23 20 14 / 0.45); }
 
+/* Armies and monsters: painted cards on the menu, and the codex entry they open. */
+.codex-lead { margin: 0; font-size: 13px; color: var(--ink-soft); line-height: 1.4; }
+.codex { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.codex.codex-3 { grid-template-columns: repeat(3, 1fr); }
+.codex button { padding: 0; overflow: hidden; display: grid; text-align: left; min-width: 0; background: rgb(255 250 235 / 0.25); }
+.codex canvas, .codex-sheet canvas { position: static; inset: auto; height: auto; }
+.codex canvas { width: 100%; aspect-ratio: 8 / 5; display: block; }
+.codex b { display: block; font-family: var(--display); font-weight: 400; font-size: 15px; line-height: 1.1; padding: 6px 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.codex small { display: block; font-size: 11px; color: var(--ink-soft); padding: 2px 8px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.codex-sheet { max-width: 760px; }
+.codex-sheet canvas { width: 100%; aspect-ratio: 8 / 5; display: block; border-radius: 4px; border: 1px solid #a8925f; }
+.codex-sheet h2 { font-size: 30px; }
+.codex-sheet h3 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 18px; border-bottom: 1px solid #b39d6c; padding-bottom: 2px; }
+.codex-sheet #codexBody { display: grid; gap: 8px; }
+.codex-sheet #codexBody h3 { margin-top: 8px; }
+.codex-sheet p, .codex-sheet li { font-size: 14px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
+.codex-sheet ul { margin: 0; padding-left: 18px; }
+.codex-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.codex-stats.codex-stats-3 { grid-template-columns: repeat(3, 1fr); }
+.codex-stats div { text-align: center; background: rgb(255 250 235 / 0.35); border-radius: 4px; padding: 6px 4px; min-width: 0; }
+.codex-stats span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
+.codex-stats strong { display: block; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.codex-quote { font-family: var(--display); font-size: 19px; color: var(--ink); line-height: 1.25; }
+@media (max-width: 560px) {
+  .codex { grid-template-columns: repeat(3, 1fr); }
+  .codex-stats { grid-template-columns: repeat(3, 1fr); }
+  .codex-stats strong { font-size: 14px; }
+}
+
 /* Main menu: the painted launch background sits behind a lighter overlay, with the title over the banner. */
 #menuArt { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #menu { background: rgb(23 20 14 / 0.12); }
@@ -547,6 +576,8 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/access.js"></script>
 <script src="js/touch.js"></script>
 <script src="art/launch-bg.js"></script>
+<script src="art/gallery.js"></script>
 <script src="js/menu-art.js"></script>
 <script src="js/grand-menu.js"></script>
+<script src="js/codex.js"></script>
 <script src="js/tutorial.js"></script>

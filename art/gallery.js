@@ -26,9 +26,46 @@
     nyx:       { name: 'Nyxhollow', full: 'The Nyxhollow Covenant',      lord: 'The Hollow Matron Veyra, Mother of Crows', role: 'Attack',   theme: 'mire',   castle: 'spires',    soldier: 'hood' },
   };
   const MONSTERS = {
-    dragon:  { name: 'The Red Dragon',  sub: 'The Scorched Reach · flies, breathes fire · 700 health · 180 coins', theme: 'scorched' },
-    cyclops: { name: 'The Cyclops',     sub: "The Giant's Fells · smashes castles · 900 health · 220 coins",      theme: 'fells' },
-    bandits: { name: 'The Bandit Gang', sub: 'The Blackwood Marches · five captains, raids and ambushes · 50 + 150 coins', theme: 'blackwood' },
+    dragon: {
+      name: 'The Red Dragon', title: 'Vaelthyr, the Red', sub: 'The Scorched Reach · flies, breathes fire · 700 health · 180 coins', theme: 'scorched',
+      map: 'The Scorched Reach', health: 700, bounty: 180, respawn: 10, strength: '3 troops for every 1 it fights',
+      story: 'The Reach was green once. Then Vaelthyr came down from the north wind, burned the forests to ash and made the mountain at the centre his bed. For a hundred years the five kingdoms paid him tribute in cattle and gold; now the tribute has stopped, and he collects it himself. He sleeps on the hoard inside the Cinder Spire, and every few waves he wakes hungry and goes looking for whatever is marching below.',
+      abilities: [
+        'Flight: ignores roads, rivers and lava, and crosses the map in straight lines.',
+        'Firebreath: when he lands, the nearest column or castle within reach loses a fifth of its troops in one blast.',
+        'Hoard sleep: regenerates health while perched on the Cinder Spire.',
+        'Old magic: cannot be frozen by Winter\'s Grip, slowed by a Great Ward, or touched by the Plague of Crows.',
+      ],
+      tactics: 'He only burns what is near where he lands, so keep columns moving between his flights and never park an army on the central keeps while he is awake. Strike from three castles at once so that the last blow is yours: whoever lands it takes the whole hoard. Frostmark shieldwalls take the fire best; Kharzul riders reach him first.',
+      quote: 'The mountain is not on fire. The mountain is where the fire lives.',
+    },
+    cyclops: {
+      name: 'The Cyclops', title: 'Old Grom of the Fells', sub: "The Giant's Fells · smashes castles · 900 health · 220 coins", theme: 'fells',
+      map: "The Giant's Fells", health: 900, bounty: 220, respawn: 10, strength: '4 troops for every 1 it fights',
+      story: 'The standing stones of the Fells were raised by giants, and Grom is the last of them. He is older than any kingdom and remembers none of them. He sleeps for years in the boulder fields and walks the old road when he wakes, looking for the stone circles his people built; a castle on a hill looks enough like one that he will try to put it right, and that is how castles are smashed. He does not hate anyone. He is simply very large.',
+      abilities: [
+        'Road-bound: slow and heavy, he follows the roads, so his route for the coming wave can be read from where he stands.',
+        'Castle smash: a castle in his path loses a third of its garrison and one level of its walls.',
+        'Crushing blows: the hardest hitter of the three monsters, killing four troops for every one he fights.',
+        'Deep sleeper: he sleeps where he stops; troops that attack a sleeping Grom deal half again as much damage that wave.',
+      ],
+      tactics: 'Watch the road a wave ahead and move the garrison out of any castle he is walking towards; walls do not stop him, they only give him something to break. Attack while he sleeps, and do it with everything at once: he has the most health of the three, and a half-finished fight just wakes him up. A cheap castle left in his way will turn him aside for a wave.',
+      quote: 'He stepped on Hollin Keep on his way to somewhere else, and did not notice.',
+    },
+    bandits: {
+      name: 'The Bandit Gang', title: 'The Blackwood Five', sub: 'The Blackwood Marches · five captains, raids and ambushes · 50 + 150 coins', theme: 'blackwood',
+      map: 'The Blackwood Marches', health: '120 per captain, five captains', bounty: '50 per captain, 150 more for the last', respawn: 10, strength: '3 troops for every 1 they fight, but only in the trees',
+      story: 'Every army leaves deserters, and the Blackwood takes them all. Five captains run the gang from a camp no lord has ever found: Redcap Morrow, who rode with Kharzul until he stole the Khagan\'s horse; Sister Ash, cast out of the Covenant for lying to the crows; Halvard Halfhand, who walked south out of the fjords one winter and never said why; Pell the Quiet, an Aldmere mason who builds the camp\'s traps; and Dunya Three-Rings, who kept the Sultan\'s accounts and now keeps the gang\'s. They do not want the realm. They want its coins, and they take them one castle at a time.',
+      abilities: [
+        'Five captains: each is a roaming column of about sixty bandits, moving separately with its own health.',
+        'Ambush: they attack only troops inside the forest, where visibility is short and the trees are theirs.',
+        'Raid: a captain who reaches a castle steals a quarter of its coins and a tenth of its garrison, then runs for the trees.',
+        'The camp: captains return to a hidden clearing to heal; storm it with enough troops and every captain at home dies at once.',
+        'Split bounty: fifty coins for each captain, and a hundred and fifty more for whoever kills the last.',
+      ],
+      tactics: 'Garrison the castles on the forest edge and spend your coins before the raiders arrive to take them. March through the woods in strength or not at all. The real prize is the camp: scout for it, wait until most captains are home, and storm it. Then hunt the last captain yourself, because the bonus goes to the final blow.',
+      quote: 'Five banners went into the Blackwood. One gang came out, and it flies no banner at all.',
+    },
   };
   const GRAND = {
     scorched:  { sub: 'Volcanic badlands. Lava fissures cross at basalt bridges; the richest keeps ring the lair.' },
