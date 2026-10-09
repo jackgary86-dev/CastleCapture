@@ -262,6 +262,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .rec-table td:not(:first-child), .rec-table th:not(:first-child) { text-align: right; width: 3.5em; }
 .rec-name::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: 1px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* Touch and small screens: thumb bar */
+#thumbBar { position: absolute; left: 12px; bottom: 86px; z-index: 2; display: flex; flex-direction: column; gap: 8px; }
+#thumbBar button { min-width: 64px; min-height: 48px; padding: 6px 10px; border-radius: 10px; border: 2px solid var(--edge);
+  background: rgb(23 20 14 / 0.9); color: var(--text); font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; font-variant-numeric: tabular-nums; }
+#thumbBar button:disabled { opacity: 0.55; }
+#thumbBar button.ready { border-color: var(--army); box-shadow: 0 0 0 3px color-mix(in srgb, var(--army) 35%, transparent); }
+#thumbBar .tb-icon { width: 20px; height: 20px; color: var(--army); display: inline-flex; }
+#thumbBar .tb-icon svg { width: 100%; height: 100%; }
+body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 </style>
 
 <div id="app">
@@ -470,3 +479,4 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 <script src="js/ui.js"></script>
 <script src="js/achievements.js"></script>
 <script src="js/access.js"></script>
+<script src="js/touch.js"></script>

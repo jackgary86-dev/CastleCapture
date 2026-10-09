@@ -73,6 +73,7 @@ Thirteen achievements, from First Blood and Lightning War (win in under 2 minute
 
 - **Colour-blind mode** (menu, or **C**) switches the armies to a colour-blind-safe palette and puts each army's emblem (crown, moon, snowflake, sun, eye) on its garrison plaques and above its marching columns, so kingdoms can be told apart by shape.
 - **Keyboard play:** **Tab** and **Shift+Tab** move between your castles, the **arrow keys** move to the nearest castle in that direction, **Enter** selects your castle or sends your selected troops to an enemy or unclaimed castle, and **Shift+Enter** sends them to any castle, including your own.
+- **Touch and phones:** pinch with two fingers to zoom (up to 3×) and drag them to pan; **Fit** shows the whole map again. Ctrl+scroll (or a trackpad pinch) zooms on desktop. Castles have larger tap areas for fingers, and phones and touch screens get a thumb bar with big **Power**, **Send %**, **All** and **Fit** buttons.
 - **Screen readers** hear the focused castle, captures, special powers, map units, surrenders and the result.
 
 ## Modes
