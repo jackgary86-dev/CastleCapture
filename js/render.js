@@ -884,9 +884,20 @@ function draw(now) {
   if (!G.cfg.demo && !G.hintDone) {
     const msg = 'Drag from a castle flying your banner onto another castle to attack';
     ctx.font = '500 14px "Alegreya Sans", system-ui, sans-serif';
-    const w = Math.min(cw - 32, ctx.measureText(msg).width + 24);
-    ctx.fillStyle = alpha(TIMBER, 0.82); ctx.beginPath(); ctx.roundRect((cw - w) / 2, ch - 44, w, 30, 4); ctx.fill();
+    // On phones the treasury and objective badge sit along the bottom edge, so the hint goes above them,
+    // to the right of the touch thumb bar, wrapped onto two lines when it doesn't fit (#57).
+    const narrow = typeof matchMedia === 'function' && matchMedia('(max-width: 560px)').matches;
+    const thumbs = narrow && typeof document !== 'undefined' && document.body && document.body.classList.contains('touchui');
+    const x0 = thumbs ? 112 : 16, room = cw - x0 - 16, cx = x0 + room / 2;
+    let lines = [msg];
+    if (ctx.measureText(msg).width + 24 > room) {
+      const words = msg.split(' '), half = Math.ceil(words.length / 2);
+      lines = [words.slice(0, half).join(' '), words.slice(half).join(' ')];
+    }
+    const w = Math.min(room, Math.max(...lines.map(l => ctx.measureText(l).width)) + 24), h = 12 + 18 * lines.length;
+    const y = ch - (narrow ? 100 : 14) - h;
+    ctx.fillStyle = alpha(TIMBER, 0.82); ctx.beginPath(); ctx.roundRect(cx - w / 2, y, w, h, 4); ctx.fill();
     ctx.fillStyle = '#ece2c6'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(msg, cw / 2, ch - 29, cw - 48);
+    lines.forEach((l, i) => ctx.fillText(l, cx, y + 15 + 18 * i, room - 16));
   }
 }

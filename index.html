@@ -146,12 +146,13 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   .unit .u-desc { display: none; }
 }
 #board { flex: 1; position: relative; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; overflow: hidden; container-type: inline-size; }
-/* Keep the battle announcement clear of the power panel when the board is too narrow for both side by side. */
-@container (max-width: 1000px) { #toast { top: 150px; } }
-@container (max-width: 560px) { #toast { top: 76px; } }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 #toast { position: absolute; top: 14px; left: 50%; z-index: 2; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 2px solid var(--toast, var(--army)); color: var(--text); font-family: var(--display); font-size: 20px; text-align: center; pointer-events: none; text-wrap: balance; }
 #toast small { display: block; font-family: var(--ui); font-size: 13px; color: var(--muted); }
+/* Keep the battle announcement clear of the power panel when the board is too narrow for both side by side.
+   These must come after the base #toast rule, or its top: 14px wins (#57). */
+@container (max-width: 1000px) { #toast { top: 150px; } }
+@container (max-width: 560px) { #toast { top: 100px; } }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: rgb(23 20 14 / 0.45); }
 #pauseOv { z-index: 4; }
 
@@ -215,10 +216,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .diplo-row .portrait { width: 38px; height: 38px; }
 .diplo-row small { display: block; color: var(--muted); font-size: 12px; }
 .diplo-row button { font-size: 13px; padding: 4px 8px; }
-#taunt { position: absolute; left: 14px; bottom: 14px; max-width: min(420px, calc(100% - 28px)); display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; border-radius: 40px 6px 6px 40px; background: rgb(23 20 14 / 0.92); border: 2px solid var(--c); pointer-events: none; }
+#taunt { position: absolute; left: 14px; bottom: 54px; max-width: min(420px, calc(100% - 28px)); display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; border-radius: 40px 6px 6px 40px; background: rgb(23 20 14 / 0.92); border: 2px solid var(--c); pointer-events: none; }
 #taunt .portrait { width: 48px; height: 48px; }
 #taunt b { display: block; font-size: 13px; color: var(--c); }
 #taunt q { font-family: var(--display); font-size: 18px; line-height: 1.2; quotes: "\201C" "\201D"; }
+/* Lord lines sit above the drag hint, and on phones above the treasury, objective and hint too, beside the thumb bar (#57). */
+@media (max-width: 560px) {
+  #taunt { bottom: 156px; right: 14px; padding: 6px 10px 6px 6px; }
+  body.touchui #taunt { left: 112px; }
+  #taunt .portrait { width: 36px; height: 36px; }
+  #taunt q { font-size: 15px; }
+}
 .lords { display: grid; gap: 14px; }
 .lord { display: flex; gap: 14px; align-items: center; min-width: 0; }
 .lord .portrait { width: 84px; height: 84px; }
@@ -350,7 +358,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .ladder.story { grid-template-columns: repeat(5, 1fr); }
 #objective { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100% - 28px); padding: 6px 14px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 1px solid #e9b43b; color: #f4ecd6; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; font-variant-numeric: tabular-nums; }
 #objective b { color: #e9b43b; font-family: var(--display); font-weight: 400; font-size: 16px; margin-right: 6px; }
-@media (max-width: 560px) { #objective { bottom: 64px; font-size: 13px; } }
+@media (max-width: 560px) { #objective { bottom: 64px; font-size: 13px; } body.touchui #objective { left: calc(50% + 49px); max-width: calc(100% - 126px); } }
 /* Two players on one screen (#12): player 2's keyboard status panel */
 #p2hud { position: absolute; right: 14px; bottom: 14px; padding: 6px 10px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 2px solid var(--c, var(--edge)); color: #f4ecd6; font-size: 13px; line-height: 1.35; pointer-events: none; font-variant-numeric: tabular-nums; max-width: 240px; }
 #p2hud b { display: block; color: var(--c); font-family: var(--display); font-weight: 400; font-size: 16px; }
