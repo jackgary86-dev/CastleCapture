@@ -247,6 +247,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Special power:</b> press <b>Q</b> or click the power panel in the top left of the map. The panel shows what your power does and counts down until it's ready: 45 seconds into the battle, then every five minutes.</li>
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
+            <li><b>Rivals surrender</b> when they're down to a tenth of the troops on the map and two castles or fewer. Against one rival, their castles open their gates to you.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
             <li><b>Space</b> selects all your castles. <b>[</b> and <b>]</b> change the game speed (1×, 1.5× or 2×). <b>P</b> pauses. <b>M</b> mutes.</li>
           </ul>
@@ -389,6 +390,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['Even good walls fall. Remember that I built them.'],
         victory: ['Patience wins every siege. You had none.'],
         defeat: ['The vale is yours. Keep its walls in good repair.'],
+        surrender: ['I yield. Keep the walls standing; they deserve better than this war.'],
       },
     },
     kharzul: {
@@ -402,6 +404,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['A horse lord dies in the saddle, not on his knees!'],
         victory: ['The steppe wind blows over your ashes.'],
         defeat: ['You ride well, for a wall-builder.'],
+        surrender: ['Bah! We ride for the steppe. This is not over.'],
       },
     },
     frostmark: {
@@ -416,6 +419,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['The ice breaks in spring. It always returns.'],
         victory: ['The north keeps its own.'],
         defeat: ['Spring comes early this year.'],
+        surrender: ['We go north. Enough.'],
       },
     },
     solmara: {
@@ -429,6 +433,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['Surely we can come to an arrangement?'],
         victory: ['The sands are mine. Send me the bill.'],
         defeat: ['Well played. Name your price.'],
+        surrender: ['Let us call it a business loss. I withdraw.'],
       },
     },
     nyx: {
@@ -442,6 +447,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['The mire keeps what it drowns. I will return.'],
         victory: ['Sleep now. The crows will keep watch.'],
         defeat: ['The crows did not see this. How interesting.'],
+        surrender: ['The Covenant withdraws into the mire. For now.'],
       },
     },
   };
@@ -707,7 +713,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       pw: Object.fromEntries(owners.map(o => [o, { ready: FIRST_CHARGE, until: -1 }])),
       ais: aiIds.map((id, i) => ({ id, diff: cfg.demo ? 'medium' : cfg.diff, timer: 1.4 + i * 0.35, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() })),
       caps: 0, peak: 0, hintDone: cfg.demo || store.get('cs-hint', false),
-      intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {},
+      intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {}, weakSince: {}, surrendered: new Set(),
     };
     sel.clear();
     resize();
@@ -1030,6 +1036,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       const brink = (G.maxCastles[o] >= 3 && castles <= 1) || (G.time > 30 && totalOf(o) < totalOf(1) * 0.2);
       if (brink) { G.nearDefeat.add(o); taunt(o, 'nearDefeat', true); }
     }
+    checkSurrender();
 
     if (G.cfg.demo) {
       if (!alive(1) || !alive(2) || G.time > 150) newGame(demoCfg());
@@ -1037,6 +1044,41 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
     if (!alive(1)) endGame(false);
     else if (G.owners.slice(1).every(o => !alive(o))) endGame(true);
+  }
+
+  // A rival far behind with no realistic comeback gives up instead of making you hunt down its last castle.
+  const SURRENDER_SHARE = 0.10, SURRENDER_HOLD = 8;
+  function checkSurrender() {
+    if (G.time < 60) return;
+    const sum = G.owners.reduce((a, o) => a + totalOf(o), 0) || 1;
+    for (const o of G.owners.slice(1)) {
+      if (G.surrendered.has(o)) continue;
+      const castles = G.planets.filter(p => p.owner === o);
+      if (!castles.length) continue;
+      const weak = totalOf(o) / sum < SURRENDER_SHARE && castles.length <= 2;
+      if (!weak) { delete G.weakSince[o]; continue; }
+      G.weakSince[o] ??= G.time;
+      if (G.time - G.weakSince[o] < SURRENDER_HOLD) continue;
+      surrender(o, castles);
+    }
+  }
+  function surrender(o, castles) {
+    G.surrendered.add(o);
+    const rivalsLeft = G.owners.slice(1).filter(q => q !== o && !G.surrendered.has(q) && G.planets.some(p => p.owner === q));
+    // Against a single rival the castles open their gates to the player; otherwise they fall back to neutral.
+    const heir = rivalsLeft.length ? 0 : 1;
+    for (const p of castles) {
+      p.prevOwner = o; p.capturedAt = G.time; p.owner = heir;
+      p.units = heir ? p.units : Math.round(p.units * 0.5);
+      if (heir === 1) G.caps++;
+    }
+    G.packets = G.packets.filter(k => k.owner !== o);
+    if (!G.cfg.demo) {
+      const A = army(o);
+      toast(`${A.full} surrenders!`, heir ? 'Their castles open their gates to you.' : 'Their castles fall back to neutral.', A.color);
+      taunt(o, 'surrender', true);
+      sfx.horn(true);
+    }
   }
 
   // Attackers deal damage scaled by their strike strength against the defender's wall strength.
@@ -1950,7 +1992,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const lordO = win ? G.owners[G.owners.length - 1] : G.owners.slice(1).sort((a, b) => totalOf(b) - totalOf(a))[0];
     const L = lordOf(lordO);
     $('endQuote').innerHTML = `${portraitHtml(G.fac[lordO])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
-    $('endQuote').querySelector('q').textContent = pick(L.lines[win ? 'defeat' : 'victory']);
+    $('endQuote').querySelector('q').textContent = pick(L.lines[!win ? 'victory' : G.surrendered.has(lordO) ? 'surrender' : 'defeat']);
     tauntEl.hidden = true;
     $('endTime').textContent = fmtTime(G.time);
     $('endCaps').textContent = G.caps;
