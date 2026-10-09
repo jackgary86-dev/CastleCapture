@@ -176,6 +176,21 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .stats div { display: flex; flex-direction: column; }
 .stats span { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.08em; }
 .stats strong { font-size: 22px; font-weight: 800; }
+/* End-of-battle summary chart: drawn on dark timber so every army colour has contrast. */
+.summary { margin: 0; display: grid; gap: 6px; }
+.summary figcaption { font-family: var(--display); font-size: 17px; color: var(--ink); }
+.chartwrap { position: relative; background: var(--timber); border-radius: 4px; }
+#endChart { position: static; display: block; width: 100%; height: 180px; touch-action: pan-y; }
+#chartTip { position: absolute; top: 8px; pointer-events: none; padding: 6px 9px; border-radius: 4px; background: rgb(236 226 198 / 0.96); color: var(--ink); font-size: 13px; line-height: 1.4; white-space: nowrap; box-shadow: 0 4px 12px rgb(0 0 0 / 0.35); font-variant-numeric: tabular-nums; }
+#chartTip b { font-weight: 800; }
+.chartkey { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-soft); }
+.chartkey span { display: inline-flex; align-items: center; gap: 6px; }
+.chartkey svg { flex: none; }
+.summary details summary { cursor: pointer; font-size: 13px; color: var(--ink-soft); }
+.tablescroll { overflow-x: auto; margin-top: 6px; }
+#endTable { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+#endTable th, #endTable td { padding: 3px 10px; text-align: right; border-bottom: 1px solid #c4b088; }
+#endTable th:first-child, #endTable td:first-child { text-align: left; }
 @media (max-width: 560px) {
   h1 { font-size: 20px; }
   .sheet { padding: 18px; gap: 13px; }
@@ -319,10 +334,20 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <h2 id="endTitle">Victory</h2>
         <p id="endText"></p>
         <div class="endquote" id="endQuote"></div>
+        <figure class="summary">
+          <figcaption>Army strength over the battle</figcaption>
+          <div class="chartwrap"><canvas id="endChart" aria-describedby="endTableWrap"></canvas><div id="chartTip" hidden></div></div>
+          <div class="chartkey" id="chartKey"></div>
+          <details id="endTableWrap"><summary>Show as table</summary><div class="tablescroll"><table id="endTable"></table></div></details>
+        </figure>
         <div class="stats">
           <div><span>Time</span><strong id="endTime">0:00</strong></div>
           <div><span>Castles taken</span><strong id="endCaps">0</strong></div>
+          <div><span>Castles lost</span><strong id="endLost">0</strong></div>
           <div><span>Largest army</span><strong id="endPeak">0</strong></div>
+          <div><span>Troops sent</span><strong id="endSent">0</strong></div>
+          <div><span>Lost on the road</span><strong id="endRoad">0</strong></div>
+          <div><span>Powers used</span><strong id="endPowers">0</strong></div>
         </div>
         <div class="row">
           <button class="primary" id="btnNext">Next battle</button>
@@ -777,6 +802,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {}, weakSince: {}, surrendered: new Set(),
       coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
       roadPts: roadSamples(map.roads), rallyClock: 0,
+      history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
     };
     sel.clear();
     resize();
@@ -821,6 +847,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
     const ai = G.ais.find(a => a.id === o);
     if (ai) ai.readyAt = null;
+    G.events.push({ t: G.time, kind: 'power', owner: o });
+    if (o === 1) G.stats.powerUses++;
     return true;
   }
 
@@ -849,6 +877,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       if (n < 1) continue;
       s.units -= n;
       launched = true;
+      if (owner === 1) G.stats.sent += n;
       const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
       const ang = Math.atan2(target.y - s.y, target.x - s.x);
       for (let i = 0; i < k; i++) {
@@ -1246,6 +1275,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const alive = o => G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o);
     G.ais = G.ais.filter(ai => alive(ai.id));
     G.peak = Math.max(G.peak, totalOf(1));
+    if (G.time >= G.nextSample) { G.history.push({ t: G.time, v: G.owners.map(totalOf) }); G.nextSample = G.time + 2; }
     // A lord on the brink says so, once.
     if (!G.cfg.demo) for (const o of G.owners.slice(1)) {
       if (G.nearDefeat.has(o) || !alive(o)) continue;
@@ -1321,6 +1351,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       if (was === 1) sel.delete(t);
       G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: col(k.owner), age: 0 });
       t.capturedAt = G.time; t.prevOwner = was;
+      if (was === 1) { G.stats.castlesLost++; G.events.push({ t: G.time, kind: 'lost', owner: k.owner }); }
+      else if (k.owner === 1) G.events.push({ t: G.time, kind: 'took', owner: 1 });
       if (!reduceMotion) {
         // A cloud of dust kicked up around the castle's base.
         for (let i = 0; i < 14; i++) {
@@ -1348,6 +1380,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         const sa = roadOf(a.owner), sb = roadOf(b.owner);
         const m = Math.min(a.n * sa, b.n * sb);
         a.n -= m / sa; b.n -= m / sb;
+        if (a.owner === 1) G.stats.roadLost += m / sa; else if (b.owner === 1) G.stats.roadLost += m / sb;
         fought = true;
         G.fx.push({ kind: 'clash', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, age: 0 });
         if (!G.cfg.demo) sfx.clash();
@@ -2412,6 +2445,134 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     btnPause.disabled = true; btnAll.disabled = true;
     newGame(demoCfg());
   }
+  // ---------- end-of-battle summary chart ----------
+  // Army colours carry identity; dash patterns and direct labels back them up, since blue and violet sit close for some readers.
+  const SERIES_DASH = [[], [7, 4], [2, 3]];
+  const CHART_INK = '#ece2c6', CHART_MUTED = '#a99d80', CHART_GRID = 'rgba(236,226,198,0.12)';
+  const seriesName = o => o === 1 ? 'You' : lordOf(o).short;
+  const niceStep = raw => { const p = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 5, 10].map(m => m * p).find(s => s >= raw); };
+  let chartBase = null, chartGeom = null;
+
+  function renderSummary() {
+    const cvs = $('endChart'), tip = $('chartTip');
+    const W = cvs.clientWidth, H = 180, d = Math.min(window.devicePixelRatio || 1, 2);
+    cvs.width = Math.round(W * d); cvs.height = Math.round(H * d);
+    const c = cvs.getContext('2d');
+    c.setTransform(d, 0, 0, d, 0, 0);
+    const hist = G.history, owners = G.owners, end = Math.max(G.time, 1);
+    const maxV = Math.max(10, ...hist.flatMap(h => h.v));
+    const step = niceStep(maxV / 3), top = Math.ceil(maxV / step) * step;
+    const L = 38, R = 70, T = 12, B = 24, pw = W - L - R, ph = H - T - B;
+    const X = t => L + (t / end) * pw, Y = v => T + ph - (v / top) * ph;
+    const valueAt = (i, t) => {
+      let best = hist[0];
+      for (const h of hist) if (Math.abs(h.t - t) < Math.abs(best.t - t)) best = h;
+      return best.v[i];
+    };
+    c.fillStyle = TIMBER; c.fillRect(0, 0, W, H);
+    c.font = '500 11px "Alegreya Sans", system-ui, sans-serif';
+
+    // Recessive grid and axes.
+    c.strokeStyle = CHART_GRID; c.lineWidth = 1; c.fillStyle = CHART_MUTED;
+    c.textAlign = 'right'; c.textBaseline = 'middle';
+    for (let v = 0; v <= top; v += step) {
+      c.beginPath(); c.moveTo(L, Math.round(Y(v)) + 0.5); c.lineTo(L + pw, Math.round(Y(v)) + 0.5); c.stroke();
+      c.fillText(String(v), L - 6, Y(v));
+    }
+    const tStep = end > 240 ? 60 : end > 90 ? 30 : 15;
+    c.textAlign = 'center'; c.textBaseline = 'top';
+    for (let t = 0; t <= end + 0.01; t += tStep) c.fillText(fmtTime(t), X(t), T + ph + 7);
+
+    // Castles won and lost, as ticks along the baseline.
+    for (const e of G.events) {
+      if (e.kind !== 'took' && e.kind !== 'lost') continue;
+      const x = X(e.t), y = T + ph;
+      c.fillStyle = e.kind === 'took' ? col(1) : WARN;
+      c.beginPath();
+      if (e.kind === 'took') { c.moveTo(x - 4, y); c.lineTo(x + 4, y); c.lineTo(x, y - 7); }
+      else { c.moveTo(x - 4, y - 7); c.lineTo(x + 4, y - 7); c.lineTo(x, y); }
+      c.closePath(); c.fill();
+    }
+
+    // One 2px line per kingdom.
+    owners.forEach((o, i) => {
+      c.strokeStyle = col(o); c.lineWidth = 2; c.lineJoin = 'round'; c.setLineDash(SERIES_DASH[i] || []);
+      c.beginPath();
+      hist.forEach((h, j) => { const x = X(h.t), y = Y(h.v[i]); j ? c.lineTo(x, y) : c.moveTo(x, y); });
+      c.stroke();
+    });
+    c.setLineDash([]);
+
+    // Special powers: a diamond on the user's line, ringed in the surface colour so it stays readable where lines cross.
+    for (const e of G.events) {
+      if (e.kind !== 'power') continue;
+      const i = owners.indexOf(e.owner); if (i < 0) continue;
+      const x = X(e.t), y = Y(valueAt(i, e.t));
+      c.beginPath(); c.moveTo(x, y - 6); c.lineTo(x + 6, y); c.lineTo(x, y + 6); c.lineTo(x - 6, y); c.closePath();
+      c.fillStyle = col(e.owner); c.fill(); c.strokeStyle = TIMBER; c.lineWidth = 2; c.stroke();
+    }
+
+    // Direct labels at the end of each line, nudged apart so they never overlap.
+    const labels = owners.map((o, i) => ({ o, y: Y(hist[hist.length - 1].v[i]) })).sort((a, b) => a.y - b.y);
+    for (let k = 1; k < labels.length; k++) labels[k].y = Math.max(labels[k].y, labels[k - 1].y + 14);
+    c.font = '700 12px "Alegreya Sans", system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle';
+    for (const lb of labels) {
+      c.fillStyle = col(lb.o); c.beginPath(); c.arc(L + pw + 8, lb.y, 3.5, 0, Math.PI * 2); c.fill();
+      c.fillStyle = CHART_INK; c.fillText(seriesName(lb.o), L + pw + 15, lb.y);
+    }
+
+    chartBase = c.getImageData(0, 0, cvs.width, cvs.height);
+    chartGeom = { L, T, pw, ph, end, X, Y, W, H, d, valueAt };
+    tip.hidden = true;
+
+    // Legend: line style per kingdom, then what the markers mean.
+    const swatch = (color, dash) => `<svg width="26" height="10" aria-hidden="true"><line x1="1" y1="5" x2="25" y2="5" stroke="${color}" stroke-width="2.5" stroke-dasharray="${dash.join(' ')}"/></svg>`;
+    $('chartKey').innerHTML = owners.map((o, i) => `<span>${swatch(col(o), SERIES_DASH[i] || [])}${o === 1 ? 'You' : `${lordOf(o).short} (${army(o).name})`}</span>`).join('') +
+      `<span><svg width="12" height="12" aria-hidden="true"><path d="M6 0l6 6-6 6-6-6z" fill="${CHART_MUTED}"/></svg>Special power used</span>` +
+      `<span><svg width="10" height="9" aria-hidden="true"><path d="M0 9h10L5 0z" fill="${col(1)}"/></svg>You took a castle</span>` +
+      `<span><svg width="10" height="9" aria-hidden="true"><path d="M0 0h10L5 9z" fill="${WARN}"/></svg>You lost a castle</span>`;
+
+    // Table view: the same numbers every 15 seconds.
+    const rows = [];
+    for (let t = 0; t < end; t += 15) rows.push(t);
+    rows.push(end);
+    $('endTable').innerHTML = `<thead><tr><th scope="col">Time</th>${owners.map(o => `<th scope="col">${seriesName(o)}</th>`).join('')}</tr></thead><tbody>` +
+      rows.map(t => `<tr><td>${fmtTime(t)}</td>${owners.map((o, i) => `<td>${Math.round(valueAt(i, t))}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  }
+
+  // Hover: a crosshair and a tooltip with every kingdom's strength at that moment.
+  function chartHover(e) {
+    if (!chartBase || !chartGeom) return;
+    const cvs = $('endChart'), tip = $('chartTip'), g = chartGeom, c = cvs.getContext('2d');
+    const r = cvs.getBoundingClientRect(), x = e.clientX - r.left;
+    if (x < g.L - 10 || x > g.L + g.pw + 10) { chartLeave(); return; }
+    const t = Math.max(0, Math.min(g.end, (x - g.L) / g.pw * g.end));
+    c.setTransform(1, 0, 0, 1, 0, 0); c.putImageData(chartBase, 0, 0); c.setTransform(g.d, 0, 0, g.d, 0, 0);
+    const cx = g.X(t);
+    c.strokeStyle = 'rgba(236,226,198,0.5)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(Math.round(cx) + 0.5, g.T); c.lineTo(Math.round(cx) + 0.5, g.T + g.ph); c.stroke();
+    const vals = G.owners.map((o, i) => ({ o, v: Math.round(g.valueAt(i, t)) }));
+    for (const { o, v } of vals) { c.beginPath(); c.arc(cx, g.Y(v), 4, 0, Math.PI * 2); c.fillStyle = col(o); c.fill(); c.strokeStyle = TIMBER; c.lineWidth = 2; c.stroke(); }
+    tip.innerHTML = `<b>${fmtTime(t)}</b>` + vals.sort((a, b) => b.v - a.v).map(({ o, v }) => `<br>${seriesName(o)}: <b>${v}</b>`).join('');
+    tip.hidden = false;
+    const tw = tip.offsetWidth;
+    tip.style.left = `${Math.max(4, Math.min(g.W - tw - 4, cx + 12 > g.W - tw - 4 ? cx - tw - 12 : cx + 12))}px`;
+  }
+  function chartLeave() {
+    if (!chartBase) return;
+    const c = $('endChart').getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0); c.putImageData(chartBase, 0, 0);
+    $('chartTip').hidden = true;
+  }
+  // Redraw whenever the chart's box changes size: on first layout of the end screen and on window resizes.
+  let chartW = 0;
+  new ResizeObserver(() => {
+    const w = $('endChart').clientWidth;
+    if (w && w !== chartW && G && G.over) { chartW = w; renderSummary(); }
+  }).observe($('endChart'));
+  $('endChart').addEventListener('pointermove', chartHover);
+  $('endChart').addEventListener('pointerleave', chartLeave);
+
   function endGame(win) {
     G.over = true; sel.clear();
     sfx.fanfare(win);
@@ -2435,6 +2596,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     $('endTime').textContent = fmtTime(G.time);
     $('endCaps').textContent = G.caps;
     $('endPeak').textContent = Math.floor(G.peak);
+    $('endLost').textContent = G.stats.castlesLost;
+    $('endSent').textContent = G.stats.sent;
+    $('endRoad').textContent = Math.round(G.stats.roadLost);
+    $('endPowers').textContent = G.stats.powerUses;
+    G.history.push({ t: G.time, v: G.owners.map(totalOf) });
+    endOv.hidden = false;
+    toastEl.hidden = true;
+    chartW = 0;
+    renderSummary();
     $('btnNext').hidden = !(win && lv && lv < LEVELS.length);
     endOv.hidden = false;
   }
