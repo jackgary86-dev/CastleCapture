@@ -191,7 +191,8 @@ function musicMood() {
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (G && !G.over && !G.paused && !G.intro) {
+  // In a Grand Campaign plan phase the world stands still until the player marches.
+  if (G && !G.over && !G.paused && !G.intro && !(G.mode === 'grand' && G.phase === 'plan')) {
     // Faster speeds run extra small steps, so road battles and arrivals stay as precise as at normal speed.
     let left = dt * (G.cfg.demo ? 1 : gameSpeed);
     while (left > 1e-6 && !G.over) { const step = Math.min(left, 1 / 60); update(step); left -= step; }

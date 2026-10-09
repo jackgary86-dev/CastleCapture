@@ -158,6 +158,37 @@ run('end screen', `
   update(1 / 30); hud(); draw(${clock});
   if (!G.over) throw new Error('battle did not end after the player took every castle');
 `);
+// ---------- 4. a few waves of a Grand Campaign, if the mode is in the build ----------
+const hasGrand = run('grand campaign check', `typeof startGrand === 'function'`);
+if (hasGrand) {
+  run('grand campaign start', `
+    startGrand('realm', 'aldmere', 'hard');
+    if (typeof startBattle === 'function') startBattle();
+    if (G.mode !== 'grand' || G.phase !== 'plan') throw new Error('Grand Campaign did not open in its plan phase');
+  `);
+  run('grand campaign plan, march and draw', `
+    for (let w = 0; w < 4; w++) {
+      const mine = G.planets.filter(p => p.owner === 1), target = G.planets.find(p => p.owner !== 1);
+      if (mine.length && target) {
+        const before = mine[0].units;
+        send(1, [mine[0]], target, 0.5);
+        if (!G.orders.length) throw new Error('a plan-phase send did not queue an order');
+        if (G.packets.some(k => k.owner === 1 && k.from === mine[0] && k.to === target)) throw new Error('a plan-phase send marched straight away');
+        // Cancel and requeue, to exercise the refund.
+        cancelOrder(G.orders[G.orders.length - 1]);
+        if (Math.abs(mine[0].units - before) > 1e-9) throw new Error('cancelling an order did not return its troops');
+        send(1, [mine[0]], target, 0.5);
+      }
+      hud(); draw(${clock});
+      march();
+      if (G.phase !== 'march') throw new Error('march() did not start the march window');
+      for (let i = 0; i < 30 * GRAND.waveSeconds + 2 && G.phase === 'march'; i++) update(1 / 30);
+      hud(); draw(${clock});
+      if (G.over) break;
+      if (G.phase !== 'plan') throw new Error('the march window did not end in a new plan phase');
+    }
+  `);
+}
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasGrand ? ', and four Grand Campaign waves planned and marched' : ''}.`);

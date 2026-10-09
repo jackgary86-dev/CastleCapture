@@ -184,6 +184,70 @@ function buildPaths(T, planets) {
   return paths;
 }
 
+// Marching routes, roads and the theme's scenery for a finished set of castles and terrain.
+// Shared by the battle maps and the Grand Campaign map. With scaleCounts, scenery counts grow with
+// the map's area; battle maps leave it off so they come out exactly as before.
+function buildScenery(planets, T, theme, rnd, w, h, scaleCounts = false) {
+  const area = scaleCounts ? Math.max(1, (w * h) / (1000 * 640)) : 1, meadowCount = Math.round(9 * area);
+  if (scaleCounts) theme = { ...theme, pools: Math.round(theme.pools * area), trees: Math.round(theme.trees * area), rocks: Math.round(theme.rocks * area) };
+  const clear = (x, y, pad) => planets.every(p => Math.hypot(p.x - x, p.y - y) > p.r + pad);
+  const paths = buildPaths(T, planets);
+  const N = planets.length;
+
+  // Roads follow the marching routes between neighbouring castles, so they cross rivers at the bridges.
+  const roads = [], seen = new Set();
+  for (const a of planets) {
+    planets.filter(b => b !== a).sort((b, c) => paths[a.id * N + b.id].len - paths[a.id * N + c.id].len).slice(0, 2).forEach(b => {
+      const key = Math.min(a.id, b.id) + '-' + Math.max(a.id, b.id);
+      if (seen.has(key)) return;
+      seen.add(key);
+      const mid = paths[a.id * N + b.id].pts.slice(0, -1);
+      roads.push({ a, b, pts: [{ x: a.x, y: a.y + a.r * 0.5 }, ...mid, { x: b.x, y: b.y + b.r * 0.5 }] });
+    });
+  }
+  const meadows = Array.from({ length: meadowCount }, () => ({ x: rnd() * w, y: rnd() * h, rx: 80 + rnd() * 140, ry: 50 + rnd() * 90 }));
+  const dry = (x, y, pad) => waterDist(T, { x, y }) > pad;
+  const pools = [];
+  for (let i = 0; i < 300 * area && pools.length < theme.pools; i++) {
+    const x = 40 + rnd() * (w - 80), y = 40 + rnd() * (h - 80), rx = 18 + rnd() * 26;
+    if (clear(x, y, rx + 24) && dry(x, y, rx + 14) && !inForest(T, { x, y })) pools.push({ x, y, rx, ry: rx * (0.45 + rnd() * 0.2) });
+  }
+  const trees = [];
+  const plant = (x, y) => {
+    if (x < 8 || y < 8 || x > w - 8 || y > h - 8 || !clear(x, y, 30) || !dry(x, y, 10)) return;
+    if (theme.tree !== 'palm' && pools.some(o => Math.hypot((o.x - x) / o.rx, (o.y - y) / o.ry) < 1.2)) return;
+    trees.push({ x, y, s: 5 + rnd() * 4, shade: rnd() });
+  };
+  // Forests are thick with trees; a few more grow scattered elsewhere.
+  for (const f of T.forests) {
+    for (let i = 0; i < Math.round(f.r * f.r / 70); i++) {
+      const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * (f.r - 4);
+      plant(f.x + Math.cos(a) * d, f.y + Math.sin(a) * d);
+    }
+  }
+  const scattered = theme.forest ? Math.round(theme.trees * 0.3) : theme.trees;
+  for (let i = 0, placed = trees.length; i < 600 * area && trees.length - placed < scattered; i++) {
+    let x, y;
+    if (theme.tree === 'palm' && pools.length) {
+      // Palms grow around the oases.
+      const o = pools[Math.floor(rnd() * pools.length)], a = rnd() * Math.PI * 2;
+      x = o.x + Math.cos(a) * (o.rx + 6 + rnd() * 14); y = o.y + Math.sin(a) * (o.ry + 5 + rnd() * 10);
+    } else {
+      const base = trees.length > placed && rnd() < theme.clump ? trees[placed + Math.floor(rnd() * (trees.length - placed))] : { x: rnd() * w, y: rnd() * h };
+      x = base.x + (rnd() - 0.5) * 60; y = base.y + (rnd() - 0.5) * 60;
+      if (inForest(T, { x, y })) continue;
+    }
+    plant(x, y);
+  }
+  trees.sort((a, b) => a.y - b.y);
+  const rocks = [];
+  for (let i = 0; i < 300 * area && rocks.length < theme.rocks; i++) {
+    const x = rnd() * w, y = rnd() * h;
+    if (clear(x, y, 22) && dry(x, y, 8)) rocks.push({ x, y, s: 2 + rnd() * 3.5 });
+  }
+  return { roads, meadows, trees, pools, rocks, terrain: T, paths };
+}
+
 // ---------- map generation ----------
 // opts: scale (map size multiplier), start (starting troops), neutral (unclaimed keep garrison multiplier).
 function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
@@ -243,62 +307,7 @@ function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
   T.bridges = T.bridges.map(b => { const [tx, ty] = rotV(b.tx, b.ty); return { ...rot(b), tx, ty, e1: rot(b.e1), e2: rot(b.e2) }; });
   T.forests = T.forests.map(f => ({ ...rot(f), r: f.r }));
   const w = portrait ? H : W, h = portrait ? W : H;
-  const clear = (x, y, pad) => planets.every(p => Math.hypot(p.x - x, p.y - y) > p.r + pad);
-  const paths = buildPaths(T, planets);
-  const N = planets.length;
-
-  // Roads follow the marching routes between neighbouring castles, so they cross rivers at the bridges.
-  const roads = [], seen = new Set();
-  for (const a of planets) {
-    planets.filter(b => b !== a).sort((b, c) => paths[a.id * N + b.id].len - paths[a.id * N + c.id].len).slice(0, 2).forEach(b => {
-      const key = Math.min(a.id, b.id) + '-' + Math.max(a.id, b.id);
-      if (seen.has(key)) return;
-      seen.add(key);
-      const mid = paths[a.id * N + b.id].pts.slice(0, -1);
-      roads.push({ a, b, pts: [{ x: a.x, y: a.y + a.r * 0.5 }, ...mid, { x: b.x, y: b.y + b.r * 0.5 }] });
-    });
-  }
-  const meadows = Array.from({ length: 9 }, () => ({ x: rnd() * w, y: rnd() * h, rx: 80 + rnd() * 140, ry: 50 + rnd() * 90 }));
-  const dry = (x, y, pad) => waterDist(T, { x, y }) > pad;
-  const pools = [];
-  for (let i = 0; i < 300 && pools.length < theme.pools; i++) {
-    const x = 40 + rnd() * (w - 80), y = 40 + rnd() * (h - 80), rx = 18 + rnd() * 26;
-    if (clear(x, y, rx + 24) && dry(x, y, rx + 14) && !inForest(T, { x, y })) pools.push({ x, y, rx, ry: rx * (0.45 + rnd() * 0.2) });
-  }
-  const trees = [];
-  const plant = (x, y) => {
-    if (x < 8 || y < 8 || x > w - 8 || y > h - 8 || !clear(x, y, 30) || !dry(x, y, 10)) return;
-    if (theme.tree !== 'palm' && pools.some(o => Math.hypot((o.x - x) / o.rx, (o.y - y) / o.ry) < 1.2)) return;
-    trees.push({ x, y, s: 5 + rnd() * 4, shade: rnd() });
-  };
-  // Forests are thick with trees; a few more grow scattered elsewhere.
-  for (const f of T.forests) {
-    for (let i = 0; i < Math.round(f.r * f.r / 70); i++) {
-      const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * (f.r - 4);
-      plant(f.x + Math.cos(a) * d, f.y + Math.sin(a) * d);
-    }
-  }
-  const scattered = theme.forest ? Math.round(theme.trees * 0.3) : theme.trees;
-  for (let i = 0, placed = trees.length; i < 600 && trees.length - placed < scattered; i++) {
-    let x, y;
-    if (theme.tree === 'palm' && pools.length) {
-      // Palms grow around the oases.
-      const o = pools[Math.floor(rnd() * pools.length)], a = rnd() * Math.PI * 2;
-      x = o.x + Math.cos(a) * (o.rx + 6 + rnd() * 14); y = o.y + Math.sin(a) * (o.ry + 5 + rnd() * 10);
-    } else {
-      const base = trees.length > placed && rnd() < theme.clump ? trees[placed + Math.floor(rnd() * (trees.length - placed))] : { x: rnd() * w, y: rnd() * h };
-      x = base.x + (rnd() - 0.5) * 60; y = base.y + (rnd() - 0.5) * 60;
-      if (inForest(T, { x, y })) continue;
-    }
-    plant(x, y);
-  }
-  trees.sort((a, b) => a.y - b.y);
-  const rocks = [];
-  for (let i = 0; i < 300 && rocks.length < theme.rocks; i++) {
-    const x = rnd() * w, y = rnd() * h;
-    if (clear(x, y, 22) && dry(x, y, 8)) rocks.push({ x, y, s: 2 + rnd() * 3.5 });
-  }
-  return { planets, w, h, roads, meadows, trees, pools, rocks, terrain: T, paths };
+  return { planets, w, h, ...buildScenery(planets, T, theme, rnd, w, h) };
 }
 
 // ---------- game state ----------
@@ -331,8 +340,10 @@ function assignKinds(planets, seed) {
 
 function newGame(cfg, portrait = false) {
   const players = cfg.armies.length;
-  const theme = THEMES[ARMIES[cfg.map].map];
-  const map = genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral });
+  const grand = cfg.mode === 'grand';
+  const theme = grand ? THEMES[(GRAND_MAPS[cfg.grandMap] || GRAND_MAPS.realm).theme] : THEMES[ARMIES[cfg.map].map];
+  const map = grand ? genGrandMap(cfg.seed, cfg)
+    : genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral });
   assignKinds(map.planets, cfg.seed);
   const owners = Array.from({ length: players }, (_, i) => i + 1);
   const aiIds = cfg.demo ? [1, 2] : owners.slice(1);
@@ -372,6 +383,7 @@ const roadOf = o => atkOf(o) * army(o).stats.road;
 const bribes = (o, t) => t.owner === 0 && G.fac[o] === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
 const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1) * bribes(o, t);
 const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
+const capOf = p => GARRISON_CAP[tierOf(p)] + WALL_CAP * lvl(p, 'walls');
 const kindOf = p => p.kind ? CASTLE_KINDS[p.kind] : null;
 // Villages speed up their owner's other castles within reach: +25% for each, up to +50%.
 function villageBoost(p) {
@@ -465,6 +477,14 @@ function aiUpgrade(ai, mine, enemyCastles, inc, pz) {
 function usePower(o) {
   const pw = G.pw[o], A = army(o);
   if (pw.ready > 0 || G.over) return false;
+  if (G.mode === 'grand' && G.phase === 'plan') {
+    if (pw.queued) return false;
+    pw.queued = true;
+    const order = { kind: 'power', owner: o };
+    G.orders.push(order);
+    emit('order', { order });
+    return true;
+  }
   pw.ready = rechargeTime();
   pw.until = G.time + A.power.dur;
   if (A.power.id === 'crows') {
@@ -491,23 +511,13 @@ function send(owner, sources, target, frac = 0.5) {
     if (n < 1) continue;
     s.units -= n;
     launched = true;
-    if (owner === 1) G.stats.sent += n;
-    const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
-    // Set off towards the first waypoint (a bridge, or the target itself).
-    const path = pathOf(s, target).pts, first = path[0];
-    const ang = Math.atan2(first.y - s.y, first.x - s.x);
-    for (let i = 0; i < k; i++) {
-      const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
-      const jx = (Math.random() - 0.5) * 4, jy = (Math.random() - 0.5) * 4;
-      const at = off => ({ x: s.x + Math.cos(ang) * s.r * 0.8 - Math.sin(ang) * off, y: s.y + Math.sin(ang) * s.r * 0.8 + Math.cos(ang) * off });
-      // Columns spread across the castle front, unless that would put the outer files in the water.
-      let start = at((Math.random() - 0.5) * s.r * 1.1);
-      if (crossesWater(G.terrain, start, path.length > 1 ? { x: first.x + jx, y: first.y + jy } : first)) start = at(0);
-      G.packets.push({
-        owner, from: s, to: target, n: cnt, str: soldierStr(s), delay: i * 0.06, phase: Math.random() * 6.28,
-        path, wp: 0, jx, jy, x: start.x, y: start.y,
-      });
+    if (G.mode === 'grand' && G.phase === 'plan') {
+      const order = { kind: 'send', owner, from: s, to: target, n };
+      G.orders.push(order);
+      emit('order', { order });
+      continue;
     }
+    launch(owner, s, target, n);
   }
   return launched;
 }
@@ -546,6 +556,27 @@ function incomingFor(o) {
   const inc = G.planets.map(() => new Array(G.owners.length + 1).fill(0));
   for (const k of G.packets) if (k.owner === o || seesAt(o, k.x, k.y)) inc[k.to.id][k.owner] += k.n;
   return inc;
+}
+
+// March n troops (already taken from s) to target as columns along the path.
+function launch(owner, s, target, n) {
+  if (owner === 1) G.stats.sent += n;
+  const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
+  // Set off towards the first waypoint (a bridge, or the target itself).
+  const path = pathOf(s, target).pts, first = path[0];
+  const ang = Math.atan2(first.y - s.y, first.x - s.x);
+  for (let i = 0; i < k; i++) {
+    const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
+    const jx = (Math.random() - 0.5) * 4, jy = (Math.random() - 0.5) * 4;
+    const at = off => ({ x: s.x + Math.cos(ang) * s.r * 0.8 - Math.sin(ang) * off, y: s.y + Math.sin(ang) * s.r * 0.8 + Math.cos(ang) * off });
+    // Columns spread across the castle front, unless that would put the outer files in the water.
+    let start = at((Math.random() - 0.5) * s.r * 1.1);
+    if (crossesWater(G.terrain, start, path.length > 1 ? { x: first.x + jx, y: first.y + jy } : first)) start = at(0);
+    G.packets.push({
+      owner, from: s, to: target, n: cnt, str: soldierStr(s), delay: i * 0.06, phase: Math.random() * 6.28,
+      path, wp: 0, jx, jy, x: start.x, y: start.y,
+    });
+  }
 }
 
 function incomingTable() {
@@ -714,7 +745,10 @@ function aiThink(ai) {
   if (id === 'aldmere' && myTotal > enemyTotal * 2) candidates = candidates.sort((a, b) => nearestOf(a, mine) - nearestOf(b, mine)).slice(0, 3);
 
   let best = null;
-  const maxSrc = d === 'hard' ? 4 : amaruRush ? 2 : 1;
+  // In the Grand Campaign, lords mass sieges from more castles, since walled castles at their cap are hard to crack.
+  const maxSrc = G.mode === 'grand' ? GRAND.siegeSources[d] || 4 : d === 'hard' ? 4 : amaruRush ? 2 : 1;
+  // A castle at its cap trains nothing more, so the AI is happy to send most of it.
+  const fracOf = s => s.units >= capOf(s) - 1 ? Math.max(pz.sendFrac, 0.8) : pz.sendFrac;
   // While rushing, Amaru's castles within reach of a rival keep at least 10 troops home.
   const exposed = s => amaruRush && nearestOf(s, enemyCastles) < 300;
   for (const t of candidates) {
@@ -726,7 +760,7 @@ function aiThink(ai) {
     for (const s of srcs) {
       if (chosen.length >= maxSrc) break;
       chosen.push(s);
-      sum += Math.floor(s.units * pz.sendFrac);
+      sum += Math.floor(s.units * fracOf(s));
       far = Math.max(far, travel(s, t));
       need = needAt(t, far, inc, me) * margin;
       if (sum >= need) break;
@@ -740,6 +774,8 @@ function aiThink(ai) {
     }
     if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
     if (id === 'kharzul' && real(t) === ai.focus) worth *= 2.5;
+    // Grand Campaign: lords turn on whichever rival has fallen well behind them, so a dying realm gets finished off.
+    if (G.mode === 'grand' && t.owner && totalOf(t.owner) < myTotal * 0.5) worth *= GRAND.finishBias;
     if (id === 'nyx') {
       // Veyra pounces on castles that were just emptied, and boxes rivals in with nearby keeps.
       const prev = ai.snap.get(t.id);
@@ -755,7 +791,7 @@ function aiThink(ai) {
     const big = best.t.owner && (best.sum >= 20 || (id === 'kharzul' && best.sum >= 10));
     // Veyra drops the crows before her main attack lands; Torvek charges alongside his.
     if (id === 'nyx' && big && G.pw[me].ready === 0) usePower(me);
-    send(me, best.chosen, real(best.t), pz.sendFrac);
+    for (const s of best.chosen) send(me, [s], real(best.t), fracOf(s));
     if (id === 'kharzul' && big && G.pw[me].ready === 0) usePower(me);
     return;
   }
@@ -764,7 +800,7 @@ function aiThink(ai) {
   if (pz.front && Math.random() < 0.5 && mine.length > 1 && enemyCastles.length) {
     const byDanger = [...mine].sort((a, b) => nearestOf(a, enemyCastles) - nearestOf(b, enemyCastles));
     const front = byDanger[0], rear = byDanger[byDanger.length - 1];
-    if (rear !== front && rear.units > 20) send(me, [rear], front, 0.5);
+    if (rear !== front && rear.units > 20 && front.units < capOf(front) * 0.8) send(me, [rear], front, 0.5);
   }
 }
 
@@ -795,10 +831,20 @@ function buyUnit(o, type, x, y) {
   if (G.bought.has(o) || G.coins[o] < U.price || placeProblem(o, x, y)) return false;
   G.coins[o] -= U.price;
   G.bought.add(o);
+  if (G.mode === 'grand' && G.phase === 'plan') {
+    const order = { kind: 'unit', owner: o, type, x, y };
+    G.orders.push(order);
+    emit('order', { order });
+    return true;
+  }
+  placeUnit(o, type, x, y);
+  return true;
+}
+
+function placeUnit(o, type, x, y) {
   G.units.push({ owner: o, type, x, y, cd: 1, fired: -9, aim: 0 });
   G.fx.push({ kind: 'capture', x, y: y - 8, r: 10, col: col(o), age: 0 });
-  emit('build', { o, unit: U });
-  return true;
+  emit('build', { o, unit: MAP_UNITS[type] });
 }
 
 // Each placed unit acts on its area.
@@ -893,7 +939,12 @@ function aiBuyUnit(ai, mine) {
 function update(dt) {
   G.time += dt;
   if (G.cfg.fog && (G.sightClock += dt) >= SIGHT_EVERY) { G.sightClock = 0; updateSight(); }
-  for (const p of G.planets) p.units += rate(p) * dt;
+  for (const p of G.planets) {
+    const cap = capOf(p);
+    if (p.units < cap) p.units = Math.min(cap, p.units + rate(p) * dt);
+    // Troops piled in beyond the cap drift away, so a castle can stage an attack but not hold a doomstack.
+    else if (p.units > cap && p.owner) p.units -= (p.units - cap) * DESERT_RATE * dt;
+  }
   for (const o of G.owners) {
     const pw = G.pw[o], was = pw.ready;
     pw.ready = Math.max(0, pw.ready - dt);
@@ -939,7 +990,8 @@ function update(dt) {
   G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, dust: 0.9, impact: 0.6, bolt: 0.2, arrow: 0.3, upgrade: 0.8 }[f.kind] || 0.35));
 
   const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
-  for (const ai of G.ais) {
+  if (G.mode === 'grand') grandTick(dt);
+  else for (const ai of G.ais) {
     ai.timer -= dt;
     if (ai.timer <= 0) {
       // Amaru moves quickly while there are keeps to claim.
@@ -983,7 +1035,13 @@ function checkSurrender() {
     if (G.surrendered.has(o)) continue;
     const castles = G.planets.filter(p => p.owner === o);
     if (!castles.length) continue;
-    const weak = totalOf(o) / sum < SURRENDER_SHARE && castles.length <= 2;
+    // In the Grand Campaign a realm gives up once it has fallen far behind the strongest realm, however
+    // many castles it still holds, so a decided war doesn't drag on for dozens of waves. (A share of all
+    // troops doesn't work with five realms: everyone starts at about a fifth.)
+    const leader = Math.max(...G.owners.filter(q => q !== o).map(totalOf));
+    const weak = G.mode === 'grand'
+      ? G.wave >= GRAND.surrenderFromWave && totalOf(o) < leader * GRAND.surrenderShare
+      : totalOf(o) / sum < SURRENDER_SHARE && castles.length <= 2;
     if (!weak) { delete G.weakSince[o]; continue; }
     G.weakSince[o] ??= G.time;
     if (G.time - G.weakSince[o] < SURRENDER_HOLD) continue;

@@ -31,7 +31,31 @@ const CASTLE_KINDS = {
   village: { name: 'Village', def: 1, prod: 0, worth: 1.3, aura: 150, auraBoost: 0.25, desc: 'Trains no troops, but your castles within reach train 25% faster.' },
 };
 const KIND_SHARE = 0.25;
+// Garrison cap by castle size (index = tier: 1 small, 2 medium, 3 large), plus WALL_CAP per Walls level.
+// A castle at its cap stops training; troops marching in can still push it over.
+const GARRISON_CAP = [0, 60, 90, 120];
+const WALL_CAP = 15;
+const DESERT_RATE = 0.05;     // troops above the cap desert at this fraction of the excess per second
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
+// Grand Campaign (#46): a wave-based mode with all five armies on one large map.
+const GRAND = {
+  castles: 71,                 // 5 starting castles, a central keep, and 13 neutral keeps per realm
+  radius: 1000,                // realm radius in world units (the regular battle map is 1000 x 640)
+  start: 40,                   // starting troops
+  waveSeconds: 20,             // length of each march window, in game seconds
+  planSecondsEstimate: 10,     // typical time a player spends planning a wave, for length estimates
+  actionsPerWave: { easy: 1, medium: 2, hard: 3 },  // decisions each AI lord makes per wave
+  siegeSources: { easy: 3, medium: 5, hard: 8 },    // castles an AI lord may combine into one attack
+  surrenderShare: 0.2,         // a rival realm surrenders below this fraction of the strongest realm's troops
+  surrenderFromWave: 20,       // ...but never before this wave
+  finishBias: 1.5,             // how much more a lord wants castles of a rival at under half its strength
+  waveCap: 400,                // headless runs stop here
+};
+// Grand Campaign maps. #50 adds more, each with its own monster from MONSTERS (#48).
+const GRAND_MAPS = {
+  realm: { name: 'The Five Realms', theme: 'vale', monster: null },
+};
+const MONSTERS = {};
 const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
 const MAP_UNITS = {
   ballista: {

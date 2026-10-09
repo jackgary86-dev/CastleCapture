@@ -268,7 +268,9 @@ function drawCastle(p, now) {
   const tw = ctx.measureText(label).width + fs * 0.8, th = fs * 1.2, py = baseY + s * 0.22;
   ctx.fillStyle = p.owner ? c : PARCH;
   ctx.beginPath(); ctx.roundRect(p.x - tw / 2, py, tw, th, 3); ctx.fill();
-  ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.stroke();
+  // A gold rim when the castle is full and has stopped training.
+  const full = p.owner && p.units >= capOf(p) - 0.5;
+  ctx.strokeStyle = full ? '#f3c64a' : INK; ctx.lineWidth = full ? 2 : 1; ctx.stroke();
   ctx.fillStyle = p.owner ? army(p.owner).plaqueText : INK;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(label, p.x, py + th / 2 + 1);

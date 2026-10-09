@@ -6,8 +6,9 @@
 //   node tools/balance.js --games 8 --diff medium --seconds 900 --band 0.35,0.65
 //   node tools/balance.js --json          # machine-readable results
 //   node tools/balance.js --fps 30        # coarser, faster simulation step (default 60, as in the game)
+//   node tools/balance.js --mode grand --games 4   # Grand Campaign: five AI lords play waves to the end
 //
-// Only js/data.js and js/sim.js are loaded, so this also proves the simulation has no DOM
+// Only js/data.js, js/sim.js and js/grand.js are loaded, so this also proves the simulation has no DOM
 // dependencies. Math.random is seeded per game, so the same arguments always give the same result.
 
 const fs = require('fs');
@@ -24,24 +25,26 @@ const SECONDS = +opt('seconds', 600);
 // The agreed band is deliberately wide to start with (see issue #47); tighten it as the armies are retuned.
 const [BAND_LO, BAND_HI] = opt('band', '0.25,0.75').split(',').map(Number);
 const JSON_OUT = process.argv.includes('--json');
+const MODE = opt('mode', 'battle');
 // Simulate at the game's own step (the browser runs 1/60 s substeps); coarser steps let fast columns skip
 // past each other on the road and skew the results.
 const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
-const code = ['js/data.js', 'js/sim.js']
+const code = ['js/data.js', 'js/sim.js', 'js/grand.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8'))
   .join('\n;\n');
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, newGame, update, totalOf,
+  ARMIES, ARMY_IDS, LORDS, GRAND, newGame, update, totalOf, march,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
 const api = ctx.__api;
 const ids = api.ARMY_IDS;
+if (MODE === 'grand') { runGrand(); process.exit(0); }
 
 const stat = Object.fromEntries(ids.map(id => [id, { games: 0, decided: 0, wins: 0, powers: 0, units: 0, surrenders: 0 }]));
 const lengths = [];
@@ -120,3 +123,50 @@ if (JSON_OUT) {
 const failed = crashes > 0 || rows.some(r => r.outside);
 if (failed && !JSON_OUT) console.log('\nFAILED: ' + (crashes ? `${crashes} crash(es)` : 'an army is outside the win band'));
 process.exit(failed ? 1 : 0);
+
+// ---------- Grand Campaign ----------
+// Five AI lords (the player's seat included) play waves until one realm is left, the wave cap is hit,
+// or every survivor is stuck. Reports how many waves a campaign takes and roughly how long that is to play.
+function runGrand() {
+  const GR = api.GRAND, results = [];
+  for (let g = 0; g < GAMES; g++) {
+    const seed = 7000 + g;
+    api.seedRandom(seed);
+    // Rotate who sits in each realm so every army plays every start.
+    const armies = ids.map((_, i) => ids[(i + g) % ids.length]);
+    api.newGame({ mode: 'grand', seed, n: GR.castles, diff: DIFF, armies, map: armies[0] });
+    const G = api.G;
+    G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+    const alive = o => G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o);
+    const out = { seed, waves: 0, winner: null, eliminated: [] };
+    try {
+      while (G.wave <= GR.waveCap) {
+        // The player's seat falling ends a real campaign; here the other lords play on to a single winner.
+        G.over = false;
+        api.march();
+        for (let t = 0; t < GR.waveSeconds; t += DT) api.update(DT);
+        // Stay in plan state if the battle has "ended" for the player's seat; the other lords play on.
+        if (G.phase === 'march') { G.phase = 'plan'; G.wave++; }
+        for (const o of G.owners) if (!alive(o) && !out.eliminated.some(e => e.o === o)) out.eliminated.push({ o, army: G.fac[o], wave: G.wave });
+        const left = G.owners.filter(o => alive(o) && !G.surrendered.has(o));
+        if (left.length <= 1) { out.winner = left.length ? G.fac[left[0]] : null; break; }
+      }
+    } catch (e) {
+      console.error(`crash in grand campaign seed ${seed}: ${e.stack}`);
+      process.exit(1);
+    }
+    out.waves = G.wave;
+    out.castles = G.planets.length;
+    results.push(out);
+  }
+  const waves = results.map(r => r.waves).sort((a, b) => a - b);
+  const median = waves[waves.length >> 1];
+  const minutes = w => Math.round(w * (GR.waveSeconds + GR.planSecondsEstimate) / 60);
+  if (JSON_OUT) { console.log(JSON.stringify({ mode: 'grand', diff: DIFF, results, medianWaves: median, estMinutes: minutes(median) }, null, 2)); return; }
+  console.log(`Castle Siege Grand Campaign: ${DIFF}, ${GAMES} campaigns, ${results[0] ? results[0].castles : '?'} castles, ${GR.waveSeconds}s waves`);
+  for (const r of results) {
+    const order = r.eliminated.map(e => `${e.army}@${e.wave}`).join(', ');
+    console.log(`seed ${r.seed}: ${r.waves} waves, winner ${r.winner || 'none (cap)'}; out: ${order || '-'}`);
+  }
+  console.log(`\nmedian ${median} waves = about ${minutes(median)} min of play (${GR.waveSeconds}s march + ~${GR.planSecondsEstimate}s planning per wave); target 120–180 waves, about an hour`);
+}
