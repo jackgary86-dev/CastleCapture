@@ -45,7 +45,7 @@ const WEATHER = {
   dust:  { name: 'Dust storm', desc: 'Troops march 15% slower and see less.', speed: 0.85, prod: 1, sight: 0.65, native: 'kharzul' },
   snow:  { name: 'Snowfall', desc: 'Troops march 15% slower.', speed: 0.85, prod: 1, sight: 0.85, native: 'frostmark' },
   heat:  { name: 'Scorching heat', desc: 'Castles train 15% slower.', speed: 1, prod: 0.85, sight: 1, native: 'solmara' },
-  mist:  { name: 'Mist', desc: 'Troops see half as far and march 5% slower.', speed: 0.95, prod: 1, sight: 0.5, native: 'nyx' },
+  mist:  { name: 'Marsh fog', desc: 'Troops see half as far and march 5% slower.', speed: 0.95, prod: 1, sight: 0.5, native: 'nyx' },
 };
 const WEATHER_FIRST = 30;          // seconds of clear skies at the start of a battle
 const WEATHER_SPELL = [40, 70];    // each spell of weather, or of clear skies, lasts this long

@@ -594,7 +594,7 @@ function launch(owner, s, target, n) {
 // G.weather alternates between a spell of the homeland's weather and a spell of clear skies.
 function updateWeather() {
   const W = G.weather;
-  if (G.time < W.until) return;
+  if (G.mode === 'grand' || G.time < W.until) return;
   const pool = G.theme.weather || [];
   if (G.cfg.tutorial || !pool.length) { W.until = 1e9; return; }
   W.prev = W.kind;
@@ -603,6 +603,20 @@ function updateWeather() {
   W.until = G.time + WEATHER_SPELL[0] + Math.random() * (WEATHER_SPELL[1] - WEATHER_SPELL[0]);
   emit('weather', { kind: W.kind, prev: W.prev });
 }
+// In the Grand Campaign the weather turns over between waves: each spell lasts one or two waves.
+on('wave', ({ phase }) => {
+  if (!G || G.mode !== 'grand' || !G.weather || phase !== 'plan') return;
+  const W = G.weather;
+  W.wavesLeft = (W.wavesLeft ?? 1) - 1;
+  if (W.wavesLeft > 0) return;
+  const pool = G.theme.weather || [];
+  if (!pool.length) return;
+  W.prev = W.kind;
+  W.kind = W.kind === 'clear' ? pick(pool) : 'clear';
+  W.since = G.time;
+  W.wavesLeft = 1 + Math.floor(Math.random() * 2);
+  emit('weather', { kind: W.kind, prev: W.prev });
+});
 // How far the current weather has set in, 0 to 1.
 const weatherAmt = () => G.weather ? Math.min(1, (G.time - G.weather.since) / WEATHER_FADE) : 1;
 // A weather multiplier for kingdom o, blending out of the last weather as the new one sets in.
