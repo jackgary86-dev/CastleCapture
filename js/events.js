@@ -119,11 +119,20 @@
     if (ev.merc && (G.time > ev.merc.until || G.planets[ev.merc.id].owner !== 0)) ev.merc = null;
     if (ev.plague && G.time > ev.plague.until) ev.plague = null;
     if (ev.harvest && G.time > ev.harvest.until) ev.harvest = null;
+    // The Grand Campaign is paced by waves, not the clock (see the 'wave' listener below).
+    if (G.mode === 'grand') return;
     if (G.time >= ev.next) {
       ev.next = G.time + rnd(EVERY_MIN, EVERY_MAX);
       fire();
     }
   };
+  // In the Grand Campaign an event opens every few march phases, so it is seen before the plans
+  // for the next wave are made.
+  const GRAND_EVERY = 4;
+  on('wave', ({ wave, phase }) => {
+    if (phase !== 'march' || !active() || !G.mode || G.mode !== 'grand') return;
+    if (wave > 1 && wave % GRAND_EVERY === 0) fire();
+  });
 
   // Glows over the finished frame: gold round a keep holding mercenaries, a sickly haze over a
   // plagued castle, and a green shimmer round a harvesting kingdom's castles.
