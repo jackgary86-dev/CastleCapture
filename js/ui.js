@@ -315,7 +315,7 @@ function playerSend(t, owner = 1) {
     s.clear();
     return;
   }
-  if (send(owner, [...s].filter(x => x !== t), t, pctOf(owner))) {
+  if (send(owner, [...s].filter(x => x !== t), t, pctOf(owner), owner === 1 ? unitType : 'foot')) {
     sfx.drum();
     if (!G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
   }
@@ -421,6 +421,17 @@ cv.addEventListener('wheel', e => {
 }, { passive: false });
 setSendPct(sendPct);
 
+// ---------- troop type ----------
+let unitType = 'foot';
+const unitCtl = document.getElementById('unitCtl');
+function setUnitType(v) {
+  unitType = v;
+  unitCtl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.unit === v)));
+}
+unitCtl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setUnitType(b.dataset.unit); });
+const cycleUnit = () => setUnitType(UNIT_IDS[(UNIT_IDS.indexOf(unitType) + 1) % UNIT_IDS.length]);
+setUnitType(unitType);
+
 // ---------- rally points ----------
 const rallyDrag = { from: null, timer: 0 };
 function beginRally(p) { rallyDrag.from = p; sel.clear(); ptr.down = false; ptr.hover = null; }
@@ -489,6 +500,7 @@ function setPaused(v) {
 addEventListener('keydown', e => {
   if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
   else if (e.key >= '1' && e.key <= '4' && !e.shiftKey) setSendPct(PCTS[+e.key - 1]);   // Shift+1-4 belong to player 2 (#12)
+  else if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.shiftKey) cycleUnit();
   else if (e.key === 'q' || e.key === 'Q') playerPower();
   else if (e.key === 'u' || e.key === 'U') playerUpgrade('walls');
   else if (e.key === 'i' || e.key === 'I') playerUpgrade('barracks');

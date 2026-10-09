@@ -52,6 +52,17 @@ const WEATHER_SPELL = [40, 70];    // each spell of weather, or of clear skies, 
 const WEATHER_FADE = 4;            // seconds for weather to set in or clear
 const DAY_LENGTH = 240;            // one full day and night, in seconds
 const NIGHT_PROD = 0.9;            // training at the darkest hour of the night
+// Troop types. speed: marching speed; siege: strength when attacking a castle; road: strength in
+// battles on the road. Reinforcing your own castle always adds every soldier.
+const UNIT_TYPES = {
+  foot:  { name: 'Foot', speed: 1, siege: 1, road: 1, desc: 'Steady all-rounders.' },
+  horse: { name: 'Cavalry', speed: 1.6, siege: 0.6, road: 1, desc: 'Fast. Best for rushing reinforcements and catching columns on the road; weak against castles.' },
+  siege: { name: 'Catapults', speed: 0.55, siege: 1.8, road: 0.75, desc: 'Slow and vulnerable on the road, but they hit castles 1.8× as hard.' },
+};
+const UNIT_IDS = Object.keys(UNIT_TYPES);
+const unitOf = k => UNIT_TYPES[k.type] || UNIT_TYPES.foot;
+const AI_SIEGE = false;         // the AI may field catapults (with a foot escort); false keeps it to foot and cavalry
+const SIEGE_ESCORT = 0.4;       // share of an AI catapult force sent as foot marching alongside at catapult pace
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
 // Grand Campaign (#46): a wave-based mode with all five armies on one large map.
 const GRAND = {

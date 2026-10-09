@@ -371,6 +371,22 @@ function drawTruceMark(p) {
   ctx.strokeStyle = col(1); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + 7, y + 1.2); ctx.stroke();
 }
 
+// A small wheeled catapult with its army's pennant; the arm rocks as it rolls.
+function drawCatapult(x, y, o, dir, t) {
+  const rock = reduceMotion ? 0 : Math.sin(t) * 0.15;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x, y + 3, 7, 2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#6b4a2f'; ctx.fillRect(x - 6, y - 2, 12, 3);
+  ctx.strokeStyle = '#4a3019'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(x - 1, y - 2); ctx.lineTo(x + 1, y - 7); ctx.lineTo(x + 3, y - 2); ctx.stroke();
+  const ax = x + 1, ay = y - 7, a = -0.9 * dir + rock, len = 9;
+  ctx.strokeStyle = '#8a6239'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(ax - Math.cos(a) * 3 * dir, ay + Math.sin(a) * 3); ctx.lineTo(ax + Math.cos(a) * len * dir, ay - Math.sin(Math.abs(a)) * len); ctx.stroke();
+  ctx.fillStyle = '#4a3019'; ctx.beginPath(); ctx.arc(ax + Math.cos(a) * len * dir, ay - Math.sin(Math.abs(a)) * len, 1.6, 0, Math.PI * 2); ctx.fill();
+  for (const wx of [x - 4, x + 4]) { ctx.fillStyle = '#3b2a19'; ctx.beginPath(); ctx.arc(wx, y + 1.5, 2.2, 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x - 5 * dir, y - 2); ctx.lineTo(x - 5 * dir, y - 9); ctx.stroke();
+  poly([[x - 5 * dir, y - 9], [x - 5 * dir - 4 * dir, y - 8], [x - 5 * dir, y - 7]], col(o));
+}
+
 function soldier(x, y, o, t, dir, style) {
   const c = col(o), step = reduceMotion ? 0 : Math.sin(t);
   ctx.strokeStyle = INK; ctx.lineWidth = 0.9;
@@ -779,7 +795,7 @@ function draw(now) {
     ctx.setLineDash([]);
     let troops = 0;
     for (const s of sel) if (s !== ptr.hover) troops += Math.floor(s.units * sendPct);
-    const msg = `${Math.round(sendPct * 100)}% · ${troops}`;
+    const msg = `${Math.round(sendPct * 100)}% · ${troops}${unitType !== 'foot' ? ' · ' + UNIT_TYPES[unitType].name : ''}`;
     const fs = 13 / sc;
     ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
     const lw = ctx.measureText(msg).width + fs, lx = ptr.wx + 14 / sc, ly = ptr.wy - 26 / sc;
@@ -805,7 +821,9 @@ function draw(now) {
   for (const it of items) {
     if (it.u) { drawUnit(it.u, now); continue; }
     if (it.p) { if (G.cfg.fog && !G.cfg.demo) drawRemembered(it.p, now); else drawCastle(it.p, now); if (!G.cfg.demo && allied(1, it.p.owner)) drawTruceMark(it.p); continue; }
-    const k = it.k, dir = k.dir || 1, style = army(k.owner).soldier, isFrozen = frozen(k.owner);
+    const k = it.k, dir = k.dir || 1, isFrozen = frozen(k.owner);
+    if (k.type === 'siege') { drawCatapult(k.x, k.y, k.owner, dir, isFrozen ? 0 : now / 140 + k.phase); if (isFrozen) { ctx.fillStyle = 'rgba(210,235,255,0.45)'; ctx.beginPath(); ctx.ellipse(k.x, k.y - 4, 10, 8, 0, 0, Math.PI * 2); ctx.fill(); } continue; }
+    const style = k.type === 'horse' ? 'rider' : army(k.owner).soldier;
     const figures = Math.min(Math.ceil(k.n), 3);
     if (powerOn(k.owner, 'bloodMoon')) {
       ctx.strokeStyle = alpha(col(k.owner), 0.45); ctx.lineWidth = 3;

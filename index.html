@@ -445,6 +445,12 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
         <button data-pct="0.75"><kbd>3</kbd>75%</button>
         <button data-pct="1"><kbd>4</kbd>100%</button>
       </div>
+      <div class="sendctl" id="unitCtl" role="group" aria-label="Troop type">
+        <span>Troops</span>
+        <button data-unit="foot" aria-pressed="true" title="Foot: steady all-rounders (T to switch)">Foot</button>
+        <button data-unit="horse" title="Cavalry: 1.6× speed, but only 0.6× against castles (T)">Cavalry</button>
+        <button data-unit="siege" title="Catapults: 0.55× speed and 0.75× on the road, but 1.8× against castles (T)">Catapults</button>
+      </div>
       <div class="sendctl" id="speedCtl" role="group" aria-label="Game speed">
         <span>Speed</span>
         <button data-speed="1" aria-pressed="true" title="Normal speed ([)">1×</button>
@@ -600,6 +606,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
             <li><b>Saving:</b> an unfinished battle is saved in this browser when you close or hide the tab, and every 10 seconds. Resume it from the top of this menu. Retreating to the menu abandons it.</li>
             <li><b>Upkeep:</b> a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when. Spread big armies out or put them to work.</li>
             <li><b>Rivers</b> can only be crossed at bridges, so bridges become chokepoints. <b>Forests</b> slow marching troops. While aiming, the dashed line shows the route each column will take.</li>
+            <li><b>Troop types</b> (the Troops buttons, or <b>T</b> to switch): <b>Foot</b> are all-rounders. <b>Cavalry</b> march 1.6× as fast but hit castles at only 0.6×, so use them to rush reinforcements and catch columns. <b>Catapults</b> crawl at 0.55× and fight at 0.75× on the road, but hit castles 1.8× as hard; send foot alongside to protect them.</li>
             <li><b>Truces</b> (three or more kingdoms): use <b>Diplomacy</b> to offer a rival lord a 90-second truce, or accept one when it's offered. Allies can't attack each other, their columns pass on the road, and their castles fly a white pennant. Isolde and Amaru offer truces when they're second; Amaru wants 15 coins; Torvek never agrees; and Veyra always says yes.</li>
             <li><b>Weather</b> drifts across each homeland: rain on the vale, dust storms on the steppe, snow in the fjords, heat (and dust) in the desert, marsh fog (and rain) in the mire. It slows marching, training or sight for a minute or so, except for the army whose homeland it is. <b>Night</b> falls every four minutes and trains troops up to 10% slower.</li>
             <li><b>Fog of war</b> (optional): you only see near your own castles and marching columns. Castles out of sight show what you last saw, greyed. Send troops out to scout. The rival lords play by the same rules.</li>

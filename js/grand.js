@@ -80,7 +80,7 @@ function march() {
   G.phase = 'march';
   G.marchLeft = GRAND.waveSeconds;
   for (const o of orders) {
-    if (o.kind === 'send') launch(o.owner, o.from, o.to, o.n);
+    if (o.kind === 'send') launch(o.owner, o.from, o.to, o.n, o.type, o.escort);
     else if (o.kind === 'power') { G.pw[o.owner].queued = false; usePower(o.owner); }
     else if (o.kind === 'unit') placeUnit(o.owner, o.type, o.x, o.y);
   }
