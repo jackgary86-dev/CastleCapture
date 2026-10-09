@@ -147,11 +147,33 @@ const ARMIES = {
     personality: 'Aggressive and cunning. Snaps up unclaimed keeps quickly and pounces on any castle you leave weak.',
     ai: { sendFrac: 0.6, keep: 6, enemyBias: 1.8, neutralBias: 1.4, margin: 1.05, defendAt: 1.0, thinkMul: 0.85, front: false, opportunist: 2.2, boldAt: 1.1 },
   },
+  // Not a kingdom: the raiding column of the bandit map event (#35). It owns no castles, no
+  // lord commands it and it never appears in the army pickers (see ARMY_IDS).
+  bandits: {
+    pseudo: true,
+    name: 'Bandits', full: 'The Greyhand Bandits', emblem: 'eye',
+    color: '#8d8a80', roof: '#5a5750', ink: '#1a1917', plaqueText: '#fff8e6',
+    role: 'Raiders', homeland: 'The wild roads', map: 'vale',
+    castle: 'stone', flag: 'swallow', soldier: 'hood',
+    story: 'Deserters and outlaws who follow the war for its leavings.',
+    strength: 'Raiders. They fight like ordinary soldiers and hold nothing they take.',
+    stats: { atk: 1, def: 1, speed: 1.1, prod: 0, road: 1, neutral: 1, forest: 0.9 },
+    power: { id: 'none', name: 'None', dur: 0, desc: '', call: '', they: '' },
+    personality: '',
+    ai: { sendFrac: 0, keep: 0, enemyBias: 1, neutralBias: 1, margin: 1, defendAt: 1, thinkMul: 1, front: false, opportunist: 1, boldAt: 1 },
+  },
 };
-const ARMY_IDS = Object.keys(ARMIES);
+// The five playable kingdoms, in picker order. Pseudo-armies (the bandits) are left out.
+const ARMY_IDS = Object.keys(ARMIES).filter(id => !ARMIES[id].pseudo);
 
 // ---------- the lords who command each army as a rival ----------
 const LORDS = {
+  bandits: {
+    name: 'The Greyhand', short: 'Greyhand', title: 'bandit captain',
+    bio: 'No one knows a face; the hood passes to whoever is left.',
+    challenge: 'Your roads are ours tonight.',
+    lines: { capture: ['Take what you can carry and burn the rest.'], lose: ['Scatter! Back to the woods!'] },
+  },
   aldmere: {
     name: 'Queen Isolde Varr', short: 'Isolde', title: 'the Mason Queen',
     bio: 'Patient and formal, she believes every war is won by the side whose walls stand longest.',

@@ -74,7 +74,7 @@
   };
 
   const PANELS = [
-    ...Object.keys(ARMIES).map(id => ({ kind: 'army', id })),
+    ...ARMY_IDS.map(id => ({ kind: 'army', id })),
     ...['vale', 'steppe', 'tundra', 'desert', 'mire'].map(id => ({ kind: 'map', id })),
     ...Object.keys(GRAND).map(id => ({ kind: 'grand', id })),
     ...Object.keys(MONSTERS).map(id => ({ kind: 'monster', id })),
@@ -311,7 +311,7 @@
     } else if (panel.kind === 'map' || panel.kind === 'grand') {
       const T = THEMES[panel.id];
       landscape(ctx, W, H, T, rnd, { sunX: 0.72, sunColor: panel.id === 'mire' || panel.id === 'blackwood' ? '#d8c8f0' : panel.id === 'scorched' ? '#ffb070' : '#fff1e0' });
-      const owner = Object.keys(ARMIES).find(id => ARMIES[id].theme === panel.id);
+      const owner = ARMY_IDS.find(id => ARMIES[id].theme === panel.id);
       if (owner) { const C = L.ARMY[owner]; L[ARMIES[owner].castle](ctx, W * 0.26, H * 0.71, 20 * u, C, u, rnd); }
       const sub = panel.kind === 'grand' ? GRAND[panel.id].sub : `Homeland of ${ARMIES[owner].full}`;
       caption(ctx, W, H, T.name, sub, panel.kind === 'grand' ? '#ff8c42' : L.ARMY[owner].color);

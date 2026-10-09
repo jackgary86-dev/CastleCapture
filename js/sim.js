@@ -396,7 +396,9 @@ function villageBoost(p) {
 const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o && dist(u, p) <= MAP_UNITS.ward.range);
 // Upkeep: a castle feeding a big garrison trains slower, which stops one castle hoarding an army forever.
 const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPKEEP_AT ? 0.5 : 1;
-const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) : 0;
+// Harvest map event (#35): one kingdom trains faster for a while, shaped like a power.
+const harvestMul = o => G.ev && G.ev.harvest && G.ev.harvest.o === o && G.time < G.ev.harvest.until ? 1.5 : 1;
+const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) : 0;
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.
 const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1);
 // Enemy Great Wards halve marching speed inside them.
@@ -553,7 +555,7 @@ const knownTotal = (o, q) =>
 // incomingTable as kingdom o can see it: its own columns, and others only where o has sight.
 function incomingFor(o) {
   if (!G.cfg.fog) return incomingTable();
-  const inc = G.planets.map(() => new Array(G.owners.length + 1).fill(0));
+  const inc = G.planets.map(() => new Array(G.owners.length + 2).fill(0));   // + the bandit column (owner id owners.length + 1)
   for (const k of G.packets) if (k.owner === o || seesAt(o, k.x, k.y)) inc[k.to.id][k.owner] += k.n;
   return inc;
 }
@@ -580,7 +582,7 @@ function launch(owner, s, target, n) {
 }
 
 function incomingTable() {
-  const inc = G.planets.map(() => new Array(G.owners.length + 1).fill(0));
+  const inc = G.planets.map(() => new Array(G.owners.length + 2).fill(0));   // + the bandit column (owner id owners.length + 1)
   for (const k of G.packets) inc[k.to.id][k.owner] += k.n;
   return inc;
 }
