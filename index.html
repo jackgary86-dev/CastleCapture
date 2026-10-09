@@ -125,6 +125,19 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #toast small { display: block; font-family: var(--ui); font-size: 13px; color: var(--muted); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: rgb(23 20 14 / 0.45); }
 
+/* Main menu: the painted launch background sits behind a lighter overlay, with the title over the banner. */
+#menuArt { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#menu { background: rgb(23 20 14 / 0.12); }
+#menuTitle { position: absolute; left: 4%; top: 7%; max-width: 46%; pointer-events: none; color: #f4ecd6; text-shadow: 0 2px 4px rgb(10 8 14 / 0.7), 0 0 28px rgb(10 8 14 / 0.6); }
+#menuTitle .mt-eyebrow { display: block; font-size: clamp(12px, 1.1vw, 16px); letter-spacing: 0.22em; text-transform: uppercase; color: #e9b43b; margin-bottom: 0.4em; }
+#menuTitle .mt-title { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(40px, 6.6vw, 112px); line-height: 0.95; letter-spacing: 0.02em; text-wrap: balance; }
+#menuTitle .mt-sub { margin: 0.6em 0 0; font-size: clamp(13px, 1.15vw, 18px); color: #e0d4b8; max-width: 34ch; line-height: 1.4; }
+@media (min-width: 1100px) {
+  #menu { justify-items: end; padding-right: 3vw; }
+  #menu .sheet > h2 { display: none; }
+}
+@media (max-width: 1099px) { #menuTitle { display: none; } }
+
 /* Lords: portraits, taunts and the pre-battle card */
 .portrait { flex: none; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid var(--c, var(--edge)); background: var(--timber); }
 .portrait svg { width: 100%; height: 100%; display: block; }
@@ -300,6 +313,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
   </header>
   <div id="board">
     <canvas id="cv"></canvas>
+    <canvas id="menuArt" hidden aria-hidden="true"></canvas>
     <div id="powerPanel" role="group" aria-label="Special power" hidden>
       <button id="btnPower" title="Use special power (Q)" disabled>
         <span class="pp-ring">
@@ -332,6 +346,11 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
     <div id="taunt" hidden></div>
 
     <div class="overlay" id="menu">
+      <div id="menuTitle">
+        <span class="mt-eyebrow">Five kingdoms. One realm.</span>
+        <p class="mt-title">Castle Siege</p>
+        <p class="mt-sub">March your banners across the realm and take every castle before the rival lords take yours.</p>
+      </div>
       <div class="sheet">
         <h2>Castle Siege</h2>
         <p>Five kingdoms war over the realm. Choose an army, then take every enemy castle by marching troops along the roads.</p>
@@ -481,3 +500,5 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/achievements.js"></script>
 <script src="js/access.js"></script>
 <script src="js/touch.js"></script>
+<script src="art/launch-bg.js"></script>
+<script src="js/menu-art.js"></script>
