@@ -7,8 +7,9 @@
 //   node tools/balance.js --json          # machine-readable results
 //   node tools/balance.js --fps 30        # coarser, faster simulation step (default 60, as in the game)
 //   node tools/balance.js --mode grand --games 4   # Grand Campaign: five AI lords play waves to the end
+//   node tools/balance.js --mode grand --map scorched   # ...on one map (realm, scorched, fells, blackwood); 'all' cycles them
 //
-// Only js/data.js, js/sim.js and js/grand.js are loaded, so this also proves the simulation has no DOM
+// Only js/data.js, js/sim.js, js/grand.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
 // dependencies. Math.random is seeded per game, so the same arguments always give the same result.
 
 const fs = require('fs');
@@ -33,13 +34,13 @@ const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
-const code = ['js/data.js', 'js/sim.js', 'js/grand.js']
+const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/monsters.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8'))
   .join('\n;\n');
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, GRAND, newGame, update, totalOf, march,
+  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, newGame, update, totalOf, march, on,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
@@ -129,17 +130,21 @@ process.exit(failed ? 1 : 0);
 // Five AI lords (the player's seat included) play waves until one realm is left, the wave cap is hit,
 // or every survivor is stuck. Reports how many waves a campaign takes and roughly how long that is to play.
 function runGrand() {
-  const GR = api.GRAND, results = [];
+  const GR = api.GRAND, results = [], mapIds = Object.keys(api.GRAND_MAPS), MAP = opt('map', 'realm');
+  // Each map's monster (#48, #50): count kills, who landed the final blow and what its special did.
+  const monsterLog = [];
+  api.on('monster', e => monsterLog.push(e));
   for (let g = 0; g < GAMES; g++) {
-    const seed = 7000 + g;
+    const seed = 7000 + g, grandMap = MAP === 'all' ? mapIds[g % mapIds.length] : MAP;
     api.seedRandom(seed);
+    monsterLog.length = 0;
     // Rotate who sits in each realm so every army plays every start.
     const armies = ids.map((_, i) => ids[(i + g) % ids.length]);
-    api.newGame({ mode: 'grand', seed, n: GR.castles, diff: DIFF, armies, map: armies[0] });
+    api.newGame({ mode: 'grand', seed, n: GR.castles, diff: DIFF, armies, map: armies[0], grandMap });
     const G = api.G;
     G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
     const alive = o => G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o);
-    const out = { seed, waves: 0, winner: null, eliminated: [] };
+    const out = { seed, map: grandMap, waves: 0, winner: null, eliminated: [], monster: null };
     try {
       while (G.wave <= GR.waveCap) {
         // The player's seat falling ends a real campaign; here the other lords play on to a single winner.
@@ -158,6 +163,10 @@ function runGrand() {
     }
     out.waves = G.wave;
     out.castles = G.planets.length;
+    if (G.monster) {
+      const slain = monsterLog.filter(e => e.kind === 'slain'), specials = monsterLog.filter(e => ['fire', 'smash', 'raid'].includes(e.kind)).length;
+      out.monster = { id: G.monster.id, kills: slain.length, slayers: slain.map(e => G.fac[e.o]), specials, left: G.monster.creatures.filter(c => !c.dead).length };
+    }
     results.push(out);
   }
   const waves = results.map(r => r.waves).sort((a, b) => a - b);
@@ -167,7 +176,8 @@ function runGrand() {
   console.log(`Castle Siege Grand Campaign: ${DIFF}, ${GAMES} campaigns, ${results[0] ? results[0].castles : '?'} castles, ${GR.waveSeconds}s waves`);
   for (const r of results) {
     const order = r.eliminated.map(e => `${e.army}@${e.wave}`).join(', ');
-    console.log(`seed ${r.seed}: ${r.waves} waves, winner ${r.winner || 'none (cap)'}; out: ${order || '-'}`);
+    const mon = r.monster ? `; ${r.monster.id}: ${r.monster.kills} kill${r.monster.kills === 1 ? '' : 's'}${r.monster.slayers.length ? ' by ' + r.monster.slayers.join(', ') : ''}, ${r.monster.specials} special${r.monster.specials === 1 ? '' : 's'}` : '';
+    console.log(`seed ${r.seed} (${r.map}): ${r.waves} waves, winner ${r.winner || 'none (cap)'}; out: ${order || '-'}${mon}`);
   }
   console.log(`\nmedian ${median} waves = about ${minutes(median)} min of play (${GR.waveSeconds}s march + ~${GR.planSecondsEstimate}s planning per wave); target 120–180 waves, about an hour`);
 }

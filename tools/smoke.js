@@ -211,6 +211,40 @@ if (hasGrand) {
     }
   `);
 }
+// ---------- 5. the map monsters (#48, #50): a wave on every map, then a save and load with the monster hurt ----------
+// and troops marching on it, so its health, the damage tally and the columns' targets survive a load.
+if (hasGrand) {
+  const maps = run('grand maps', `Object.keys(GRAND_MAPS)`);
+  // Braces keep each script's consts out of the shared context.
+  for (const map of maps) run(`Grand Campaign on ${map}`, `{
+    startGrand('${map}', 'aldmere', 'hard');
+    if (typeof startBattle === 'function') startBattle();
+    G.ais.unshift({ id: 1, diff: 'hard', timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+    for (let w = 0; w < 2; w++) { march(); for (let i = 0; i < 600; i++) update(1 / 30); hud(); draw(${clock}); }
+    if (!G.monster) throw new Error('map ${map} has no monster');
+    const c = G.monster.creatures[0];
+    c.hp = Math.round(c.maxHp * 0.2); c.dmg = { 2: c.maxHp * 0.5, 3: c.maxHp * 0.3 };
+    send(1, G.planets.filter(p => p.owner === 1), c, 0.5);
+    march();
+    for (let i = 0; i < 30; i++) update(1 / 30);
+    const marching = G.packets.filter(k => k.to === c).length, hpAt = c.hp;
+    if (!saveGrandSlot(4)) throw new Error('saving the campaign failed');
+    for (let i = 0; i < 60; i++) update(1 / 30);
+    if (!loadGrandSlot(4)) throw new Error('loading the campaign failed');
+    setPaused(false);
+    const r = G.monster.creatures[0];
+    if (!r || Math.abs(r.hp - hpAt) > 0.01 || !r.dmg[2]) throw new Error('monster health or damage tally lost on load');
+    if (G.phase === 'plan') march();
+    for (let i = 0; i < 5; i++) update(1 / 30);
+    if (marching && !G.packets.some(k => k.to === r)) throw new Error('columns lost their monster target on load');
+    // A few more waves: the lords swarm a monster this low, and the kill schedules its return.
+    for (let w = 0; w < 6 && !r.dead; w++) { if (G.phase === 'plan') march(); for (let i = 0; i < 700 && !r.dead; i++) update(1 / 30); }
+    if (!r.dead) throw new Error('a monster at a fifth of its health was not finished off within six waves');
+    if (G.monster.creatures.every(x => x.dead) && G.monster.respawnWave === null) throw new Error('no respawn scheduled after the kill');
+    deleteGrandSlot(4);
+    hud(); draw(${clock});
+  }`);
+}
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasGrand ? ', and four Grand Campaign waves planned, marched, saved and loaded' : ''}.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasGrand ? ', and four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}.`);

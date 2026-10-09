@@ -78,11 +78,7 @@ const GRAND = {
   finishBias: 1.5,             // how much more a lord wants castles of a rival at under half its strength
   waveCap: 400,                // headless runs stop here
 };
-// Grand Campaign maps. #50 adds more, each with its own monster from MONSTERS (#48).
-const GRAND_MAPS = {
-  realm: { name: 'The Five Realms', theme: 'vale', monster: null },
-};
-const MONSTERS = {};
+// Grand Campaign maps and monsters (#48, #50) are defined after THEMES below.
 const COIN_CAP = 300;         // the treasury holds at most this many coins, except in the Grand Campaign
 const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
 const MAP_UNITS = {
@@ -211,6 +207,11 @@ const LORDS = {
       lose: ['A setback. Walls can be rebuilt.', 'Enjoy it while it lasts.'],
       power: ['By the Oath of Stone!'],
       nearDefeat: ['Even good walls fall. Remember that I built them.'],
+      slay: ['A beast is only a wall that moves. It has stopped moving.'],
+      slay: ['Its head rides on my saddle now!'],
+      slay: ['The north hunts too.'],
+      slay: ['A fine investment. The hide alone is worth the troops.'],
+      slay: ['The crows will feast for a month.'],
       victory: ['Patience wins every siege. You had none.'],
       defeat: ['The vale is yours. Keep its walls in good repair.'],
       surrender: ['I yield. Keep the walls standing; they deserve better than this war.'],
@@ -332,6 +333,56 @@ const THEMES = {
   tundra: { bg: '#8a96a2', field: '#c3cdd6', lit: '#d8e0e7', road: '#8d98a3', ring: INK,   tree: 'pine',  trees: 85, clump: 0.75, rocks: 14, pools: 3, pool: '#9fbfd2', castle: 'longhouse', weather: ['snow'], river: true, forest: true, water: '#7ea6c0', bank: '#e9eff3', wood: '#aab7b4', dust: '#ffffff' },
   desert: { bg: '#9a7843', field: '#c8a462', lit: '#d6b574', road: '#a3824a', ring: INK,   tree: 'palm',  trees: 30, clump: 0,  rocks: 10, pools: 4, pool: '#3f8fa0', castle: 'domes', weather: ['heat', 'dust'], river: false, forest: false, water: '#3f8fa0', bank: '#b8955a', wood: '#b8955a', dust: '#efdcae' },
   mire:   { bg: '#16131c', field: '#28242f', lit: '#332d3d', road: '#5a4f68', ring: PARCH, tree: 'dead',  trees: 60, clump: 0.6, rocks: 0,  pools: 9, pool: '#1a1426', castle: 'spires', weather: ['mist', 'rain'], river: true, forest: true, water: '#120d1c', bank: '#463d55', wood: '#1f1a27', dust: '#8a7ea0' },
+  // Grand Campaign realms (#50). `lava` makes the rivers molten (basalt bridges) and the pools glowing fissures;
+  // `sky` is a drifting overlay of the realm's own (embers, fog banks, gloom); `fog` and `boulders` feed the menu previews.
+  scorched:  { bg: '#1c1210', field: '#3a2420', lit: '#4a2d24', road: '#6f5240', ring: PARCH, tree: 'dead',  trees: 40, clump: 0.5, rocks: 40, pools: 7, pool: '#ff6a1a', castle: 'domes', weather: ['heat', 'dust'], river: true, forest: false, water: '#ff6a1a', bank: '#1a1210', wood: '#2a1c18', lava: '#ff6a1a', bridge: '#3a3430', sky: 'embers', dust: '#9a7a62',
+    desc: 'Volcanic badlands between the desert and the steppe: black rock, glowing lava fissures crossed only at basalt bridges, and scorched keeps.' },
+  fells:     { bg: '#3d4a44', field: '#5a6e60', lit: '#6a8070', road: '#8e9890', ring: PARCH, tree: 'pine',  trees: 35, clump: 0.3, rocks: 70, pools: 4, pool: '#6f8a92', castle: 'longhouse', weather: ['rain', 'snow'], river: false, forest: false, water: '#6f8a92', bank: '#7f8a84', wood: '#3a4a40', fog: '#c8d4d0', boulders: 30, sky: 'fog', dust: '#c9d3cc',
+    desc: 'High moorland on the Frostmark and Aldmere border: cold greens and greys, fog banks, cairns and a vast boulder field. The keeps are hill forts.' },
+  blackwood: { bg: '#0f1a12', field: '#1b2c1e', lit: '#243a27', road: '#4f5a3a', ring: PARCH, tree: 'oak',   trees: 150, clump: 0.8, rocks: 6, pools: 8, pool: '#1d3340', castle: 'spires', weather: ['mist', 'rain'], river: true, forest: true, water: '#1d3340', bank: '#2f3b2a', wood: '#142316', sky: 'gloom', dust: '#6a7a5a',
+    desc: 'Dense forest and river country near Nyxhollow: dark greens, a wide river with ferry crossings, forest tracks and hidden clearings. The keeps are robber towers.' },
+};
+
+// ---------- Grand Campaign maps and their monsters (#48, #50) ----------
+// A monster is mostly data. `hp` is its health in troop-equivalents; `bite` is how many troops it kills per
+// second from each column it fights (times BITE_RATE in js/monsters.js: about 3 troops for every troop it meets);
+// `reach` is how close a column must pass to be attacked; `speed` is in world units per second during a march;
+// `regen` is health recovered per wave when nothing fought it; `payout` goes to whoever lands the final blow and
+// `respawn` is how many waves it stays gone. `special` names a small hook in js/monsters.js. The bandit gang is
+// `count` captains with `hp` each, and `bonus` goes to whoever kills the last of them.
+const MONSTERS = {
+  wyrm: {
+    name: 'the Wyrm of the Wastes', short: 'Wyrm', art: 'wyrm', color: '#8fb57a',
+    hp: 600, bite: 3, reach: 24, speed: 76, regen: 40, payout: 150, respawn: 10, special: null,
+    desc: 'A long serpent that wanders the realm, skirting the castles, and attacks any column that strays within its reach.',
+  },
+  dragon: {
+    name: 'the Red Dragon', short: 'Dragon', art: 'dragon', color: '#e0362f',
+    hp: 700, bite: 3, reach: 24, speed: 110, regen: 60, payout: 180, respawn: 10, special: 'fire', flies: true,
+    fireReach: 60, fireBurn: 0.2,
+    desc: 'Flies in straight lines, and breathes fire on the nearest column or castle when it lands, burning a fifth of it. Perches on the mountain at the centre of the map, where the richest keeps are.',
+  },
+  cyclops: {
+    name: 'the Cyclops', short: 'Cyclops', art: 'cyclops', color: '#c9a66b',
+    hp: 900, bite: 4, reach: 24, speed: 42, regen: 50, payout: 220, respawn: 10, special: 'smash', roads: true,
+    smashGarrison: 0.3, sleepMul: 1.5,
+    desc: 'Slow and ground-bound, it follows the roads, so its route can be read a wave ahead. A castle it walks into loses 30% of its garrison and an upgrade level. It sleeps where it stops; troops that catch it asleep strike 1.5× for that wave.',
+  },
+  bandits: {
+    name: 'the Bandit Gang', short: 'Bandits', art: 'bandit', color: '#b08a4a',
+    hp: 120, count: 5, bite: 2, reach: 24, speed: 70, regen: 30, payout: 50, bonus: 150, respawn: 10, special: 'raid', forest: true,
+    raidCoins: 0.25, raidGarrison: 0.1,
+    desc: 'Five bandit captains who roam the woods separately, ambush columns among the trees, and raid castles for a quarter of their coins. Each pays 50 coins; whoever kills the last captain gets 150 more. They heal at their camp, and a big enough raid on the camp kills every captain there at once.',
+  },
+};
+// Lifetimes of the monsters' effects, in seconds; sim.js ages them and render.js hands them to drawMonsterFx.
+const MONSTER_FX = { fire: 1.2, smash: 0.9, raid: 1.1, bite: 0.4, roar: 1.6 };
+// Each Grand Campaign map pairs a theme (above) with a monster.
+const GRAND_MAPS = {
+  realm:     { name: 'The Five Realms', theme: 'vale', monster: 'wyrm', desc: 'The green heart of the realm, where the Wyrm of the Wastes wanders between the keeps.' },
+  scorched:  { name: 'The Scorched Reach', theme: 'scorched', monster: 'dragon', desc: THEMES.scorched.desc },
+  fells:     { name: "The Giant's Fells", theme: 'fells', monster: 'cyclops', desc: THEMES.fells.desc },
+  blackwood: { name: 'The Blackwood Marches', theme: 'blackwood', monster: 'bandits', desc: THEMES.blackwood.desc },
 };
 
 const LEVELS = [

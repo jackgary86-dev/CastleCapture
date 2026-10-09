@@ -482,6 +482,7 @@ function aiUpgrade(ai, mine, enemyCastles, inc, pz) {
   for (const p of pool) {
     const cost = upgradeCost(p, kind);
     if (cost === null || threatOn(p, ai.id, inc) > 0) continue;
+    if (G.monster && typeof monsterAvoidUpgrade === 'function' && monsterAvoidUpgrade(p)) continue;
     const surplus = pz.front ? (p.units > p.r * UPKEEP_AT || p.units >= cost * 1.3 + 6) : p.units >= cost * 2 + Math.max(pz.keep, 8);
     if (surplus && p.units >= cost + 4 && upgrade(p, kind)) { ai.upgradedAt = G.time; return true; }
   }
@@ -666,7 +667,7 @@ const knownTotal = (o, q) =>
 function incomingFor(o) {
   if (!G.cfg.fog) return incomingTable();
   const inc = G.planets.map(() => new Array(G.owners.length + 2).fill(0));   // + the bandit column (owner id owners.length + 1)
-  for (const k of G.packets) if (k.owner === o || seesAt(o, k.x, k.y)) inc[k.to.id][k.owner] += k.n;
+  for (const k of G.packets) if (!k.to.monster && (k.owner === o || seesAt(o, k.x, k.y))) inc[k.to.id][k.owner] += k.n;
   return inc;
 }
 
@@ -676,7 +677,7 @@ function launch(owner, s, target, n, type = 'foot', escort = false) {
   if (owner === 1) G.stats.sent += n;
   const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
   // Set off towards the first waypoint (a bridge, or the target itself).
-  const path = pathOf(s, target).pts, first = path[0];
+  const path = target.monster ? [{ x: target.x, y: target.y }] : pathOf(s, target).pts, first = path[0];   // a map monster is marched at directly
   const ang = Math.atan2(first.y - s.y, first.x - s.x);
   for (let i = 0; i < k; i++) {
     const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
@@ -738,7 +739,7 @@ const nightProd = () => 1 - (1 - NIGHT_PROD) * nightAmt();
 
 function incomingTable() {
   const inc = G.planets.map(() => new Array(G.owners.length + 2).fill(0));   // + the bandit column (owner id owners.length + 1)
-  for (const k of G.packets) inc[k.to.id][k.owner] += k.n;
+  for (const k of G.packets) if (!k.to.monster) inc[k.to.id][k.owner] += k.n;
   return inc;
 }
 // A marching column's punch against its target: its troops times its army's strike and its Barracks strength.
@@ -840,6 +841,8 @@ function aiThink(ai) {
   const pz = { ...army(me).ai };
   const mine = P.filter(p => p.owner === me);
   if (!mine.length) return;
+  // A Grand Campaign monster near death is worth a lord's turn (js/monsters.js).
+  if (G.monster && typeof monsterAi === 'function' && monsterAi(ai)) return;
   const inc = incomingFor(me), pow = incomingPowerFor(me);
   const enemyCastles = P.filter(p => p.owner && p.owner !== me);
   // Marching distance to the nearest castle in a list: rivers and forests count, not just the crow's flight.
@@ -986,6 +989,7 @@ function aiThink(ai) {
       if (t.kind === 'village') worth *= 1 + 0.3 * mine.filter(m => dist(m, t) <= CASTLE_KINDS.village.aura).length;
     }
     if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
+    if (G.monster && typeof monsterWorthMul === 'function') worth *= monsterWorthMul(t, me);
     if (id === 'kharzul' && real(t) === ai.focus) worth *= 2.5;
     // Grand Campaign: lords turn on whichever rival has fallen well behind them, so a dying realm gets finished off.
     if (G.mode === 'grand' && t.owner && totalOf(t.owner) < myTotal * 0.5) worth *= GRAND.finishBias;
@@ -1184,11 +1188,13 @@ function update(dt) {
     const k = G.packets[i];
     if (frozen(k.owner)) continue;
     if (k.delay > 0) { k.delay -= dt; continue; }
+    if (k.hold) continue;   // standing and fighting a map monster (js/monsters.js)
     // March towards the next waypoint on the route (bridge ends), then the castle itself.
     const t = k.to, last = k.wp >= k.path.length - 1, wpt = k.path[k.wp];
     const gx = last ? t.x : wpt.x + k.jx, gy = last ? t.y : wpt.y + k.jy;
     const dx = gx - k.x, dy = gy - k.y, dd = Math.hypot(dx, dy);
     if (last && dd <= t.r * 0.8) {
+      if (t.monster) { k.hold = true; continue; }
       G.packets.splice(i, 1);
       arrive(k, t);
       continue;
@@ -1215,10 +1221,11 @@ function update(dt) {
   for (const o of G.owners) G.coins[o] = Math.min(coinCap(), G.coins[o] + incomeOf(o) / 60 * dt);
   mapUnits(dt);
   archersTick(dt);
+  if (G.monster && typeof monstersTick === 'function') monstersTick(dt);
 
   for (const f of G.fx) f.age += dt;
   for (const f of G.fx) if (f.kind === 'dust') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.94; f.vy *= 0.94; }
-  G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, dust: 0.9, impact: 0.6, bolt: 0.2, arrow: 0.3, upgrade: 0.8 }[f.kind] || 0.35));
+  G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, dust: 0.9, impact: 0.6, bolt: 0.2, arrow: 0.3, upgrade: 0.8 }[f.kind] || MONSTER_FX[f.kind] || 0.35));
 
   const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
   if (G.mode === 'grand') grandTick(dt);

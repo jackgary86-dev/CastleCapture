@@ -703,8 +703,8 @@ function drawBridge(b) {
   const len = RIVER_W + 16, wid = 12, ang = Math.atan2(b.tx, -b.ty);
   ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang);
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(-len / 2 + 1.5, -wid / 2 + 2, len, wid);
-  ctx.fillStyle = '#8a6239'; ctx.fillRect(-len / 2, -wid / 2, len, wid);
-  ctx.strokeStyle = '#5e3f22'; ctx.lineWidth = 1;
+  ctx.fillStyle = G.theme.bridge || '#8a6239'; ctx.fillRect(-len / 2, -wid / 2, len, wid);
+  ctx.strokeStyle = G.theme.bridge ? 'rgba(0,0,0,0.35)' : '#5e3f22'; ctx.lineWidth = 1;
   for (let x = -len / 2 + 3; x < len / 2; x += 4) { ctx.beginPath(); ctx.moveTo(x, -wid / 2); ctx.lineTo(x, wid / 2); ctx.stroke(); }
   ctx.strokeStyle = '#4a3019'; ctx.lineWidth = 1.6;
   ctx.beginPath(); ctx.moveTo(-len / 2, -wid / 2); ctx.lineTo(len / 2, -wid / 2); ctx.moveTo(-len / 2, wid / 2); ctx.lineTo(len / 2, wid / 2); ctx.stroke();
@@ -721,6 +721,14 @@ function drawScenery(now) {
     ctx.fillStyle = alpha(T.wood, 0.45); ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
   }
   for (const o of G.pools) {
+    if (T.lava) {
+      // A glowing fissure: a dark crack with molten rock showing through.
+      const glow = reduceMotion ? 0.8 : 0.65 + 0.2 * Math.sin(now / 600 + o.x);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx * 1.15, o.ry * 1.3, 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = alpha(T.pool, glow); ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx, o.ry * 0.8, 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,230,120,${glow * 0.6})`; ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx * 0.5, o.ry * 0.3, 0.4, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
     ctx.fillStyle = T.pool; ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx, o.ry, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx * 0.95, o.ry * 0.9, 0, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
@@ -743,12 +751,22 @@ function drawScenery(now) {
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x + 1, r.y + r.s * 0.4, r.s, r.s * 0.45, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#8b8577'; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.s, r.s * 0.7, 0, 0, Math.PI * 2); ctx.fill();
   }
+  if (G.monster && typeof drawMonsterGround === 'function') drawMonsterGround(now);
   for (const t of G.trees) drawTree(t, T.tree);
-  if (T.tree === 'dead' && !reduceMotion) {
-    // Drifting marsh fog.
-    for (let i = 0; i < 5; i++) {
+  if ((T.tree === 'dead' && !T.sky || T.sky === 'fog') && !reduceMotion) {
+    // Drifting marsh fog, or the fog banks of the fells.
+    const n = T.sky === 'fog' ? Math.ceil(G.h / 120) : 5, tint = T.sky === 'fog' ? 'rgba(220,230,228,0.07)' : 'rgba(190,170,220,0.05)';
+    for (let i = 0; i < n; i++) {
       const x = ((now / 60 + i * 260) % (G.w + 300)) - 150, y = (i * 137) % G.h;
-      ctx.fillStyle = 'rgba(190,170,220,0.05)'; ctx.beginPath(); ctx.ellipse(x, y, 160, 40, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = tint; ctx.beginPath(); ctx.ellipse(x, y, 160, 40, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (T.sky === 'embers' && !reduceMotion) {
+    // Drifting embers rising off the badlands.
+    const n = Math.ceil(G.w * G.h / 60000);
+    for (let i = 0; i < n; i++) {
+      const t = (now / 2400 + i * 0.37) % 1, x = ((i * 977) % G.w) + Math.sin(now / 700 + i) * 20, y = G.h - t * G.h;
+      ctx.fillStyle = `rgba(255,${120 + (i % 4) * 25},40,${0.7 * (1 - t)})`; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
     }
   }
 }
@@ -817,9 +835,11 @@ function draw(now) {
   // Under fog, enemy columns out of sight aren't drawn.
   for (const k of G.packets) if (k.delay <= 0 && (k.owner === 1 || G.cfg.demo || seesAt(1, k.x, k.y))) items.push({ y: k.y, k });
   for (const u of G.units) items.push({ y: u.y, u });
+  if (G.monster) for (const m of G.monster.creatures) if (!m.dead && (G.cfg.demo || seesAt(1, m.x, m.y))) items.push({ y: m.y + 8, m });
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.u) { drawUnit(it.u, now); continue; }
+    if (it.m) { drawMonster(it.m, now); continue; }
     if (it.p) { if (G.cfg.fog && !G.cfg.demo) drawRemembered(it.p, now); else drawCastle(it.p, now); if (!G.cfg.demo && allied(1, it.p.owner)) drawTruceMark(it.p); continue; }
     const k = it.k, dir = k.dir || 1, isFrozen = frozen(k.owner);
     if (k.type === 'siege') { drawCatapult(k.x, k.y, k.owner, dir, isFrozen ? 0 : now / 140 + k.phase); if (isFrozen) { ctx.fillStyle = 'rgba(210,235,255,0.45)'; ctx.beginPath(); ctx.ellipse(k.x, k.y - 4, 10, 8, 0, 0, Math.PI * 2); ctx.fill(); } continue; }
@@ -838,12 +858,14 @@ function draw(now) {
     if (isFrozen) { ctx.fillStyle = 'rgba(210,235,255,0.45)'; ctx.beginPath(); ctx.ellipse(k.x, k.y - 3, 8, 7, 0, 0, Math.PI * 2); ctx.fill(); }
   }
 
+  if (G.monster) drawMonsterBars(now);
   if (!G.cfg.demo) drawThreats(now);
   if (G.cfg.fog && !G.cfg.demo) drawFog();
   drawShots();
   drawPlacement(now);
 
   for (const f of G.fx) {
+    if (MONSTER_FX[f.kind]) { drawMonsterFx(f, now); continue; }
     if (f.kind === 'clash') {
       const t = f.age / 0.35;
       ctx.strokeStyle = alpha('#fff3d0', 1 - t); ctx.lineWidth = 1.2;

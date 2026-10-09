@@ -317,6 +317,12 @@ function drawMinimap(now) {
     mm.beginPath(); mm.arc(x0 + p.x * k, y0 + p.y * k, Math.max(2, p.r * k * 1.3), 0, Math.PI * 2); mm.fill();
     if (q.owner === 1) { mm.strokeStyle = PARCH; mm.lineWidth = 1; mm.stroke(); }
   }
+  // The map monster (#48), where the player can see it.
+  if (G.monster) for (const c of G.monster.creatures) {
+    if (c.dead || (typeof seesAt === 'function' && !seesAt(1, c.x, c.y))) continue;
+    mm.fillStyle = MONSTERS[G.monster.id].color; mm.beginPath(); mm.arc(x0 + c.x * k, y0 + c.y * k, 3, 0, Math.PI * 2); mm.fill();
+    mm.strokeStyle = INK; mm.lineWidth = 1; mm.stroke();
+  }
   // The part of the realm on screen.
   const vx = Math.max(0, -ox / sc), vy = Math.max(0, -oy / sc);
   const vw = Math.min(G.w - vx, cw / sc), vh = Math.min(G.h - vy, ch / sc);
