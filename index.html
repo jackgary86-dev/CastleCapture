@@ -358,6 +358,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .slot.empty { color: var(--ink-soft); justify-content: space-between; }
 .slot.empty b { color: var(--ink-soft); }
 .slot button.danger { background: #9e2a25; border-color: #7a1f1b; color: #f4ecd6; }
+/* On phones the label and its line take the full width and the buttons drop below, so names don't wrap word by word. */
+@media (max-width: 560px) { .slot { flex-wrap: wrap; } .slot > div { flex-basis: 100%; } .slot:not(.empty) button { flex: 1; } }
 @media (max-width: 560px) { .grand-maps { grid-template-columns: 1fr; } .grand-map { flex-direction: row; flex-wrap: wrap; align-items: center; } .grand-map canvas { width: 96px; height: 52px; flex: none; } .grand-map b { flex: 1; } .grand-map .grand-monster, .grand-map small { flex-basis: 100%; } }
 /* Story campaigns (#27): the parchment screen before each chapter, and the objective badge in battle */
 .story-sheet { max-width: 600px; }
