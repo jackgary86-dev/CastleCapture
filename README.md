@@ -52,8 +52,9 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 - **Q** or the power panel in the top left of the map uses your army's special power. The panel shows the power's name, what it does, and a countdown until it's ready.
 - **Armies that meet on the road fight.** The stronger column marches on with what's left.
 - **Red banners** over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.
+- **Rivals surrender** when they hold under 10% of all troops and two castles or fewer for 8 seconds (after the first minute). Against one rival their castles open their gates to you; with two rivals they fall back to neutral.
 - **Bigger castles** train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.
-- **Space** selects all your castles. **P** pauses. **M** mutes the sound.
+- **Space** selects all your castles. **[** and **]** (or the Speed buttons) change the game speed: 1×, 1.5× or 2×. **P** pauses. **M** mutes the sound.
 
 ## Modes
 

@@ -199,6 +199,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <button data-pct="0.75"><kbd>3</kbd>75%</button>
         <button data-pct="1"><kbd>4</kbd>100%</button>
       </div>
+      <div class="sendctl" id="speedCtl" role="group" aria-label="Game speed">
+        <span>Speed</span>
+        <button data-speed="1" aria-pressed="true" title="Normal speed ([)">1×</button>
+        <button data-speed="1.5" title="Faster">1.5×</button>
+        <button data-speed="2" title="Fastest (])">2×</button>
+      </div>
       <button id="btnAll" title="Select all your castles (Space)" disabled>Select all</button>
       <button id="btnSound" title="Sound (M)">Sound on</button>
       <button id="btnPause" title="Pause (P)" disabled>Pause</button>
@@ -279,8 +285,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Coins:</b> every castle you hold earns coins each minute: small 1, medium 2, large 3. Save up to buy <b>one map unit</b> per battle (<b>B</b> opens the shop): a Ballista Tower (40), Siege Trebuchet (65) or Great Ward (90), placed near your castles.</li>
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
+            <li><b>Rivals surrender</b> when they're down to a tenth of the troops on the map and two castles or fewer. Against one rival, their castles open their gates to you.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
-            <li><b>Space</b> selects all your castles. <b>P</b> pauses. <b>M</b> mutes.</li>
+            <li><b>Space</b> selects all your castles. <b>[</b> and <b>]</b> change the game speed (1×, 1.5× or 2×). <b>P</b> pauses. <b>M</b> mutes.</li>
           </ul>
         </div>
       </div>
@@ -439,6 +446,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['Even good walls fall. Remember that I built them.'],
         victory: ['Patience wins every siege. You had none.'],
         defeat: ['The vale is yours. Keep its walls in good repair.'],
+        surrender: ['I yield. Keep the walls standing; they deserve better than this war.'],
       },
     },
     kharzul: {
@@ -452,6 +460,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['A horse lord dies in the saddle, not on his knees!'],
         victory: ['The steppe wind blows over your ashes.'],
         defeat: ['You ride well, for a wall-builder.'],
+        surrender: ['Bah! We ride for the steppe. This is not over.'],
       },
     },
     frostmark: {
@@ -466,6 +475,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['The ice breaks in spring. It always returns.'],
         victory: ['The north keeps its own.'],
         defeat: ['Spring comes early this year.'],
+        surrender: ['We go north. Enough.'],
       },
     },
     solmara: {
@@ -479,6 +489,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['Surely we can come to an arrangement?'],
         victory: ['The sands are mine. Send me the bill.'],
         defeat: ['Well played. Name your price.'],
+        surrender: ['Let us call it a business loss. I withdraw.'],
       },
     },
     nyx: {
@@ -492,6 +503,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         nearDefeat: ['The mire keeps what it drowns. I will return.'],
         victory: ['Sleep now. The crows will keep watch.'],
         defeat: ['The crows did not see this. How interesting.'],
+        surrender: ['The Covenant withdraws into the mire. For now.'],
       },
     },
   };
@@ -532,11 +544,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   // Homeland maps: ground, roads, scenery and the style of unclaimed keeps.
   const THEMES = {
-    vale:   { bg: '#263220', field: '#33432a', lit: '#3d5031', road: '#8d7a55', ring: PARCH, tree: 'oak',   trees: 90, clump: 0.7, rocks: 0,  pools: 3, pool: '#3f6a7a', castle: 'stone' },
-    steppe: { bg: '#4a3a20', field: '#6c5a32', lit: '#7b683c', road: '#a88d5a', ring: PARCH, tree: 'shrub', trees: 45, clump: 0.4, rocks: 28, pools: 0, pool: '#5c7480', castle: 'palisade' },
-    tundra: { bg: '#8a96a2', field: '#c3cdd6', lit: '#d8e0e7', road: '#8d98a3', ring: INK,   tree: 'pine',  trees: 85, clump: 0.75, rocks: 14, pools: 3, pool: '#9fbfd2', castle: 'longhouse' },
-    desert: { bg: '#9a7843', field: '#c8a462', lit: '#d6b574', road: '#a3824a', ring: INK,   tree: 'palm',  trees: 30, clump: 0,  rocks: 10, pools: 4, pool: '#3f8fa0', castle: 'domes' },
-    mire:   { bg: '#16131c', field: '#28242f', lit: '#332d3d', road: '#5a4f68', ring: PARCH, tree: 'dead',  trees: 60, clump: 0.6, rocks: 0,  pools: 9, pool: '#1a1426', castle: 'spires' },
+    vale:   { bg: '#263220', field: '#33432a', lit: '#3d5031', road: '#8d7a55', ring: PARCH, tree: 'oak',   trees: 90, clump: 0.7, rocks: 0,  pools: 3, pool: '#3f6a7a', castle: 'stone', dust: '#b9a27a' },
+    steppe: { bg: '#4a3a20', field: '#6c5a32', lit: '#7b683c', road: '#a88d5a', ring: PARCH, tree: 'shrub', trees: 45, clump: 0.4, rocks: 28, pools: 0, pool: '#5c7480', castle: 'palisade', dust: '#c9a46a' },
+    tundra: { bg: '#8a96a2', field: '#c3cdd6', lit: '#d8e0e7', road: '#8d98a3', ring: INK,   tree: 'pine',  trees: 85, clump: 0.75, rocks: 14, pools: 3, pool: '#9fbfd2', castle: 'longhouse', dust: '#ffffff' },
+    desert: { bg: '#9a7843', field: '#c8a462', lit: '#d6b574', road: '#a3824a', ring: INK,   tree: 'palm',  trees: 30, clump: 0,  rocks: 10, pools: 4, pool: '#3f8fa0', castle: 'domes', dust: '#efdcae' },
+    mire:   { bg: '#16131c', field: '#28242f', lit: '#332d3d', road: '#5a4f68', ring: PARCH, tree: 'dead',  trees: 60, clump: 0.6, rocks: 0,  pools: 9, pool: '#1a1426', castle: 'spires', dust: '#8a7ea0' },
   };
 
   const LEVELS = [
@@ -757,7 +769,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       pw: Object.fromEntries(owners.map(o => [o, { ready: FIRST_CHARGE, until: -1 }])),
       ais: aiIds.map((id, i) => ({ id, diff: cfg.demo ? 'medium' : cfg.diff, timer: 1.4 + i * 0.35, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() })),
       caps: 0, peak: 0, hintDone: cfg.demo || store.get('cs-hint', false),
-      intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {},
+      intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {}, weakSince: {}, surrendered: new Set(),
       coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
       roadPts: roadSamples(map.roads),
     };
@@ -1077,6 +1089,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   // Each placed unit acts on its area.
   function mapUnits(dt) {
+    // A map unit falls silent once its kingdom has surrendered or lost every castle.
+    G.units = G.units.filter(u => !G.surrendered.has(u.owner) && G.planets.some(p => p.owner === u.owner));
+    G.shots = G.shots.filter(sh => G.units.includes(sh.u));
     let bolted = false;
     for (const u of G.units) {
       u.cd -= dt;
@@ -1190,7 +1205,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     mapUnits(dt);
 
     for (const f of G.fx) f.age += dt;
-    G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, impact: 0.6, bolt: 0.2 }[f.kind] || 0.35));
+    for (const f of G.fx) if (f.kind === 'dust') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.94; f.vy *= 0.94; }
+    G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, dust: 0.9, impact: 0.6, bolt: 0.2 }[f.kind] || 0.35));
 
     const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
     for (const ai of G.ais) {
@@ -1214,6 +1230,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       const brink = (G.maxCastles[o] >= 3 && castles <= 1) || (G.time > 30 && totalOf(o) < totalOf(1) * 0.2);
       if (brink) { G.nearDefeat.add(o); taunt(o, 'nearDefeat', true); }
     }
+    checkSurrender();
 
     if (G.cfg.demo) {
       if (!alive(1) || !alive(2) || G.time > 150) newGame(demoCfg());
@@ -1221,6 +1238,44 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
     if (!alive(1)) endGame(false);
     else if (G.owners.slice(1).every(o => !alive(o))) endGame(true);
+  }
+
+  // A rival far behind with no realistic comeback gives up instead of making you hunt down its last castle.
+  const SURRENDER_SHARE = 0.10, SURRENDER_HOLD = 8;
+  function checkSurrender() {
+    if (G.time < 60) return;
+    const sum = G.owners.reduce((a, o) => a + totalOf(o), 0) || 1;
+    for (const o of G.owners.slice(1)) {
+      if (G.surrendered.has(o)) continue;
+      const castles = G.planets.filter(p => p.owner === o);
+      if (!castles.length) continue;
+      const weak = totalOf(o) / sum < SURRENDER_SHARE && castles.length <= 2;
+      if (!weak) { delete G.weakSince[o]; continue; }
+      G.weakSince[o] ??= G.time;
+      if (G.time - G.weakSince[o] < SURRENDER_HOLD) continue;
+      surrender(o, castles);
+    }
+  }
+  function surrender(o, castles) {
+    G.surrendered.add(o);
+    const rivalsLeft = G.owners.slice(1).filter(q => q !== o && !G.surrendered.has(q) && G.planets.some(p => p.owner === q));
+    // Against a single rival the castles open their gates to the player; otherwise they fall back to neutral.
+    const heir = rivalsLeft.length ? 0 : 1;
+    for (const p of castles) {
+      p.prevOwner = o; p.capturedAt = G.time; p.owner = heir;
+      p.units = heir ? p.units : Math.round(p.units * 0.5);
+      if (heir === 1) G.caps++;
+    }
+    G.packets = G.packets.filter(k => k.owner !== o);
+    // A surrendering kingdom's map unit leaves the field with it.
+    G.units = G.units.filter(u => u.owner !== o);
+    G.shots = G.shots.filter(sh => sh.u.owner !== o);
+    if (!G.cfg.demo) {
+      const A = army(o);
+      toast(`${A.full} surrenders!`, heir ? 'Their castles open their gates to you.' : 'Their castles fall back to neutral.', A.color);
+      taunt(o, 'surrender', true);
+      sfx.horn(true);
+    }
   }
 
   // Attackers deal damage scaled by their strike strength against the defender's wall strength.
@@ -1241,6 +1296,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       else if (k.owner === 1 && was) taunt(was, 'lose');
       if (was === 1) sel.delete(t);
       G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: col(k.owner), age: 0 });
+      t.capturedAt = G.time; t.prevOwner = was;
+      if (!reduceMotion) {
+        // A cloud of dust kicked up around the castle's base.
+        for (let i = 0; i < 14; i++) {
+          const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4, sp = 14 + Math.random() * 22;
+          G.fx.push({ kind: 'dust', x: t.x + Math.cos(a) * t.r * 0.6, y: t.y + t.r * 0.45 + Math.sin(a) * t.r * 0.25,
+            vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 6, s: 4 + Math.random() * 4, age: 0 });
+        }
+        // A brief shake when the player wins or loses a castle.
+        if (!G.cfg.demo && (k.owner === 1 || was === 1)) G.shake = { until: G.time + 0.35, mag: was === 1 ? 6 : 4 };
+      }
     }
   }
 
@@ -1479,12 +1545,23 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     },
   };
 
-  function drawFlag(x, y, h, o, now, seed) {
+  // `raise` runs from 0 (banner at the foot of the pole) to 1 (flying at the top).
+  function drawFlag(x, y, h, o, now, seed, raise = 1) {
     ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
-    if (!o) return;
+    if (!o || raise <= 0) return;
     const wave = reduceMotion ? 0 : Math.sin(now / 260 + seed) * 1.6;
-    FLAG[army(o).flag](x, y - h, h, col(o), wave, now);
+    FLAG[army(o).flag](x, y - h + (1 - raise) * h * 0.7, h, col(o), wave * raise, now);
+  }
+
+  const CAPTURE_ANIM = 1.1;   // seconds for the old banner to lower and the new one to rise
+  // Which banner flies over a castle right now, and how high, during a capture.
+  function bannerState(p) {
+    const t = G.time - (p.capturedAt ?? -99);
+    if (reduceMotion || t >= CAPTURE_ANIM) return [p.owner, 1];
+    const half = CAPTURE_ANIM * 0.45;
+    if (t < half) return [p.prevOwner, 1 - t / half];
+    return [p.owner, (t - half) / (CAPTURE_ANIM - half)];
   }
 
   function drawCastle(p, now) {
@@ -1506,7 +1583,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const roofCol = p.owner ? army(p.owner).roof : '#6f6a5e';
     const glow = p.owner ? c : '#5a5468';
     const flags = CASTLE[style](p, s, baseY, tier, roofCol, glow);
-    for (const [fx, fy] of flags) drawFlag(fx, fy, s * 0.6, p.owner, now, p.id);
+    const [flagOwner, raise] = bannerState(p);
+    for (const [fx, fy] of flags) drawFlag(fx, fy, s * 0.6, flagOwner, now, p.id, raise);
 
     if (powerOn(p.owner, 'goldenTithe') && !reduceMotion) {
       for (let i = 0; i < 4; i++) {
@@ -1757,7 +1835,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = G ? G.theme.bg : TIMBER; ctx.fillRect(0, 0, cw, ch);
     if (!G) return;
-    ctx.translate(ox, oy); ctx.scale(sc, sc);
+    let shakeX = 0, shakeY = 0;
+    if (G.shake && G.time < G.shake.until) {
+      const k = (G.shake.until - G.time) / 0.35 * G.shake.mag;
+      shakeX = (Math.random() - 0.5) * 2 * k; shakeY = (Math.random() - 0.5) * 2 * k;
+    }
+    ctx.translate(ox + shakeX, oy + shakeY); ctx.scale(sc, sc);
     drawScenery(now);
     for (const u of G.units) drawUnitRange(u, now, col(u.owner));
     const spin = reduceMotion ? 0 : now / 1100;
@@ -1827,6 +1910,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         ctx.fillStyle = `rgba(120,100,70,${0.45 * (1 - t)})`; ctx.fill(); ctx.restore();
         ctx.fillStyle = `rgba(90,80,64,${1 - t})`;
         for (let i = 0; i < 6; i++) { const a = i * 1.05; ctx.fillRect(f.x + Math.cos(a) * (6 + t * 16), f.y - 6 + Math.sin(a) * (4 + t * 10) - t * 6, 2, 2); }
+      } else if (f.kind === 'dust') {
+        const t = f.age / 0.9;
+        ctx.fillStyle = alpha(G.theme.dust, 0.7 * (1 - t));
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.s * (1 + t * 1.6), 0, Math.PI * 2); ctx.fill();
       } else if (f.kind === 'crows') {
         drawCrows(f, now);
       } else {
@@ -1936,7 +2023,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (G && !G.over && !G.paused && !G.intro) update(dt);
+    if (G && !G.over && !G.paused && !G.intro) {
+      // Faster speeds run extra small steps, so road battles and arrivals stay as precise as at normal speed.
+      let left = dt * (G.cfg.demo ? 1 : gameSpeed);
+      while (left > 1e-6 && !G.over) { const step = Math.min(left, 1 / 60); update(step); left -= step; }
+    }
     for (const s of [...sel]) if (s.owner !== 1) sel.delete(s);
     draw(now);
     if ((hudTick += dt) > 0.2) { hudTick = 0; hud(); renderTreasury(); }
@@ -2035,6 +2126,18 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     return true;
   }
   cv.addEventListener('contextmenu', e => { if (G && G.placing) e.preventDefault(); });
+  // ---------- game speed ----------
+  const SPEEDS = [1, 1.5, 2];
+  let gameSpeed = SPEEDS.includes(store.get('cs-speed', 1)) ? store.get('cs-speed', 1) : 1;
+  const speedCtl = document.getElementById('speedCtl');
+  function setSpeed(v) {
+    gameSpeed = v;
+    store.set('cs-speed', v);
+    speedCtl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.speed === v)));
+  }
+  speedCtl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSpeed(+b.dataset.speed); });
+  const stepSpeed = d => setSpeed(SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, SPEEDS.indexOf(gameSpeed) + d))]);
+  setSpeed(gameSpeed);
 
   // ---------- send amount ----------
   const PCTS = [0.25, 0.5, 0.75, 1];
@@ -2100,6 +2203,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
     else if (e.key >= '1' && e.key <= '4') setSendPct(PCTS[+e.key - 1]);
     else if (e.key === 'q' || e.key === 'Q') playerPower();
+    else if (e.key === '[') stepSpeed(-1);
+    else if (e.key === ']') stepSpeed(1);
     else if (e.key === 'm' || e.key === 'M') toggleSound();
     else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
     else if ((e.key === 'b' || e.key === 'B') && playable()) { if (G.placing) cancelPlacing(); else if (!G.bought.has(1)) setShop(!shopOpen); }
@@ -2245,7 +2350,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const lordO = win ? G.owners[G.owners.length - 1] : G.owners.slice(1).sort((a, b) => totalOf(b) - totalOf(a))[0];
     const L = lordOf(lordO);
     $('endQuote').innerHTML = `${portraitHtml(G.fac[lordO])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
-    $('endQuote').querySelector('q').textContent = pick(L.lines[win ? 'defeat' : 'victory']);
+    $('endQuote').querySelector('q').textContent = pick(L.lines[!win ? 'victory' : G.surrendered.has(lordO) ? 'surrender' : 'defeat']);
     tauntEl.hidden = true;
     $('endTime').textContent = fmtTime(G.time);
     $('endCaps').textContent = G.caps;
@@ -2274,7 +2379,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   btnSound.addEventListener('click', toggleSound);
   btnSound.textContent = sfx.muted ? 'Muted' : 'Sound on';
 
-  resize();
+  resize(); window.__cs = { get G() { return G; }, send, play, update, draw, usePower, buyUnit, placeProblem, incomeOf, ARMIES, MAP_UNITS };
   toMenu();
   requestAnimationFrame(frame);
 })();
