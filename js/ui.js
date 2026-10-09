@@ -83,7 +83,53 @@ function hud() {
     statusEl.textContent = `${label} · ${fmtTime(G.time)}`;
   }
   updatePowerPanel();
+  updateCastlePanel();
 }
+
+// ---------- castle upgrade panel ----------
+// Shown along the bottom of the map when exactly one of your castles is selected.
+// This runs before the $ helper further down is defined, so it looks elements up directly.
+const castlePanel = document.getElementById('castlePanel');
+const UPG_TEXT = {
+  walls: { name: 'Walls', key: 'U', desc: 'Defenders count 15% more; archers shoot faster and farther.' },
+  barracks: { name: 'Barracks', key: 'I', desc: 'Trains 8% faster; its soldiers hit 12% harder.' },
+};
+let castlePanelKey = '';
+function selectedCastle() {
+  if (!G || G.cfg.demo || G.over || G.intro || sel.size !== 1) return null;
+  const p = [...sel][0];
+  return p.owner === 1 ? p : null;
+}
+function updateCastlePanel() {
+  const p = selectedCastle();
+  castlePanel.hidden = !p;
+  if (!p) { castlePanelKey = ''; return; }
+  const units = Math.floor(p.units), key = `${p.id}|${units}|${lvl(p, 'walls')}|${lvl(p, 'barracks')}`;
+  if (key === castlePanelKey) return;
+  castlePanelKey = key;
+  document.getElementById('cpInfo').textContent = `${units} troops · Walls ${ROMAN[lvl(p, 'walls')]} · Barracks ${ROMAN[lvl(p, 'barracks')]}`;
+  for (const kind of ['walls', 'barracks']) {
+    const btn = kind === 'walls' ? document.getElementById('btnWalls') : document.getElementById('btnBarracks');
+    const T = UPG_TEXT[kind], L = lvl(p, kind), cost = upgradeCost(p, kind), ok = canUpgrade(p, kind);
+    const title = cost === null ? `${T.name} ${ROMAN[L]} · max` : `${T.name} ${L ? ROMAN[L] + ' → ' : ''}${ROMAN[L + 1]}`;
+    const costText = cost === null ? 'Fully upgraded' : ok ? `Costs ${cost} troops` : `Costs ${cost} troops · need ${cost + 1 - units} more`;
+    btn.innerHTML = `<span class="u-top"><span class="u-name"></span><span class="u-key">${T.key}</span></span><span class="u-desc">${T.desc}</span><span class="u-cost"></span>`;
+    btn.querySelector('.u-name').textContent = title;
+    btn.querySelector('.u-cost').textContent = costText;
+    btn.classList.toggle('can', ok);
+    btn.disabled = !ok;
+  }
+}
+// Upgrade every selected castle that can afford it.
+function playerUpgrade(kind) {
+  if (!G || G.cfg.demo || G.over || G.intro || G.paused) return;
+  let any = false;
+  for (const p of sel) if (p.owner === 1 && upgrade(p, kind)) any = true;
+  if (any) { castlePanelKey = ''; updateCastlePanel(); }
+}
+document.getElementById('btnWalls').addEventListener('click', () => playerUpgrade('walls'));
+document.getElementById('btnBarracks').addEventListener('click', () => playerUpgrade('barracks'));
+on('upgrade', ({ castle }) => { if (castle.owner === 1 && !G.cfg.demo) sfx.chime(); });
 
 // Special power panel: name, description, and a countdown ring until it can be used.
 function updatePowerPanel() {
@@ -338,6 +384,8 @@ addEventListener('keydown', e => {
   if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
   else if (e.key >= '1' && e.key <= '4') setSendPct(PCTS[+e.key - 1]);
   else if (e.key === 'q' || e.key === 'Q') playerPower();
+  else if (e.key === 'u' || e.key === 'U') playerUpgrade('walls');
+  else if (e.key === 'i' || e.key === 'I') playerUpgrade('barracks');
   else if (e.key === '[') stepSpeed(-1);
   else if (e.key === ']') stepSpeed(1);
   else if (e.key === 'm' || e.key === 'M') toggleSound();

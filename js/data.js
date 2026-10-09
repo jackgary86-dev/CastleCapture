@@ -11,6 +11,17 @@ const RECHARGE = 300;         // seconds a special power takes to recharge after
 const COIN_PER_MIN = [0, 1, 2, 3]; // coins per minute from a small, medium and large castle
 const RALLY_EVERY = 2;        // seconds between rally-point sends
 const RALLY_KEEP = 5;         // troops a rallying castle keeps at home
+// Castle upgrades: Walls (defence and archers) and Barracks (training and soldier strength), three levels each.
+const UPGRADE = {
+  max: 3,
+  cost: [15, 25, 40],          // troops for level 1, 2, 3 at a medium castle (0.8x small, 1.2x large)
+  wallDef: 0.15,               // defenders count +15% per Walls level
+  barracksTrain: 0.08,         // +8% training per Barracks level
+  barracksStr: 0.12,           // +12% soldier strength per Barracks level
+  // Archers, by Walls level 0-3: reach beyond the walls, seconds between volleys, troops each volley takes down.
+  archer: { reach: [32, 46, 62, 80], every: [1.1, 0.9, 0.7, 0.55], kill: [0.6, 1, 1.4, 1.9] },
+};
+const ROMAN = ['0', 'I', 'II', 'III'];
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
 const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
 const MAP_UNITS = {
@@ -49,8 +60,8 @@ const ARMIES = {
     role: 'Defense', homeland: 'The Vale of Aldmere', map: 'vale',
     castle: 'stone', flag: 'swallow', soldier: 'spear',
     story: "Aldmere's kings have held the green river vale for nine hundred years without losing a keep for long. Its masons' guild is older than the crown, and every child there learns that a wall built well is worth a hundred spears.",
-    strength: 'Masterwork walls. Every defender in an Aldmere castle counts as 1.3 soldiers.',
-    stats: { atk: 1, def: 1.3, speed: 1, prod: 1, road: 1, neutral: 1 },
+    strength: 'Masterwork walls. Every defender in an Aldmere castle counts as 1.35 soldiers.',
+    stats: { atk: 1, def: 1.35, speed: 1, prod: 1, road: 1, neutral: 1 },
     power: { id: 'stoneOath', name: 'Stone Oath', dur: 20, desc: 'For 20 seconds, every defender in your castles counts double.', call: 'swear the Stone Oath', they: 'swears the Stone Oath' },
     personality: 'Defensive. Holds the frontier, reinforces early, and marches only when it badly outnumbers you.',
     ai: { sendFrac: 0.45, keep: 10, enemyBias: 0.9, neutralBias: 1, margin: 1.35, defendAt: 0.8, thinkMul: 1.1, front: true, opportunist: 1.2, boldAt: 1.6 },
@@ -61,8 +72,8 @@ const ARMIES = {
     role: 'Attack', homeland: 'The Red Steppe', map: 'steppe',
     castle: 'palisade', flag: 'tassel', soldier: 'rider',
     story: 'Born in the saddle on the endless red grass, the clans of Kharzul build no stone. They raise palisades where they halt and burn them when they ride on. Their shamans read every war in the colour of the moon.',
-    strength: 'Horse lords. Riders move 30% faster and strike 1.25× harder, but wooden palisades defend at only 0.9.',
-    stats: { atk: 1.25, def: 0.9, speed: 1.3, prod: 1, road: 1, neutral: 1 },
+    strength: 'Horse lords. Riders move 30% faster and strike 1.12× harder, but wooden palisades defend at only 0.9.',
+    stats: { atk: 1.12, def: 0.9, speed: 1.3, prod: 1, road: 1, neutral: 1 },
     power: { id: 'bloodMoon', name: 'Blood Moon Charge', dur: 15, desc: 'For 15 seconds, your riders move twice as fast and hit 1.5× harder.', call: 'charge under the Blood Moon', they: 'charges under the Blood Moon' },
     personality: 'Very aggressive. Attacks constantly with most of its army and rarely stops to defend.',
     ai: { sendFrac: 0.75, keep: 4, enemyBias: 2.2, neutralBias: 0.9, margin: 1.0, defendAt: 1.4, thinkMul: 0.7, front: false, opportunist: 1.3, boldAt: 0.9 },
@@ -73,11 +84,11 @@ const ARMIES = {
     role: 'Defense', homeland: 'The Frostmark Fjords', map: 'tundra',
     castle: 'longhouse', flag: 'square', soldier: 'shield',
     story: 'In the frozen north the jarls winter behind stone and pine, waiting out storms that would kill any army caught in the open. They are slow to march and almost impossible to dislodge, and their shieldwalls do not break.',
-    strength: 'Shieldwall. Frostmark troops count 1.4× in battles on the road, and castles defend at 1.25. They march 5% slower.',
-    stats: { atk: 1, def: 1.25, speed: 0.95, prod: 1, road: 1.4, neutral: 1 },
+    strength: 'Shieldwall. Frostmark troops count 1.45× in battles on the road, and castles defend at 1.3. They march 5% slower.',
+    stats: { atk: 1, def: 1.3, speed: 0.95, prod: 1, road: 1.45, neutral: 1 },
     power: { id: 'wintersGrip', name: "Winter's Grip", dur: 12, desc: 'A blizzard sweeps the map. For 12 seconds, every enemy soldier in the field freezes in place.', call: "call down Winter's Grip", they: "calls down Winter's Grip" },
     personality: 'Very defensive. Builds up behind its walls, punishes weak attacks, and strikes only at castles left nearly empty.',
-    ai: { sendFrac: 0.4, keep: 14, enemyBias: 0.6, neutralBias: 1, margin: 1.6, defendAt: 0.6, thinkMul: 1.25, front: true, opportunist: 2.4, boldAt: 1.9 },
+    ai: { sendFrac: 0.45, keep: 10, enemyBias: 0.6, neutralBias: 1, margin: 1.35, defendAt: 0.6, thinkMul: 1.25, front: true, opportunist: 2.4, boldAt: 1.5 },
   },
   solmara: {
     name: 'Solmara', full: 'The Sun Dominion of Solmara', emblem: 'sun',
@@ -85,9 +96,9 @@ const ARMIES = {
     role: 'Balanced', homeland: 'The Sunscorched Sands', map: 'desert',
     castle: 'domes', flag: 'pennant', soldier: 'turban',
     story: "Solmara's wealth flows from the oases and caravan roads of the great desert. Its sultans pay their soldiers in gold, and gold raises soldiers faster than any blade can cut them down.",
-    strength: 'Rich treasury. Castles train troops 15% faster, but soldiers fight at 0.95.',
-    stats: { atk: 0.95, def: 0.95, speed: 1, prod: 1.15, road: 1, neutral: 1 },
-    power: { id: 'goldenTithe', name: 'Golden Tithe', dur: 15, desc: 'Open the treasury. For 15 seconds, your castles train troops 2.5 times as fast.', call: 'open the Golden Tithe', they: 'opens the Golden Tithe' },
+    strength: 'Rich treasury. Castles train troops 5% faster, but soldiers fight at 0.9.',
+    stats: { atk: 0.9, def: 0.95, speed: 1, prod: 1.05, road: 1, neutral: 1 },
+    power: { id: 'goldenTithe', name: 'Golden Tithe', dur: 15, desc: 'Open the treasury. For 15 seconds, your castles train troops twice as fast.', call: 'open the Golden Tithe', they: 'opens the Golden Tithe' },
     personality: 'Balanced. Expands steadily, defends what it holds, and attacks when the odds are good.',
     ai: { sendFrac: 0.5, keep: 8, enemyBias: 1.3, neutralBias: 1.1, margin: 1.15, defendAt: 0.9, thinkMul: 1, front: false, opportunist: 1.4, boldAt: 1.3 },
   },
@@ -97,8 +108,8 @@ const ARMIES = {
     role: 'Attack', homeland: 'Nyxhollow Mire', map: 'mire',
     castle: 'spires', flag: 'streamer', soldier: 'hood',
     story: 'Out of the drowned marshes comes the Covenant, a court of witches and hooded zealots. Unclaimed keeps open their gates to Nyxhollow whispers, and the crows of the mire carry plague wherever they are sent.',
-    strength: 'Whispers. Attacks on unclaimed keeps count 1.5×, and Covenant troops strike 1.15× harder.',
-    stats: { atk: 1.15, def: 1, speed: 1, prod: 1, road: 1, neutral: 1.5 },
+    strength: 'Whispers. Attacks on unclaimed keeps count 1.35×, and Covenant troops strike 1.12× harder.',
+    stats: { atk: 1.12, def: 1, speed: 1, prod: 1, road: 1, neutral: 1.35 },
     power: { id: 'crows', name: 'Plague of Crows', dur: 3, desc: 'Crows descend on the three largest enemy castles. Each loses 40% of its garrison at once.', call: 'loose the Plague of Crows', they: 'looses the Plague of Crows' },
     personality: 'Aggressive and cunning. Snaps up unclaimed keeps quickly and pounces on any castle you leave weak.',
     ai: { sendFrac: 0.6, keep: 6, enemyBias: 1.8, neutralBias: 1.4, margin: 1.05, defendAt: 1.0, thinkMul: 0.85, front: false, opportunist: 2.2, boldAt: 1.1 },

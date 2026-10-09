@@ -271,6 +271,22 @@ function drawCastle(p, now) {
   ctx.fillStyle = p.owner ? army(p.owner).plaqueText : INK;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(label, p.x, py + th / 2 + 1);
+  // Upgrade pips under the plaque: stone blocks for Walls, gold blades for Barracks.
+  const wl = lvl(p, 'walls'), bl = lvl(p, 'barracks');
+  if (p.owner && (wl || bl)) {
+    const ps = Math.max(4, s * 0.2), gap = 2, n = wl + bl;
+    let x = p.x - (n * ps + (n - 1) * gap) / 2;
+    const y = py + th + 2;
+    for (let i = 0; i < wl; i++, x += ps + gap) {
+      ctx.fillStyle = '#cfd4d8'; ctx.fillRect(x, y, ps, ps);
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.strokeRect(x, y, ps, ps);
+    }
+    for (let i = 0; i < bl; i++, x += ps + gap) {
+      const tri = [[x, y + ps], [x + ps, y + ps], [x + ps / 2, y]];
+      poly(tri, '#f3c64a');
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.beginPath(); tri.forEach(([tx, ty], i2) => i2 ? ctx.lineTo(tx, ty) : ctx.moveTo(tx, ty)); ctx.closePath(); ctx.stroke();
+    }
+  }
   // Hourglass beside the plaque when upkeep is slowing training: amber at half speed, red at a quarter.
   const up = p.owner ? upkeepOf(p) : 1;
   if (up < 1) {
@@ -592,7 +608,12 @@ function draw(now) {
       ctx.strokeStyle = alpha(col(k.owner), 0.45); ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(k.x - dir * 4, k.y - 2); ctx.lineTo(k.x - dir * 16, k.y - 2); ctx.stroke();
     }
-    for (let i = 0; i < figures; i++) soldier(k.x + (i - (figures - 1) / 2) * 4.6, k.y + (i % 2) * 2.5, k.owner, isFrozen ? 0 : now / 90 + k.phase + i, dir, style);
+    for (let i = 0; i < figures; i++) {
+      const fx = k.x + (i - (figures - 1) / 2) * 4.6, fy = k.y + (i % 2) * 2.5;
+      soldier(fx, fy, k.owner, isFrozen ? 0 : now / 90 + k.phase + i, dir, style);
+      // A gold crest on soldiers from upgraded barracks.
+      if ((k.str || 1) > 1) { const cy = fy - (style === 'rider' ? 8.3 : 7.2); poly([[fx - 1.4, cy], [fx + 1.4, cy], [fx, cy - 2.6]], '#f3c64a'); }
+    }
     if (isFrozen) { ctx.fillStyle = 'rgba(210,235,255,0.45)'; ctx.beginPath(); ctx.ellipse(k.x, k.y - 3, 8, 7, 0, 0, Math.PI * 2); ctx.fill(); }
   }
 
@@ -608,6 +629,16 @@ function draw(now) {
         const ang = a * Math.PI / 2 + 0.6, r1 = 2 + t * 3, r2 = 4 + t * 6;
         ctx.beginPath(); ctx.moveTo(f.x + Math.cos(ang) * r1, f.y - 4 + Math.sin(ang) * r1); ctx.lineTo(f.x + Math.cos(ang) * r2, f.y - 4 + Math.sin(ang) * r2); ctx.stroke();
       }
+    } else if (f.kind === 'arrow') {
+      // A short arrow streaking from the walls to the column.
+      const t = Math.min(1, f.age / 0.18), hx = f.x + (f.x1 - f.x) * t, hy = f.y + (f.y1 - f.y) * t;
+      const ang = Math.atan2(f.y1 - f.y, f.x1 - f.x);
+      ctx.strokeStyle = alpha('#f3e6c0', 1 - f.age / 0.3); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(hx - Math.cos(ang) * 7, hy - Math.sin(ang) * 7); ctx.lineTo(hx, hy); ctx.stroke();
+    } else if (f.kind === 'upgrade') {
+      const t = f.age / 0.8;
+      ctx.strokeStyle = alpha(f.col, 1 - t); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(f.x, f.y - f.r * 0.4 - t * 16, f.r * (0.6 + t * 0.5), Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
     } else if (f.kind === 'bolt') {
       ctx.strokeStyle = alpha('#f3e6c0', 1 - f.age / 0.2); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x1, f.y1); ctx.stroke();

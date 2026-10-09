@@ -73,6 +73,22 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   #powerPanel:not(.expanded) .pp-desc { display: none; }
   #ppMore { display: block; }
 }
+/* Castle upgrades: along the bottom of the map when one of your castles is selected */
+#castlePanel { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(420px, calc(100% - 24px)); z-index: 1;
+  padding: 8px 10px; border-radius: 6px; background: rgb(23 20 14 / 0.92); border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); display: grid; gap: 6px; }
+.cp-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); }
+.cp-head b { font-family: var(--display); font-size: 17px; font-weight: 400; color: var(--text); }
+.cp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.upg { display: grid; gap: 1px; text-align: left; padding: 6px 9px; background: rgb(255 255 255 / 0.03); }
+.upg:not(:disabled):hover { border-color: var(--army); }
+.upg .u-top { display: flex; align-items: baseline; gap: 6px; }
+.upg .u-name { font-family: var(--display); font-size: 16px; line-height: 1.1; }
+.upg .u-key { margin-left: auto; font-size: 11px; color: var(--muted); }
+.upg .u-desc { font-size: 12px; line-height: 1.35; color: var(--muted); }
+.upg .u-cost { font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.upg.can .u-cost { color: var(--army); }
+.upg:disabled { opacity: 0.75; }
+@media (max-width: 560px) { #castlePanel { bottom: 64px; } .upg .u-desc { display: none; } }
 /* Treasury: coins, income and the map-unit shop, top right of the map */
 #treasury { position: absolute; top: 12px; right: 12px; width: min(300px, calc(100% - 24px)); padding: 8px 12px; border-radius: 6px; z-index: 1;
   background: rgb(23 20 14 / 0.9); border: 2px solid var(--edge); display: grid; gap: 8px; }
@@ -286,6 +302,13 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       <p class="pp-desc" id="ppDesc"></p>
       <button id="ppMore" aria-expanded="false" aria-controls="ppDesc">What does it do?</button>
     </div>
+    <div id="castlePanel" role="group" aria-label="Castle upgrades" hidden>
+      <div class="cp-head"><b>Your castle</b><span id="cpInfo"></span></div>
+      <div class="cp-row">
+        <button class="upg" id="btnWalls"></button>
+        <button class="upg" id="btnBarracks"></button>
+      </div>
+    </div>
     <div id="treasury" role="group" aria-label="Treasury" hidden>
       <div class="tr-head">
         <span class="coin" aria-hidden="true"></span>
@@ -375,6 +398,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
             <li><b>Special power:</b> press <b>Q</b> or click the power panel in the top left of the map. The panel shows what your power does and counts down until it's ready: 45 seconds into the battle, then every five minutes.</li>
             <li><b>Coins:</b> every castle you hold earns coins each minute: small 1, medium 2, large 3. Save up to buy <b>one map unit</b> per battle (<b>B</b> opens the shop): a Ballista Tower (40), Siege Trebuchet (65) or Great Ward (90), placed near your castles.</li>
+            <li><b>Upgrades:</b> select one of your castles to spend its troops on <b>Walls</b> (defenders count more, archers shoot faster and farther) or <b>Barracks</b> (faster training, stronger soldiers), three levels each. <b>U</b> and <b>I</b> upgrade every selected castle. A captured castle loses one level of each.</li>
+            <li><b>Archers</b> on every castle shoot at enemy columns marching past.</li>
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Rivals surrender</b> when they're down to a tenth of the troops on the map and two castles or fewer. Against one rival, their castles open their gates to you.</li>

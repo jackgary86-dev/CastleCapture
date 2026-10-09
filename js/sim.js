@@ -137,13 +137,83 @@ const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
 const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o && dist(u, p) <= MAP_UNITS.ward.range);
 // Upkeep: a castle feeding a big garrison trains slower, which stops one castle hoarding an army forever.
 const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPKEEP_AT ? 0.5 : 1;
-const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2.5 : 1) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) : 0;
+const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) : 0;
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.
-const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1);
+const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1);
 // Enemy Great Wards halve marching speed inside them.
 const slowedAt = k => G.units.some(u => u.type === 'ward' && u.owner !== k.owner && dist(u, k) <= MAP_UNITS.ward.range);
 const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] : 0), 0);
 const frozen = o => G.owners.some(q => q !== o && powerOn(q, 'wintersGrip'));
+
+// ---------- castle upgrades and archers ----------
+const lvl = (p, kind) => (p.up && p.up[kind]) || 0;
+// Bigger castles train more, so their upgrades cost more: 0.8x for small, 1x medium, 1.2x large.
+const upgradeCost = (p, kind) => lvl(p, kind) < UPGRADE.max ? Math.round(UPGRADE.cost[lvl(p, kind)] * (0.6 + 0.2 * tierOf(p))) : null;
+const canUpgrade = (p, kind) => !!p.owner && upgradeCost(p, kind) !== null && p.units >= upgradeCost(p, kind) + 1;
+const wallsMul = p => 1 + UPGRADE.wallDef * lvl(p, 'walls');
+const barracksTrainMul = p => 1 + UPGRADE.barracksTrain * lvl(p, 'barracks');
+const soldierStr = c => 1 + UPGRADE.barracksStr * lvl(c, 'barracks');
+const archerStats = p => {
+  const L = lvl(p, 'walls'), A = UPGRADE.archer;
+  return { range: p.r + A.reach[L], every: A.every[L], kill: A.kill[L] * (0.7 + 0.15 * tierOf(p)) };
+};
+
+function upgrade(p, kind) {
+  if (!canUpgrade(p, kind)) return false;
+  p.units -= upgradeCost(p, kind);
+  p.up = { walls: lvl(p, 'walls'), barracks: lvl(p, 'barracks') };
+  p.up[kind]++;
+  G.fx.push({ kind: 'upgrade', x: p.x, y: p.y, r: p.r, col: col(p.owner), age: 0 });
+  emit('upgrade', { castle: p, kind });
+  return true;
+}
+
+// Archers: every castle a kingdom holds shoots at enemy columns marching within range.
+function archersTick(dt) {
+  let hit = false;
+  for (const p of G.planets) {
+    if (!p.owner) continue;
+    p.arrowT = (p.arrowT ?? 0) - dt;
+    if (p.arrowT > 0) continue;
+    const a = archerStats(p);
+    let target = null, best = a.range;
+    for (const k of G.packets) {
+      if (k.owner === p.owner || k.delay > 0 || k.n <= 0.05) continue;
+      const d = Math.hypot(k.x - p.x, k.y - p.y);
+      if (d < best) { best = d; target = k; }
+    }
+    if (!target) { p.arrowT = 0.25; continue; }
+    p.arrowT = a.every;
+    const kill = Math.min(target.n, a.kill);
+    target.n -= kill; hit = true;
+    if (target.owner === 1) G.stats.roadLost += kill;
+    G.fx.push({ kind: 'arrow', x: p.x, y: p.y - p.r * 1.1, x1: target.x, y1: target.y - 4, age: 0 });
+  }
+  if (hit) G.packets = G.packets.filter(k => k.n > 0.05);
+}
+
+// Troops an attacker should expect to lose to a castle's archers on the way in.
+function archerLoss(t, me) {
+  if (!t.owner || t.owner === me) return 0;
+  const a = archerStats(t);
+  return (a.range - t.r) / speedOf(me) / a.every * a.kill;
+}
+
+// AI upgrades: defensive armies build Walls on their front line (and sink garrisons upkeep is already slowing),
+// aggressive ones build Barracks in the rear, balanced ones a mix. At most one upgrade every 20 seconds.
+function aiUpgrade(ai, mine, enemyCastles, inc, pz) {
+  if (!enemyCastles.length || G.time - (ai.upgradedAt ?? -99) < 20 || Math.random() > 0.25) return false;
+  const danger = p => Math.min(...enemyCastles.map(e => dist(p, e)));
+  const kind = pz.front ? 'walls' : pz.enemyBias >= 1.5 ? 'barracks' : (Math.random() < 0.5 ? 'walls' : 'barracks');
+  const pool = [...mine].sort((a, b) => kind === 'walls' ? danger(a) - danger(b) : danger(b) - danger(a)).slice(0, 2);
+  for (const p of pool) {
+    const cost = upgradeCost(p, kind);
+    if (cost === null || threatOn(p, ai.id, inc) > 0) continue;
+    const surplus = pz.front ? (p.units > p.r * UPKEEP_AT || p.units >= cost * 1.3 + 6) : p.units >= cost * 2 + Math.max(pz.keep, 8);
+    if (surplus && p.units >= cost + 4 && upgrade(p, kind)) { ai.upgradedAt = G.time; return true; }
+  }
+  return false;
+}
 
 function usePower(o) {
   const pw = G.pw[o], A = army(o);
@@ -181,7 +251,7 @@ function send(owner, sources, target, frac = 0.5) {
       const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
       const off = (Math.random() - 0.5) * s.r * 1.1;
       G.packets.push({
-        owner, from: s, to: target, n: cnt, delay: i * 0.06, phase: Math.random() * 6.28,
+        owner, from: s, to: target, n: cnt, str: soldierStr(s), delay: i * 0.06, phase: Math.random() * 6.28,
         x: s.x + Math.cos(ang) * s.r * 0.8 - Math.sin(ang) * off,
         y: s.y + Math.sin(ang) * s.r * 0.8 + Math.cos(ang) * off,
       });
@@ -201,7 +271,7 @@ function incomingTable() {
 function needAt(t, far, inc, me) {
   let def = t.units;
   if (t.owner !== 0) def += rate(t) * (far / speedOf(me)) + inc[t.id][t.owner];
-  def = def * defAt(t) / strikeOf(me, t);
+  def = def * defAt(t) / strikeOf(me, t) + archerLoss(t, me);
   def -= inc[t.id][me];
   return Math.ceil(def + 2);
 }
@@ -330,6 +400,8 @@ function aiThink(ai) {
     const rivals = G.owners.filter(o => o !== me).sort((a, b) => totalOf(b) - totalOf(a));
     ai.focus = P.filter(p => p.owner === rivals[0]).sort((a, b) => b.units - a.units)[0] || null;
   }
+
+  if (aiUpgrade(ai, mine, enemyCastles, inc, pz)) return;
 
   let candidates = P.filter(t => t.owner !== me);
   // Sigrun holds her army home early, taking only neutrals and near-empty castles.
@@ -550,10 +622,11 @@ function update(dt) {
   }
   for (const o of G.owners) G.coins[o] += incomeOf(o) / 60 * dt;
   mapUnits(dt);
+  archersTick(dt);
 
   for (const f of G.fx) f.age += dt;
   for (const f of G.fx) if (f.kind === 'dust') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.94; f.vy *= 0.94; }
-  G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, dust: 0.9, impact: 0.6, bolt: 0.2 }[f.kind] || 0.35));
+  G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, dust: 0.9, impact: 0.6, bolt: 0.2, arrow: 0.3, upgrade: 0.8 }[f.kind] || 0.35));
 
   const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
   for (const ai of G.ais) {
@@ -627,7 +700,7 @@ function surrender(o, castles) {
 // Attackers deal damage scaled by their strike strength against the defender's wall strength.
 function arrive(k, t) {
   if (t.owner === k.owner) { t.units += k.n; return; }
-  const A = strikeOf(k.owner, t), D = defAt(t);
+  const A = strikeOf(k.owner, t) * (k.str || 1), D = defAt(t);
   t.units -= k.n * A / D;
   G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
   emit('clash', { attacker: k.owner, defender: t.owner });
@@ -642,6 +715,8 @@ function arrive(k, t) {
     emit('capture', { o: k.owner, was, castle: t });
     G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: col(k.owner), age: 0 });
     t.capturedAt = G.time; t.prevOwner = was;
+    // A captured castle loses one level of each upgrade.
+    if (t.up) t.up = { walls: Math.max(0, lvl(t, 'walls') - 1), barracks: Math.max(0, lvl(t, 'barracks') - 1) };
     if (was === 1) { G.stats.castlesLost++; G.events.push({ t: G.time, kind: 'lost', owner: k.owner }); }
     else if (k.owner === 1) G.events.push({ t: G.time, kind: 'took', owner: 1 });
     if (!reduceMotion) {
@@ -668,7 +743,7 @@ function roadBattles() {
     for (let j = i + 1; a.n > 0.05 && j < act.length && act[j].x - a.x < R; j++) {
       const b = act[j];
       if (b.n <= 0.05 || b.owner === a.owner || Math.abs(b.y - a.y) >= R) continue;
-      const sa = roadOf(a.owner), sb = roadOf(b.owner);
+      const sa = roadOf(a.owner) * (a.str || 1), sb = roadOf(b.owner) * (b.str || 1);
       const m = Math.min(a.n * sa, b.n * sb);
       a.n -= m / sa; b.n -= m / sb;
       if (a.owner === 1) G.stats.roadLost += m / sa; else if (b.owner === 1) G.stats.roadLost += m / sb;
