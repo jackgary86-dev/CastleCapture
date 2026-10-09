@@ -19,16 +19,10 @@
   // typeof directly (safe for names no script has declared yet).
   const grandMaps = () => (typeof GRAND_MAPS !== 'undefined' && GRAND_MAPS && typeof GRAND_MAPS === 'object' ? GRAND_MAPS : null);
   const monsters = () => (typeof MONSTERS !== 'undefined' && MONSTERS && typeof MONSTERS === 'object' ? MONSTERS : null);
-  // Starting: #46's own startGrand(mapId, armyId) when it defines one, else the agreed cfg shape
-  // passed to play() once js/grand.js (genGrandMap) is loaded.
-  const grandReady = () => typeof genGrandMap === 'function' && typeof GRAND !== 'undefined' && typeof play === 'function';
-  const startFallback = (mapId, armyId) => {
-    const rivals = ARMY_IDS.filter(id => id !== armyId);
-    const diff = typeof qDiff === 'string' ? qDiff : 'medium';
-    play({ mode: 'grand', seed: Math.floor(Math.random() * 1e9), n: GRAND.castles, diff, armies: [armyId, ...rivals], map: armyId, grandMap: mapId });
-  };
+  // Starting: #46 defines startGrand(mapId, armyId) only once the mode is playable (its plan-phase
+  // UI), so Begin stays disabled while js/grand.js is on main without an entry point.
   const fns = {
-    startGrand: () => (typeof startGrand === 'function' ? startGrand : grandReady() ? startFallback : null),
+    startGrand: () => (typeof startGrand === 'function' ? startGrand : null),
     loadGrandSlot: () => (typeof loadGrandSlot === 'function' ? loadGrandSlot : null),
     deleteGrandSlot: () => (typeof deleteGrandSlot === 'function' ? deleteGrandSlot : null),
   };
@@ -50,6 +44,8 @@
   const themeOf = m => (typeof THEMES === 'object' && THEMES[m.theme]) || THEMES.vale || {};
   const SLOT_KEY = i => `cs-grand-${i}`;
   const slot = i => { const d = store.get(SLOT_KEY(i), null); return d && typeof d === 'object' && d.map !== undefined ? d : null; };
+  // A save written by another version of the game can't be restored; it is listed so it can be deleted.
+  const stale = d => typeof SAVE_VERSION !== 'undefined' && d.v !== undefined && d.v !== SAVE_VERSION;
   const ago = t => {
     const mins = Math.round((Date.now() - (t || 0)) / 60000);
     return mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
@@ -220,10 +216,10 @@
   // ---------- Continue row ----------
   function renderContinue() {
     const d = slot(0);
-    contBox.hidden = !d;
+    contBox.hidden = !d || stale(d);
     if (d) $('grandContinueText').textContent = slotLine(d);
   }
-  $('btnGrandContinue').addEventListener('click', () => { const load = fn('loadGrandSlot'); if (load && slot(0)) load(0); });
+  $('btnGrandContinue').addEventListener('click', () => { const load = fn('loadGrandSlot'), d = slot(0); if (load && d && !stale(d)) load(0); });
 
   // ---------- Saved games sheet ----------
   const ov = document.createElement('div');
@@ -243,8 +239,9 @@
     listEl.innerHTML = [1, 2, 3, 4, 5].map(i => {
       const d = slot(i);
       if (!d) return `<div class="slot empty"><b>Slot ${i}</b><span>Empty</span></div>`;
-      return `<div class="slot"><div><b>${d.label ? String(d.label).replace(/[<>&]/g, '') : `Slot ${i}`}</b><span>${slotLine(d)}</span></div>
-        <button data-load="${i}" ${canLoad ? '' : 'disabled'}>Load</button>
+      const old = stale(d);
+      return `<div class="slot"><div><b>${d.label ? String(d.label).replace(/[<>&]/g, '') : `Slot ${i}`}</b><span>${old ? 'Saved by an older version of the game and cannot be loaded. ' : ''}${slotLine(d)}</span></div>
+        <button data-load="${i}" ${canLoad && !old ? '' : 'disabled'}>Load</button>
         <button data-del="${i}" class="${confirming === i ? 'danger' : ''}">${confirming === i ? 'Really delete?' : 'Delete'}</button></div>`;
     }).join('');
   }
