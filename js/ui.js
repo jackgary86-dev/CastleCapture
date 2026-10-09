@@ -570,7 +570,7 @@ function dec(v) {
   if ('$map' in v) return new Map(v.$map.map(([k, x]) => [dec(k), dec(x)]));
   return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, dec(x)]));
 }
-const savable = () => G && !G.cfg.demo && !G.over && !G.intro;
+const savable = () => G && !G.cfg.demo && !G.cfg.tutorial && !G.over && !G.intro;
 function saveBattle() {
   if (!savable()) return;
   const state = Object.fromEntries(Object.entries(G).filter(([k]) => !SAVE_SKIP.has(k)).map(([k, v]) => [k, enc(v)]));

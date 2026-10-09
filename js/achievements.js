@@ -67,7 +67,7 @@ function lowestShare() {
 }
 
 on('end', ({ win }) => {
-  if (!G || G.cfg.demo) return;
+  if (!G || G.cfg.demo || G.cfg.tutorial) return;
   const r = ach.rec, me = G.fac[1], rivals = G.owners.slice(1).map(o => G.fac[o]), diff = G.cfg.diff;
   r.battles++;
   if (win) r.wins++; else r.losses++;

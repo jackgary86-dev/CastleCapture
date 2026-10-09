@@ -77,6 +77,10 @@ Thirteen achievements, from First Blood and Lightning War (win in under 2 minute
 - **Touch and phones:** pinch with two fingers to zoom (up to 3×) and drag them to pan; **Fit** shows the whole map again. Ctrl+scroll (or a trackpad pinch) zooms on desktop. Castles have larger tap areas for fingers, and phones and touch screens get a thumb bar with big **Power**, **Send %**, **All** and **Fit** buttons.
 - **Screen readers** hear the focused castle, captures, special powers, map units, surrenders and the result.
 
+## Tutorial
+
+New players are offered a short guided battle on first launch, and it's always available from the menu under **Learn to play**. Seven lessons, each waiting until you've done it: sending troops, choosing how many, attacking from several castles, reading red banners and reinforcing, intercepting a column on the road, using your special power, and finally winning the battle. Gold rings mark what to click; the lesson card can be folded down or a lesson skipped. Tutorial battles aren't saved and don't count towards achievements.
+
 ## Modes
 
 - **Skirmish:** Pick your rival (or a random one), 1 or 2 rivals, and whether to invade their homeland or defend yours. Difficulty is Squire, Knight or Warlord.
