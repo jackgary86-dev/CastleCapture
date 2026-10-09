@@ -73,6 +73,33 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   #powerPanel:not(.expanded) .pp-desc { display: none; }
   #ppMore { display: block; }
 }
+/* Treasury: coins, income and the map-unit shop, top right of the map */
+#treasury { position: absolute; top: 12px; right: 12px; width: min(300px, calc(100% - 24px)); padding: 8px 12px; border-radius: 6px; z-index: 1;
+  background: rgb(23 20 14 / 0.9); border: 2px solid var(--edge); display: grid; gap: 8px; }
+.tr-head { display: flex; align-items: center; gap: 8px; }
+.coin { flex: none; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe7a0, #e9b43b 55%, #a8781c); box-shadow: inset 0 0 0 1.5px #8a6512; }
+#coinCount { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: #f3d27a; }
+#coinRate { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#btnShop { margin-left: auto; padding: 3px 10px; font-size: 13px; }
+#btnShop[aria-expanded="true"] { border-color: #e9b43b; color: #f3d27a; }
+#shop { display: grid; gap: 6px; }
+.unit { display: grid; gap: 2px; text-align: left; padding: 7px 9px; border-color: var(--edge); background: rgb(255 255 255 / 0.03); }
+.unit:not(:disabled):hover { border-color: #e9b43b; }
+.unit .u-top { display: flex; align-items: baseline; gap: 6px; }
+.unit .u-name { font-family: var(--display); font-size: 17px; line-height: 1.1; }
+.unit .u-kind { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.unit .u-price { margin-left: auto; font-weight: 800; color: #f3d27a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.unit .u-desc { font-size: 12px; line-height: 1.35; color: var(--muted); }
+.unit .u-when { font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.unit.can .u-when { color: #f3d27a; }
+.unit:disabled { opacity: 0.75; }
+.tr-note { margin: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.tr-note b { color: var(--text); }
+@media (max-width: 560px) {
+  #treasury { top: auto; bottom: 12px; right: 12px; width: auto; max-width: calc(100% - 24px); padding: 6px 10px; }
+  #coinCount { font-size: 17px; }
+  .unit .u-desc { display: none; }
+}
 #board { flex: 1; position: relative; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; overflow: hidden; container-type: inline-size; }
 /* Keep the battle announcement clear of the power panel when the board is too narrow for both side by side. */
 @container (max-width: 1000px) { #toast { top: 150px; } }
@@ -190,6 +217,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       <p class="pp-desc" id="ppDesc"></p>
       <button id="ppMore" aria-expanded="false" aria-controls="ppDesc">What does it do?</button>
     </div>
+    <div id="treasury" role="group" aria-label="Treasury" hidden>
+      <div class="tr-head">
+        <span class="coin" aria-hidden="true"></span>
+        <b id="coinCount" title="Coins">0</b>
+        <span id="coinRate">+0/min</span>
+        <button id="btnShop" aria-expanded="false" aria-controls="shop" title="Map units (B)">Map units</button>
+      </div>
+      <div id="shop" hidden></div>
+      <p class="tr-note" id="trNote" hidden></p>
+    </div>
     <div id="toast" hidden></div>
     <div id="taunt" hidden></div>
 
@@ -239,6 +276,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Drag</b> from your castle to any castle to send troops. Keys <b>1–4</b> or the <b>scroll wheel</b> choose how many: 25%, 50%, 75% or all.</li>
             <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
             <li><b>Special power:</b> press <b>Q</b> or click the power panel in the top left of the map. The panel shows what your power does and counts down until it's ready: 45 seconds into the battle, then every five minutes.</li>
+            <li><b>Coins:</b> every castle you hold earns coins each minute: small 1, medium 2, large 3. Save up to buy <b>one map unit</b> per battle (<b>B</b> opens the shop): a Ballista Tower (40), Siege Trebuchet (65) or Great Ward (90), placed near your castles.</li>
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
@@ -293,6 +331,24 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const PROD = 0.055;           // troops per second per unit of castle size
   const FIRST_CHARGE = 45;      // seconds before a special power is first ready
   const RECHARGE = 300;         // seconds a special power takes to recharge after use
+  const COIN_PER_MIN = [0, 1, 2, 3]; // coins per minute from a small, medium and large castle
+  const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
+  const MAP_UNITS = {
+    ballista: {
+      name: 'Ballista Tower', kind: 'Defensive', price: 40, range: 120,
+      desc: 'Fires bolts at enemy soldiers marching within range, killing about three troops a second.',
+    },
+    trebuchet: {
+      name: 'Siege Trebuchet', kind: 'Offensive', price: 65, range: 180,
+      desc: 'Every 5 seconds, hurls a boulder at the enemy castle in range with the biggest garrison, knocking out 15% of its defenders.',
+    },
+    ward: {
+      name: 'Great Ward', kind: 'Support', price: 90, range: 150,
+      desc: 'Your castles inside train twice as fast and their defenders count 1.5×. Enemy troops passing through march at half speed.',
+    },
+  };
+  // The unit each lord saves up for.
+  const AI_UNIT = { aldmere: 'ward', kharzul: 'trebuchet', frostmark: 'ballista', solmara: 'ward', nyx: 'trebuchet' };
   const NEUTRAL = '#8c8676', INK = '#2a2014', PARCH = '#dccba2', TIMBER = '#17140e', WARN = '#e0362f';
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -702,6 +758,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       ais: aiIds.map((id, i) => ({ id, diff: cfg.demo ? 'medium' : cfg.diff, timer: 1.4 + i * 0.35, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() })),
       caps: 0, peak: 0, hintDone: cfg.demo || store.get('cs-hint', false),
       intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {},
+      coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
+      roadPts: roadSamples(map.roads),
     };
     sel.clear();
     resize();
@@ -716,7 +774,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const speedOf = o => SPEED * army(o).stats.speed * (powerOn(o, 'bloodMoon') ? 2 : 1);
   const roadOf = o => atkOf(o) * army(o).stats.road;
   const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1);
-  const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2.5 : 1) : 0;
+  const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
+  const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o && dist(u, p) <= MAP_UNITS.ward.range);
+  const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2.5 : 1) * (wardOver(p, p.owner) ? 2 : 1) : 0;
+  // Wall strength of one castle: its owner's defence plus a Great Ward over it.
+  const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1);
+  // Enemy Great Wards halve marching speed inside them.
+  const slowedAt = k => G.units.some(u => u.type === 'ward' && u.owner !== k.owner && dist(u, k) <= MAP_UNITS.ward.range);
+  const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] : 0), 0);
   const frozen = o => G.owners.some(q => q !== o && powerOn(q, 'wintersGrip'));
 
   function usePower(o) {
@@ -789,7 +854,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function needAt(t, far, inc, me) {
     let def = t.units;
     if (t.owner !== 0) def += rate(t) * (far / speedOf(me)) + inc[t.id][t.owner];
-    def = def * defOf(t.owner) / strikeOf(me, t);
+    def = def * defAt(t) / strikeOf(me, t);
     def -= inc[t.id][me];
     return Math.ceil(def + 2);
   }
@@ -803,7 +868,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (ai.readyAt == null) ai.readyAt = G.time;
     const waited = G.time - ai.readyAt;
     if (ai.diff === 'easy' && Math.random() < 0.6) return;
-    const falling = mine.filter(p => threatOn(p, me, inc) >= 8 && threatOn(p, me, inc) > (p.units + inc[p.id][me]) * defOf(me));
+    const falling = mine.filter(p => threatOn(p, me, inc) >= 8 && threatOn(p, me, inc) > (p.units + inc[p.id][me]) * defAt(p));
     const incoming = mine.reduce((a, p) => a + threatOn(p, me, inc), 0);
     let use = false;
     switch (id) {
@@ -842,6 +907,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const enemyCastles = P.filter(p => p.owner && p.owner !== me);
     const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => dist(p, q))) : Infinity;
     aiPower(ai, inc, mine);
+    aiBuyUnit(ai, mine);
 
     // Sigrun: the moment her blizzard lifts, strike the castles that attacked her.
     if (id === 'frostmark' && ai.counter && G.time >= G.pw[me].until) {
@@ -875,7 +941,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (id !== 'kharzul') {
       for (const p of mine) {
         const threat = threatOn(p, me, inc);
-        const hold = (p.units + inc[p.id][me]) * defOf(me) + rate(p) * 1.5;
+        const hold = (p.units + inc[p.id][me]) * defAt(p) + rate(p) * 1.5;
         if (threat > 0 && threat > hold * pz.defendAt) {
           const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => dist(a, p) - dist(b, p));
           if (helpers.length) {
@@ -971,6 +1037,129 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
   }
 
+  // ---------- coins and map units ----------
+  // Points along each drawn road, so map units aren't placed on top of one.
+  function roadSamples(roads) {
+    const pts = [];
+    for (const r of roads) {
+      const x0 = r.a.x, y0 = r.a.y + r.a.r * 0.5, x1 = r.b.x, y1 = r.b.y + r.b.r * 0.5;
+      for (let i = 0; i <= 16; i++) {
+        const t = i / 16, u = 1 - t;
+        pts.push({ x: u * u * x0 + 2 * u * t * r.mx + t * t * x1, y: u * u * y0 + 2 * u * t * r.my + t * t * y1 });
+      }
+    }
+    return pts;
+  }
+
+  // Why a spot can't take a map unit, or null if it can.
+  function placeProblem(o, x, y) {
+    if (x < 24 || y < 30 || x > G.w - 24 || y > G.h - 14) return 'Too close to the edge of the map';
+    if (!G.planets.some(p => p.owner === o && Math.hypot(p.x - x, p.y - y) <= PLACE_REACH)) return 'Too far from your castles';
+    if (G.planets.some(p => Math.hypot(p.x - x, p.y - (y - 6)) < p.r * 1.25 + 14)) return 'Too close to a castle';
+    if (G.roadPts.some(q => Math.hypot(q.x - x, q.y - y) < 12)) return 'Can\'t build on a road';
+    if (G.units.some(u => Math.hypot(u.x - x, u.y - y) < 36)) return 'Too close to another map unit';
+    return null;
+  }
+
+  function buyUnit(o, type, x, y) {
+    const U = MAP_UNITS[type];
+    if (G.bought.has(o) || G.coins[o] < U.price || placeProblem(o, x, y)) return false;
+    G.coins[o] -= U.price;
+    G.bought.add(o);
+    G.units.push({ owner: o, type, x, y, cd: 1, fired: -9, aim: 0 });
+    G.fx.push({ kind: 'capture', x, y: y - 8, r: 10, col: col(o), age: 0 });
+    if (!G.cfg.demo) {
+      toast(o === 1 ? `You build a ${U.name}` : `${army(o).full} builds a ${U.name}`, o === 1 ? U.desc : U.desc.replace(/\bYour\b/g, 'Their'), col(o));
+      sfx.drum();
+    }
+    return true;
+  }
+
+  // Each placed unit acts on its area.
+  function mapUnits(dt) {
+    let bolted = false;
+    for (const u of G.units) {
+      u.cd -= dt;
+      if (u.cd > 0) continue;
+      if (u.type === 'ballista') {
+        let target = null, bd = MAP_UNITS.ballista.range;
+        for (const k of G.packets) {
+          if (k.owner === u.owner || k.delay > 0 || k.n <= 0.05) continue;
+          const d = dist(u, k);
+          if (d <= bd) { bd = d; target = k; }
+        }
+        if (!target) { u.cd = 0.1; continue; }
+        target.n -= 1;
+        bolted = true;
+        u.cd = 0.33;
+        u.aim = Math.atan2(target.y - (u.y - 14), target.x - u.x);
+        G.fx.push({ kind: 'bolt', x: u.x, y: u.y - 14, x1: target.x, y1: target.y - 3, age: 0 });
+      } else if (u.type === 'trebuchet') {
+        const target = G.planets.filter(p => p.owner && p.owner !== u.owner && dist(u, p) <= MAP_UNITS.trebuchet.range).sort((a, b) => b.units - a.units)[0];
+        if (!target) { u.cd = 0.5; continue; }
+        G.shots.push({ u, t: target, age: 0, dur: 1.1, dmg: Math.max(4, target.units * 0.15) });
+        u.fired = G.time;
+        u.cd = 5;
+      } else {
+        u.cd = 1e9; // The Great Ward works through wardOver and slowedAt.
+      }
+    }
+    if (bolted) G.packets = G.packets.filter(k => k.n > 0.05);
+    for (const sh of G.shots) {
+      sh.age += dt;
+      if (sh.age >= sh.dur && !sh.done) {
+        sh.done = true;
+        if (sh.t.owner && sh.t.owner !== sh.u.owner) {
+          sh.t.units = Math.max(0, sh.t.units - sh.dmg);
+          G.fx.push({ kind: 'impact', x: sh.t.x, y: sh.t.y, r: sh.t.r, age: 0 });
+          if (!G.cfg.demo && (sh.u.owner === 1 || sh.t.owner === 1)) sfx.clash();
+        }
+      }
+    }
+    G.shots = G.shots.filter(sh => !sh.done);
+  }
+
+  // AI lords save for the unit that suits them, then place it where it matters.
+  function aiBuyUnit(ai, mine) {
+    const me = ai.id;
+    if (G.bought.has(me)) return;
+    const type = AI_UNIT[G.fac[me]], U = MAP_UNITS[type];
+    if (G.coins[me] < U.price) return;
+    if (ai.diff === 'easy' && Math.random() < 0.5) return;
+    const enemies = G.planets.filter(p => p.owner && p.owner !== me);
+    if (!enemies.length) return;
+    const nearestEnemy = p => enemies.reduce((b, e) => !b || dist(p, e) < dist(p, b) ? e : b, null);
+    let anchors = [];
+    if (type === 'ballista') {
+      // On the front line, between the most exposed castle and its nearest enemy.
+      const front = [...mine].sort((a, b) => dist(a, nearestEnemy(a)) - dist(b, nearestEnemy(b)))[0];
+      const e = nearestEnemy(front), d = dist(front, e);
+      anchors = [0.35, 0.25, 0.45].map(f => ({ x: front.x + (e.x - front.x) * Math.min(f, 110 / d), y: front.y + (e.y - front.y) * Math.min(f, 110 / d) }));
+    } else if (type === 'trebuchet') {
+      // Within range of the biggest enemy castle it can reach.
+      const reachable = enemies.filter(e => mine.some(m => dist(m, e) < PLACE_REACH + MAP_UNITS.trebuchet.range - 20)).sort((a, b) => b.units - a.units);
+      for (const e of reachable.slice(0, 3)) {
+        const m = [...mine].sort((a, b) => dist(a, e) - dist(b, e))[0], d = dist(m, e);
+        const f = Math.max(0, (d - MAP_UNITS.trebuchet.range + 30) / d);
+        anchors.push({ x: m.x + (e.x - m.x) * f, y: m.y + (e.y - m.y) * f });
+      }
+    } else {
+      // In the middle of the biggest cluster of its own castles near the front.
+      const scored = mine.map(p => {
+        const near = mine.filter(q => dist(p, q) <= MAP_UNITS.ward.range);
+        return { near, score: near.length * 100 - dist(p, nearestEnemy(p)) * 0.2 };
+      }).sort((a, b) => b.score - a.score);
+      for (const s of scored.slice(0, 3)) anchors.push({ x: s.near.reduce((a, q) => a + q.x, 0) / s.near.length, y: s.near.reduce((a, q) => a + q.y, 0) / s.near.length + 20 });
+    }
+    for (const a of anchors) {
+      for (let i = 0; i < 24; i++) {
+        const r = i === 0 ? 0 : 10 + i * 4, ang = i * 2.4;
+        const x = a.x + Math.cos(ang) * r, y = a.y + Math.sin(ang) * r;
+        if (!placeProblem(me, x, y)) { buyUnit(me, type, x, y); return; }
+      }
+    }
+  }
+
   // ---------- simulation ----------
   function update(dt) {
     G.time += dt;
@@ -991,15 +1180,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         arrive(k, t);
         continue;
       }
-      const step = Math.min(dd, speedOf(k.owner) * dt);
+      const step = Math.min(dd, speedOf(k.owner) * (slowedAt(k) ? 0.5 : 1) * dt);
       k.x += dx / dd * step; k.y += dy / dd * step;
       k.dir = dx < 0 ? -1 : 1;
     }
 
     roadBattles();
+    for (const o of G.owners) G.coins[o] += incomeOf(o) / 60 * dt;
+    mapUnits(dt);
 
     for (const f of G.fx) f.age += dt;
-    G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6 }[f.kind] || 0.35));
+    G.fx = G.fx.filter(f => f.age < ({ capture: 0.9, crows: 2.6, impact: 0.6, bolt: 0.2 }[f.kind] || 0.35));
 
     const intervals = { easy: 2.2, medium: 1.3, hard: 0.7 };
     for (const ai of G.ais) {
@@ -1035,7 +1226,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   // Attackers deal damage scaled by their strike strength against the defender's wall strength.
   function arrive(k, t) {
     if (t.owner === k.owner) { t.units += k.n; return; }
-    const A = strikeOf(k.owner, t), D = defOf(t.owner);
+    const A = strikeOf(k.owner, t), D = defAt(t);
     t.units -= k.n * A / D;
     G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
     if (!G.cfg.demo && (k.owner === 1 || t.owner === 1)) sfx.clash();
@@ -1391,7 +1582,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       if (p.owner !== 1) continue;
       const threat = inc[p.id][2] + inc[p.id][3];
       if (threat < 0.5) continue;
-      const falls = threat > (p.units + inc[p.id][1]) * defOf(1);
+      const falls = threat > (p.units + inc[p.id][1]) * defAt(p);
       if (falls) {
         const pulse = reduceMotion ? 0.6 : 0.45 + 0.4 * Math.sin(now / 160);
         ctx.save(); ctx.translate(p.x, p.y + p.r * 0.45); ctx.scale(1, 0.5);
@@ -1447,6 +1638,80 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
   }
 
+  // ---------- map unit drawing ----------
+  function drawUnitRange(u, now, color, valid = true) {
+    const R = MAP_UNITS[u.type].range;
+    ctx.beginPath(); ctx.arc(u.x, u.y, R, 0, Math.PI * 2);
+    const pulse = u.type === 'ward' && !reduceMotion ? 0.06 + 0.03 * Math.sin(now / 500) : 0.05;
+    ctx.fillStyle = alpha(color, valid ? pulse : 0.08); ctx.fill();
+    ctx.setLineDash([6, 6]); ctx.strokeStyle = alpha(color, 0.55); ctx.lineWidth = 1.5; ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function drawUnit(u, now) {
+    const c = col(u.owner), x = u.x, y = u.y;
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 1, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
+    if (u.type === 'ballista') {
+      ctx.strokeStyle = '#5e3b20'; ctx.lineWidth = 2.2; ctx.beginPath();
+      ctx.moveTo(x - 9, y); ctx.lineTo(x - 4, y - 12); ctx.moveTo(x + 9, y); ctx.lineTo(x + 4, y - 12); ctx.moveTo(x - 6, y - 5); ctx.lineTo(x + 6, y - 5); ctx.stroke();
+      ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 10, y - 15, 20, 4);
+      ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + 9, y - 15); ctx.lineTo(x + 9, y - 27); ctx.stroke();
+      poly([[x + 9, y - 27], [x + 17, y - 24.5], [x + 9, y - 22]], c);
+      ctx.save(); ctx.translate(x, y - 17); ctx.rotate(u.aim || 0);
+      ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(8, 0); ctx.stroke();
+      ctx.strokeStyle = '#2a1c10'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(1, 0, 7, -1.25, 1.25); ctx.stroke();
+      ctx.strokeStyle = '#d8cfb8'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(1 + Math.cos(-1.25) * 7, Math.sin(-1.25) * 7); ctx.lineTo(-3, 0); ctx.lineTo(1 + Math.cos(1.25) * 7, Math.sin(1.25) * 7); ctx.stroke();
+      ctx.restore();
+    } else if (u.type === 'trebuchet') {
+      ctx.fillStyle = '#7a5230'; ctx.fillRect(x - 15, y - 4, 30, 4);
+      ctx.strokeStyle = '#68431f'; ctx.lineWidth = 2.6; ctx.beginPath();
+      ctx.moveTo(x - 10, y - 3); ctx.lineTo(x, y - 25); ctx.lineTo(x + 10, y - 3); ctx.stroke();
+      // The arm rests pointing down-right, whips over the top when it fires, then settles back.
+      const since = G.time - u.fired, rest = 0.85, fired = -2.3;
+      const ang = since < 0.35 ? rest + (fired - rest) * (since / 0.35) : since < 1.8 ? fired + (rest - fired) * ((since - 0.35) / 1.45) : rest;
+      const px = x, py = y - 25, lx = px + Math.cos(ang) * 24, ly = py + Math.sin(ang) * 24, sx = px - Math.cos(ang) * 8, sy = py - Math.sin(ang) * 8;
+      ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(lx, ly); ctx.stroke();
+      ctx.fillStyle = c; ctx.fillRect(sx - 4, sy - 1, 8, 7);
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.strokeRect(sx - 4, sy - 1, 8, 7);
+      if (since > 1.8 || since < 0) { ctx.fillStyle = '#6b6458'; ctx.beginPath(); ctx.arc(lx, ly + 2, 2.6, 0, Math.PI * 2); ctx.fill(); }
+    } else {
+      const glow = reduceMotion ? 0.8 : 0.55 + 0.4 * Math.sin(now / 400);
+      ctx.fillStyle = '#8f897d';
+      ctx.beginPath(); ctx.roundRect(x - 15, y - 13, 5, 13, [2, 2, 0, 0]); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(x + 10, y - 12, 5, 12, [2, 2, 0, 0]); ctx.fill();
+      poly([[x - 5, y], [x - 3.5, y - 24], [x, y - 29], [x + 3.5, y - 24], [x + 5, y]], '#7d776c');
+      shadeRight(x - 5, y - 26, 10, 26, 0.12);
+      ctx.fillStyle = alpha(c, glow * 0.45); ctx.beginPath(); ctx.arc(x, y - 16, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y - 16, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = alpha(c, glow); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - 22); ctx.lineTo(x, y - 10); ctx.moveTo(x - 3, y - 16); ctx.lineTo(x + 3, y - 16); ctx.stroke();
+    }
+  }
+
+  function drawShots() {
+    for (const sh of G.shots) {
+      const t = Math.min(1, sh.age / sh.dur);
+      const x0 = sh.u.x, y0 = sh.u.y - 26, x1 = sh.t.x, y1 = sh.t.y - sh.t.r * 0.6;
+      const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t - Math.sin(Math.PI * t) * 80;
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x0 + (x1 - x0) * t, sh.u.y + (sh.t.y - sh.u.y) * t, 3, 1.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6b6458'; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawPlacement(now) {
+    if (!G.placing || !ptr.placeHover) return;
+    const ghost = { owner: 1, type: G.placing, x: ptr.wx, y: ptr.wy, aim: 0, fired: -9 };
+    const problem = placeProblem(1, ptr.wx, ptr.wy);
+    drawUnitRange(ghost, now, problem ? WARN : col(1), !problem);
+    ctx.globalAlpha = problem ? 0.45 : 0.8; drawUnit(ghost, now); ctx.globalAlpha = 1;
+    if (problem) {
+      const fs = 12 / sc;
+      ctx.font = `700 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
+      const w = ctx.measureText(problem).width + fs, lx = ptr.wx - w / 2, ly = ptr.wy + 10 / sc;
+      ctx.fillStyle = alpha(TIMBER, 0.88); ctx.beginPath(); ctx.roundRect(lx, ly, w, fs * 1.6, 3 / sc); ctx.fill();
+      ctx.fillStyle = '#ffb3ad'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(problem, ptr.wx, ly + fs * 0.85);
+    }
+  }
+
   function drawScenery(now) {
     const T = G.theme;
     ctx.fillStyle = T.field; ctx.fillRect(0, 0, G.w, G.h);
@@ -1494,6 +1759,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (!G) return;
     ctx.translate(ox, oy); ctx.scale(sc, sc);
     drawScenery(now);
+    for (const u of G.units) drawUnitRange(u, now, col(u.owner));
     const spin = reduceMotion ? 0 : now / 1100;
     const ring = G.theme.ring;
 
@@ -1524,8 +1790,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     // Castles and troops back to front so nearer things overlap farther ones.
     const items = G.planets.map(p => ({ y: p.y + p.r * 0.55, p }));
     for (const k of G.packets) if (k.delay <= 0) items.push({ y: k.y, k });
+    for (const u of G.units) items.push({ y: u.y, u });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) {
+      if (it.u) { drawUnit(it.u, now); continue; }
       if (it.p) { drawCastle(it.p, now); continue; }
       const k = it.k, dir = k.dir || 1, style = army(k.owner).soldier, isFrozen = frozen(k.owner);
       const figures = Math.min(Math.ceil(k.n), 3);
@@ -1538,6 +1806,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     }
 
     if (!G.cfg.demo) drawThreats(now);
+    drawShots();
+    drawPlacement(now);
 
     for (const f of G.fx) {
       if (f.kind === 'clash') {
@@ -1547,6 +1817,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
           const ang = a * Math.PI / 2 + 0.6, r1 = 2 + t * 3, r2 = 4 + t * 6;
           ctx.beginPath(); ctx.moveTo(f.x + Math.cos(ang) * r1, f.y - 4 + Math.sin(ang) * r1); ctx.lineTo(f.x + Math.cos(ang) * r2, f.y - 4 + Math.sin(ang) * r2); ctx.stroke();
         }
+      } else if (f.kind === 'bolt') {
+        ctx.strokeStyle = alpha('#f3e6c0', 1 - f.age / 0.2); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x1, f.y1); ctx.stroke();
+      } else if (f.kind === 'impact') {
+        const t = f.age / 0.6;
+        ctx.save(); ctx.translate(f.x, f.y + f.r * 0.4); ctx.scale(1, 0.5);
+        ctx.beginPath(); ctx.arc(0, 0, f.r * 0.8 + t * 26, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(120,100,70,${0.45 * (1 - t)})`; ctx.fill(); ctx.restore();
+        ctx.fillStyle = `rgba(90,80,64,${1 - t})`;
+        for (let i = 0; i < 6; i++) { const a = i * 1.05; ctx.fillRect(f.x + Math.cos(a) * (6 + t * 16), f.y - 6 + Math.sin(a) * (4 + t * 10) - t * 6, 2, 2); }
       } else if (f.kind === 'crows') {
         drawCrows(f, now);
       } else {
@@ -1659,7 +1939,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (G && !G.over && !G.paused && !G.intro) update(dt);
     for (const s of [...sel]) if (s.owner !== 1) sel.delete(s);
     draw(now);
-    if ((hudTick += dt) > 0.2) { hudTick = 0; hud(); }
+    if ((hudTick += dt) > 0.2) { hudTick = 0; hud(); renderTreasury(); }
     requestAnimationFrame(frame);
   }
 
@@ -1688,6 +1968,74 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   function playerPower() { if (playable() && usePower(1)) hud(); }
 
+  // ---------- treasury and map-unit shop ----------
+  const trEl = document.getElementById('treasury'), shopEl = document.getElementById('shop'), btnShop = document.getElementById('btnShop'), trNote = document.getElementById('trNote');
+  let shopOpen = false, lastShopHtml = '', noteFlash = null;
+
+  function setShop(open) {
+    shopOpen = open;
+    btnShop.setAttribute('aria-expanded', String(open));
+    renderTreasury();
+  }
+
+  function renderTreasury() {
+    trEl.hidden = !G || G.cfg.demo || G.over || G.intro;
+    if (trEl.hidden) return;
+    const coins = G.coins[1], income = incomeOf(1);
+    document.getElementById('coinCount').textContent = Math.floor(coins);
+    document.getElementById('coinRate').textContent = `+${income}/min`;
+    const owned = G.units.find(u => u.owner === 1);
+    btnShop.hidden = !!owned || !!G.placing;
+    if (owned) {
+      shopEl.hidden = true; trNote.hidden = false;
+      trNote.innerHTML = `Your <b>${MAP_UNITS[owned.type].name}</b> stands on the field. One map unit per battle.`;
+      return;
+    }
+    if (G.placing) {
+      shopEl.hidden = true; trNote.hidden = false;
+      trNote.innerHTML = noteFlash && performance.now() < noteFlash.until
+        ? `<b>${noteFlash.text}.</b> Pick another spot.`
+        : `Click near your castles to place the <b>${MAP_UNITS[G.placing].name}</b>. Right-click or Esc to cancel.`;
+      return;
+    }
+    trNote.hidden = true;
+    shopEl.hidden = !shopOpen;
+    if (!shopOpen) return;
+    const html = Object.entries(MAP_UNITS).map(([id, U]) => {
+      const can = coins >= U.price;
+      const when = can ? 'Click to buy, then place it on the map'
+        : income > 0 ? `Affordable in ${fmtTime(Math.ceil((U.price - coins) / income * 60))}` : `Need ${Math.ceil(U.price - coins)} more coins`;
+      return `<button class="unit${can ? ' can' : ''}" data-unit="${id}" ${can ? '' : 'disabled'}>
+        <span class="u-top"><span class="u-name">${U.name}</span><span class="u-kind">${U.kind}</span><span class="u-price">${U.price} coins</span></span>
+        <span class="u-desc">${U.desc} Range ${U.range}.</span>
+        <span class="u-when">${when}</span></button>`;
+    }).join('') + '<p class="tr-note">You can buy <b>one</b> map unit per battle.</p>';
+    if (html !== lastShopHtml) { shopEl.innerHTML = html; lastShopHtml = html; }
+  }
+
+  btnShop.addEventListener('click', () => setShop(!shopOpen));
+  shopEl.addEventListener('click', e => {
+    const b = e.target.closest('button[data-unit]');
+    if (!b || b.disabled || !playable()) return;
+    G.placing = b.dataset.unit;
+    ptr.placeHover = false;
+    sel.clear();
+    setShop(false);
+  });
+  function cancelPlacing() { if (G && G.placing) { G.placing = null; renderTreasury(); } }
+  // Returns true when the click was used for placing a map unit.
+  function placeAt(e) {
+    if (!G.placing) return false;
+    if (e.button === 2) { cancelPlacing(); return true; }
+    const w = toWorld(e), problem = placeProblem(1, w.x, w.y);
+    if (problem) { noteFlash = { text: problem, until: performance.now() + 1800 }; renderTreasury(); return true; }
+    buyUnit(1, G.placing, w.x, w.y);
+    G.placing = null;
+    renderTreasury();
+    return true;
+  }
+  cv.addEventListener('contextmenu', e => { if (G && G.placing) e.preventDefault(); });
+
   // ---------- send amount ----------
   const PCTS = [0.25, 0.5, 0.75, 1];
   let sendPct = PCTS.includes(store.get('cs-send', 0.5)) ? store.get('cs-send', 0.5) : 0.5;
@@ -1708,6 +2056,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   cv.addEventListener('pointerdown', e => {
     if (!playable()) return;
+    if (placeAt(e)) return;
     cv.setPointerCapture(e.pointerId);
     const w = toWorld(e), p = planetAt(w);
     Object.assign(ptr, { down: true, moved: false, sx: w.sx, sy: w.sy, wx: w.x, wy: w.y, start: p, wasSel: !!p && sel.has(p), hover: p });
@@ -1716,6 +2065,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     else if (sel.size) { playerSend(p); ptr.down = false; }
   });
   cv.addEventListener('pointermove', e => {
+    if (G && G.placing && playable()) { const w = toWorld(e); ptr.wx = w.x; ptr.wy = w.y; ptr.placeHover = true; return; }
     if (!ptr.down || !playable()) return;
     const w = toWorld(e);
     ptr.wx = w.x; ptr.wy = w.y;
@@ -1752,6 +2102,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     else if (e.key === 'q' || e.key === 'Q') playerPower();
     else if (e.key === 'm' || e.key === 'M') toggleSound();
     else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
+    else if ((e.key === 'b' || e.key === 'B') && playable()) { if (G.placing) cancelPlacing(); else if (!G.bought.has(1)) setShop(!shopOpen); }
+    else if (e.key === 'Escape' && G && G.placing) cancelPlacing();
     else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
@@ -1841,6 +2193,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   function play(cfg) {
     lastCfg = cfg;
+    shopOpen = false; btnShop.setAttribute('aria-expanded', 'false');
     menu.hidden = true; endOv.hidden = true; pauseOv.hidden = true; toastEl.hidden = true;
     btnPause.disabled = false; btnAll.disabled = false; btnPause.textContent = 'Pause';
     setArmyColors(cfg.armies[0]);

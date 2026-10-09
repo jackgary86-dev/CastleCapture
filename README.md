@@ -32,6 +32,18 @@ Each army is commanded by a named lord when it's your rival. They introduce them
 | **Sultan Amaru al-Zahir**, the Golden Hand | Solmara | Expands fast in the first minute, opens the treasury right after a wave of captures, and avoids even fights. |
 | **The Hollow Matron Veyra**, Mother of Crows | Nyxhollow | Pounces on castles you've just emptied, looses the crows right before her main attack, and takes keeps near you to box you in. |
 
+## Coins and map units
+
+Every castle you hold earns coins each minute: small castles 1, medium 2, large 3. Coins build up slowly, so they pay off late in a battle. Spend them on **one map unit per battle**, placed on the map near your castles. Open the shop from the Treasury panel at the top right, or press **B**.
+
+| Map unit | Type | Price | Range | Effect |
+|---|---|---|---|---|
+| **Ballista Tower** | Defensive | 40 | 120 | Fires bolts at enemy soldiers marching within range, killing about three troops a second |
+| **Siege Trebuchet** | Offensive | 65 | 180 | Every 5 seconds, hurls a boulder at the enemy castle in range with the biggest garrison, knocking out 15% of its defenders |
+| **Great Ward** | Support | 90 | 150 | Your castles inside train twice as fast and defend at 1.5x; enemy troops passing through march at half speed |
+
+Map units can't be destroyed once placed, and a Great Ward only helps the kingdom that built it. AI lords save up for the unit that suits them. The prices and ranges live in `MAP_UNITS` and `COIN_PER_MIN` at the top of the script.
+
 ## How to play
 
 - **Drag** from one of your castles to any castle to send troops.
