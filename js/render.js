@@ -442,6 +442,68 @@ function drawFog() {
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(fogCv, 0, 0); ctx.restore();
 }
 
+// Weather and night, drawn over the whole board. Particles are worked out from the clock, so they need
+// no state; under reduced motion only the tints show.
+const WEATHER_LOOK = {
+  rain: { tint: '#4f6178', a: 0.16 }, dust: { tint: '#b08a50', a: 0.22 }, snow: { tint: '#eef4fa', a: 0.12 },
+  heat: { tint: '#ff9f40', a: 0.09 }, mist: { tint: '#d6d6e4', a: 0.18 },
+};
+const hash01 = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+function drawWeather(now) {
+  if (!G.weather) return;
+  const night = nightAmt();
+  if (night > 0) { ctx.fillStyle = `rgba(10,16,42,${(0.3 * night).toFixed(3)})`; ctx.fillRect(0, 0, cw, ch); }
+  const amt = weatherAmt();
+  for (const [kind, a] of [[G.weather.prev, 1 - amt], [G.weather.kind, amt]]) {
+    if (kind === 'clear' || a <= 0.01) continue;
+    const L = WEATHER_LOOK[kind];
+    ctx.fillStyle = alpha(L.tint, L.a * a); ctx.fillRect(0, 0, cw, ch);
+    if (reduceMotion) continue;
+    const area = cw * ch;
+    if (kind === 'rain') {
+      ctx.strokeStyle = `rgba(205,218,236,${0.45 * a})`; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0, n = Math.round(area / 7000); i < n; i++) {
+        const y = (hash01(i, 1) * (ch + 40) + now * (0.6 + hash01(i, 3) * 0.3)) % (ch + 40) - 20;
+        const x = (hash01(i, 2) * cw + y * 0.25) % cw;
+        ctx.moveTo(x, y); ctx.lineTo(x - 3, y - 11);
+      }
+      ctx.stroke();
+    } else if (kind === 'snow') {
+      ctx.fillStyle = `rgba(255,255,255,${0.85 * a})`;
+      for (let i = 0, n = Math.round(area / 5500); i < n; i++) {
+        const y = (hash01(i, 1) * ch + now * 0.035 * (0.6 + hash01(i, 3))) % ch;
+        const x = (hash01(i, 2) * cw + Math.sin(now / 900 + i) * 12 + cw) % cw;
+        ctx.beginPath(); ctx.arc(x, y, 0.9 + hash01(i, 4) * 1.4, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (kind === 'dust') {
+      ctx.strokeStyle = `rgba(222,186,128,${0.4 * a})`; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (let i = 0, n = Math.round(area / 9000); i < n; i++) {
+        const x = (hash01(i, 2) * (cw + 80) + now * 0.32 * (0.7 + hash01(i, 3))) % (cw + 80) - 40;
+        const y = hash01(i, 1) * ch + Math.sin(now / 500 + i) * 5;
+        ctx.moveTo(x, y); ctx.lineTo(x - 16 - hash01(i, 4) * 10, y + 1.5);
+      }
+      ctx.stroke();
+    } else if (kind === 'heat') {
+      ctx.strokeStyle = `rgba(255,228,180,${0.12 * a})`; ctx.lineWidth = 2;
+      for (let i = 0; i < 7; i++) {
+        const y0 = ((i + 0.5) / 7 * ch + now * 0.012) % ch;
+        ctx.beginPath();
+        for (let x = 0; x <= cw; x += 16) ctx.lineTo(x, y0 + Math.sin(x / 40 + now / 300 + i) * 3);
+        ctx.stroke();
+      }
+    } else if (kind === 'mist') {
+      ctx.fillStyle = `rgba(226,226,238,${0.11 * a})`;
+      for (let i = 0; i < 9; i++) {
+        const x = (hash01(i, 2) * (cw + 500) + now * 0.018 * (0.5 + hash01(i, 3))) % (cw + 500) - 250;
+        const y = hash01(i, 1) * ch;
+        ctx.beginPath(); ctx.ellipse(x, y, 240, 70, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+}
+
 function drawThreats(now) {
   const inc = incomingFor(1);
   for (const p of G.planets) {
@@ -798,6 +860,7 @@ function draw(now) {
 
   // Map-wide tints while a power is active.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawWeather(now);
   for (const o of G.owners) {
     const id = army(o).power.id;
     if (!powerOn(o, id)) continue;

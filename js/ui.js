@@ -50,6 +50,12 @@ on('power', ({ o, army: A }) => {
   if (o !== 1) taunt(o, 'power', true);
 });
 on('powerReady', ({ o }) => { if (o === 1 && !G.cfg.demo) sfx.chime(); });
+on('weather', ({ kind, prev }) => {
+  if (G.cfg.demo) return;
+  if (kind === 'clear') { toast(`The ${WEATHER[prev].name.toLowerCase()} clears`, 'Marching, training and sight are back to normal.', '#cbbb92'); return; }
+  const W = WEATHER[kind], home = G.owners.find(o => G.fac[o] === W.native);
+  toast(W.name, W.desc + (home ? ` ${home === 1 ? 'Your troops are' : army(home).full + ' are'} used to it and unaffected.` : ''), '#cbbb92');
+});
 on('taunt', ({ o, kind, force }) => taunt(o, kind, force));
 on('clash', ({ attacker, defender, road }) => { if (!G.cfg.demo && (road || attacker === 1 || defender === 1)) sfx.clash(); });
 on('capture', ({ o, was, castle }) => {
@@ -90,7 +96,8 @@ function hud() {
   } else {
     const rivals = G.owners.slice(1).map(o => `${lordOf(o).short} of ${army(o).name}`).join(' & ');
     const label = G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name} vs ${rivals}` : `${DIFF_NAME[G.cfg.diff]} · vs ${rivals}`;
-    statusEl.textContent = `${label} · ${fmtTime(G.time)}`;
+    const sky = [G.weather && G.weather.kind !== 'clear' ? WEATHER[G.weather.kind].name : '', nightAmt() > 0.5 ? 'Night' : ''].filter(Boolean).join(', ');
+    statusEl.textContent = `${label} · ${fmtTime(G.time)}${sky ? ' · ' + sky : ''}`;
   }
   updatePowerPanel();
   updateCastlePanel();

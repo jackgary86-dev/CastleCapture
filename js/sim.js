@@ -356,6 +356,7 @@ function newGame(cfg, portrait = false) {
     intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {}, weakSince: {}, surrendered: new Set(),
     coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
     roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0, sight: {}, sightClock: 0,
+    weather: { kind: 'clear', prev: 'clear', since: -WEATHER_FADE, until: WEATHER_FIRST },
     seen: Object.fromEntries(owners.map(o => [o, map.planets.map(p => ({ owner: p.owner, units: p.units }))])),
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
   };
@@ -376,7 +377,7 @@ const col = o => o ? army(o).color : NEUTRAL;
 const powerOn = (o, id) => o && army(o).power.id === id && G.time < G.pw[o].until;
 const atkOf = o => army(o).stats.atk * (powerOn(o, 'bloodMoon') ? 1.5 : 1);
 const defOf = o => o ? army(o).stats.def * (powerOn(o, 'stoneOath') ? 2 : 1) : 1;
-const speedOf = o => SPEED * (G.cfg.speedMul ?? 1) * army(o).stats.speed * (powerOn(o, 'bloodMoon') ? 2 : 1);
+const speedOf = o => SPEED * (G.cfg.speedMul ?? 1) * army(o).stats.speed * (powerOn(o, 'bloodMoon') ? 2 : 1) * weatherMul(o, 'speed');
 const rechargeTime = () => G.cfg.recharge ?? RECHARGE;
 const roadOf = o => atkOf(o) * army(o).stats.road;
 // Amaru, as an AI rival, bribes the garrisons of unclaimed keeps in his first minute: they count 1.6×.
@@ -398,7 +399,7 @@ const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o 
 const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPKEEP_AT ? 0.5 : 1;
 // Harvest map event (#35): one kingdom trains faster for a while, shaped like a power.
 const harvestMul = o => G.ev && G.ev.harvest && G.ev.harvest.o === o && G.time < G.ev.harvest.until ? 1.5 : 1;
-const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) : 0;
+const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() : 0;
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.
 const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1);
 // Enemy Great Wards halve marching speed inside them.
@@ -532,8 +533,9 @@ const SIGHT_CASTLE = 200, SIGHT_COLUMN = 85, SIGHT_EVERY = 0.2;
 function updateSight() {
   for (const o of G.owners) {
     const src = [];
-    for (const p of G.planets) if (p.owner === o) src.push({ x: p.x, y: p.y, r: SIGHT_CASTLE + p.r });
-    for (const k of G.packets) if (k.owner === o && k.delay <= 0) src.push({ x: k.x, y: k.y, r: SIGHT_COLUMN });
+    const far = weatherMul(o, 'sight');
+    for (const p of G.planets) if (p.owner === o) src.push({ x: p.x, y: p.y, r: (SIGHT_CASTLE + p.r) * far });
+    for (const k of G.packets) if (k.owner === o && k.delay <= 0) src.push({ x: k.x, y: k.y, r: SIGHT_COLUMN * far });
     G.sight[o] = src;
     const mem = G.seen[o];
     for (const p of G.planets) if (seesAt(o, p.x, p.y)) mem[p.id] = { owner: p.owner, units: p.units };
@@ -580,6 +582,36 @@ function launch(owner, s, target, n) {
     });
   }
 }
+
+// ---------- weather and day/night ----------
+// G.weather alternates between a spell of the homeland's weather and a spell of clear skies.
+function updateWeather() {
+  const W = G.weather;
+  if (G.time < W.until) return;
+  const pool = G.theme.weather || [];
+  if (G.cfg.tutorial || !pool.length) { W.until = 1e9; return; }
+  W.prev = W.kind;
+  W.kind = W.kind === 'clear' ? pick(pool) : 'clear';
+  W.since = G.time;
+  W.until = G.time + WEATHER_SPELL[0] + Math.random() * (WEATHER_SPELL[1] - WEATHER_SPELL[0]);
+  emit('weather', { kind: W.kind, prev: W.prev });
+}
+// How far the current weather has set in, 0 to 1.
+const weatherAmt = () => G.weather ? Math.min(1, (G.time - G.weather.since) / WEATHER_FADE) : 1;
+// A weather multiplier for kingdom o, blending out of the last weather as the new one sets in.
+function weatherMul(o, key) {
+  const W = G.weather;
+  if (!W) return 1;
+  const at = k => o && WEATHER[k].native === G.fac[o] ? 1 : WEATHER[k][key];
+  const a = weatherAmt();
+  return at(W.kind) * a + at(W.prev) * (1 - a);
+}
+// Night, 0 at day to 1 at the darkest hour. A battle starts at dawn; the first night peaks at DAY_LENGTH / 2.
+function nightAmt() {
+  const glow = (1 - Math.cos((G.time / DAY_LENGTH) * Math.PI * 2)) / 2;
+  return Math.max(0, Math.min(1, (glow - 0.5) * 2));
+}
+const nightProd = () => 1 - (1 - NIGHT_PROD) * nightAmt();
 
 function incomingTable() {
   const inc = G.planets.map(() => new Array(G.owners.length + 2).fill(0));   // + the bandit column (owner id owners.length + 1)
@@ -940,6 +972,7 @@ function aiBuyUnit(ai, mine) {
 // ---------- simulation ----------
 function update(dt) {
   G.time += dt;
+  if (G.weather) updateWeather();
   if (G.cfg.fog && (G.sightClock += dt) >= SIGHT_EVERY) { G.sightClock = 0; updateSight(); }
   for (const p of G.planets) {
     const cap = capOf(p);

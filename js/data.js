@@ -36,6 +36,22 @@ const KIND_SHARE = 0.25;
 const GARRISON_CAP = [0, 60, 90, 120];
 const WALL_CAP = 15;
 const DESERT_RATE = 0.05;     // troops above the cap desert at this fraction of the excess per second
+// Weather that drifts across a homeland during a battle (THEMES[...].weather lists which kinds).
+// speed: marching speed; prod: training; sight: fog-of-war sight. The army whose homeland it is
+// (native) is used to it and ignores the effects.
+const WEATHER = {
+  clear: { name: 'Clear skies', speed: 1, prod: 1, sight: 1 },
+  rain:  { name: 'Rain', desc: 'The roads turn to mud: troops march 10% slower.', speed: 0.9, prod: 1, sight: 0.85, native: 'aldmere' },
+  dust:  { name: 'Dust storm', desc: 'Troops march 15% slower and see less.', speed: 0.85, prod: 1, sight: 0.65, native: 'kharzul' },
+  snow:  { name: 'Snowfall', desc: 'Troops march 15% slower.', speed: 0.85, prod: 1, sight: 0.85, native: 'frostmark' },
+  heat:  { name: 'Scorching heat', desc: 'Castles train 15% slower.', speed: 1, prod: 0.85, sight: 1, native: 'solmara' },
+  mist:  { name: 'Mist', desc: 'Troops see half as far and march 5% slower.', speed: 0.95, prod: 1, sight: 0.5, native: 'nyx' },
+};
+const WEATHER_FIRST = 30;          // seconds of clear skies at the start of a battle
+const WEATHER_SPELL = [40, 70];    // each spell of weather, or of clear skies, lasts this long
+const WEATHER_FADE = 4;            // seconds for weather to set in or clear
+const DAY_LENGTH = 240;            // one full day and night, in seconds
+const NIGHT_PROD = 0.9;            // training at the darkest hour of the night
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
 // Grand Campaign (#46): a wave-based mode with all five armies on one large map.
 const GRAND = {
@@ -283,11 +299,11 @@ const portraitHtml = id => `<span class="portrait" style="--c:${ARMIES[id].color
 
 // Homeland maps: ground, roads, scenery and the style of unclaimed keeps.
 const THEMES = {
-  vale:   { bg: '#263220', field: '#33432a', lit: '#3d5031', road: '#8d7a55', ring: PARCH, tree: 'oak',   trees: 90, clump: 0.7, rocks: 0,  pools: 3, pool: '#3f6a7a', castle: 'stone', river: true, forest: true, water: '#3f6a7a', bank: '#6d6a44', wood: '#283a1f', dust: '#b9a27a' },
-  steppe: { bg: '#4a3a20', field: '#6c5a32', lit: '#7b683c', road: '#a88d5a', ring: PARCH, tree: 'shrub', trees: 45, clump: 0.4, rocks: 28, pools: 0, pool: '#5c7480', castle: 'palisade', river: true, forest: false, water: '#4c6c78', bank: '#8f7a4c', wood: '#5a4a28', dust: '#c9a46a' },
-  tundra: { bg: '#8a96a2', field: '#c3cdd6', lit: '#d8e0e7', road: '#8d98a3', ring: INK,   tree: 'pine',  trees: 85, clump: 0.75, rocks: 14, pools: 3, pool: '#9fbfd2', castle: 'longhouse', river: true, forest: true, water: '#7ea6c0', bank: '#e9eff3', wood: '#aab7b4', dust: '#ffffff' },
-  desert: { bg: '#9a7843', field: '#c8a462', lit: '#d6b574', road: '#a3824a', ring: INK,   tree: 'palm',  trees: 30, clump: 0,  rocks: 10, pools: 4, pool: '#3f8fa0', castle: 'domes', river: false, forest: false, water: '#3f8fa0', bank: '#b8955a', wood: '#b8955a', dust: '#efdcae' },
-  mire:   { bg: '#16131c', field: '#28242f', lit: '#332d3d', road: '#5a4f68', ring: PARCH, tree: 'dead',  trees: 60, clump: 0.6, rocks: 0,  pools: 9, pool: '#1a1426', castle: 'spires', river: true, forest: true, water: '#120d1c', bank: '#463d55', wood: '#1f1a27', dust: '#8a7ea0' },
+  vale:   { bg: '#263220', field: '#33432a', lit: '#3d5031', road: '#8d7a55', ring: PARCH, tree: 'oak',   trees: 90, clump: 0.7, rocks: 0,  pools: 3, pool: '#3f6a7a', castle: 'stone', weather: ['rain'], river: true, forest: true, water: '#3f6a7a', bank: '#6d6a44', wood: '#283a1f', dust: '#b9a27a' },
+  steppe: { bg: '#4a3a20', field: '#6c5a32', lit: '#7b683c', road: '#a88d5a', ring: PARCH, tree: 'shrub', trees: 45, clump: 0.4, rocks: 28, pools: 0, pool: '#5c7480', castle: 'palisade', weather: ['dust'], river: true, forest: false, water: '#4c6c78', bank: '#8f7a4c', wood: '#5a4a28', dust: '#c9a46a' },
+  tundra: { bg: '#8a96a2', field: '#c3cdd6', lit: '#d8e0e7', road: '#8d98a3', ring: INK,   tree: 'pine',  trees: 85, clump: 0.75, rocks: 14, pools: 3, pool: '#9fbfd2', castle: 'longhouse', weather: ['snow'], river: true, forest: true, water: '#7ea6c0', bank: '#e9eff3', wood: '#aab7b4', dust: '#ffffff' },
+  desert: { bg: '#9a7843', field: '#c8a462', lit: '#d6b574', road: '#a3824a', ring: INK,   tree: 'palm',  trees: 30, clump: 0,  rocks: 10, pools: 4, pool: '#3f8fa0', castle: 'domes', weather: ['heat', 'dust'], river: false, forest: false, water: '#3f8fa0', bank: '#b8955a', wood: '#b8955a', dust: '#efdcae' },
+  mire:   { bg: '#16131c', field: '#28242f', lit: '#332d3d', road: '#5a4f68', ring: PARCH, tree: 'dead',  trees: 60, clump: 0.6, rocks: 0,  pools: 9, pool: '#1a1426', castle: 'spires', weather: ['mist', 'rain'], river: true, forest: true, water: '#120d1c', bank: '#463d55', wood: '#1f1a27', dust: '#8a7ea0' },
 };
 
 const LEVELS = [
