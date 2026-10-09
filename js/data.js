@@ -349,28 +349,30 @@ const THEMES = {
 // `reach` is how close a column must pass to be attacked; `speed` is in world units per second during a march;
 // `regen` is health recovered per wave when nothing fought it; `payout` goes to whoever lands the final blow and
 // `respawn` is how many waves it stays gone. `special` names a small hook in js/monsters.js. The bandit gang is
-// `count` captains with `hp` each, and `bonus` goes to whoever kills the last of them.
+// `count` captains with `hp` each, and `bonus` goes to whoever kills the last of them. `title` and `captains` are the
+// names the codex (art/gallery.js) uses; keep the numbers here and there in step.
 const MONSTERS = {
   wyrm: {
-    name: 'the Wyrm of the Wastes', short: 'Wyrm', art: 'wyrm', color: '#8fb57a',
+    name: 'the Wyrm of the Wastes', title: 'the Wyrm of the Wastes', short: 'the Wyrm', art: 'wyrm', color: '#8fb57a',
     hp: 600, bite: 3, reach: 24, speed: 76, regen: 40, payout: 150, respawn: 10, special: null,
     desc: 'A long serpent that wanders the realm, skirting the castles, and attacks any column that strays within its reach.',
   },
   dragon: {
-    name: 'the Red Dragon', short: 'Dragon', art: 'dragon', color: '#e0362f',
+    name: 'the Red Dragon', title: 'Vaelthyr the Red', short: 'Vaelthyr', art: 'dragon', color: '#e0362f',
     hp: 700, bite: 3, reach: 24, speed: 110, regen: 60, payout: 180, respawn: 10, special: 'fire', flies: true,
     fireReach: 60, fireBurn: 0.2,
     desc: 'Flies in straight lines, and breathes fire on the nearest column or castle when it lands, burning a fifth of it. Perches on the mountain at the centre of the map, where the richest keeps are.',
   },
   cyclops: {
-    name: 'the Cyclops', short: 'Cyclops', art: 'cyclops', color: '#c9a66b',
+    name: 'the Cyclops', title: 'Old Grom of the Fells', short: 'Old Grom', art: 'cyclops', color: '#c9a66b',
     hp: 900, bite: 4, reach: 24, speed: 42, regen: 50, payout: 220, respawn: 10, special: 'smash', roads: true,
     smashGarrison: 0.3, sleepMul: 1.5,
     desc: 'Slow and ground-bound, it follows the roads, so its route can be read a wave ahead. A castle it walks into loses 30% of its garrison and an upgrade level. It sleeps where it stops; troops that catch it asleep strike 1.5× for that wave.',
   },
   bandits: {
-    name: 'the Bandit Gang', short: 'Bandits', art: 'bandit', color: '#b08a4a',
-    hp: 120, count: 5, bite: 2, reach: 24, speed: 70, regen: 30, payout: 50, bonus: 150, respawn: 10, special: 'raid', forest: true,
+    name: 'the Bandit Gang', title: 'the Blackwood Five', short: 'the Five', art: 'bandit', color: '#b08a4a',
+    captains: ['Redcap Morrow', 'Sister Ash', 'Halvard Halfhand', 'Pell the Quiet', 'Dunya Three-Rings'],
+    hp: 120, count: 5, bite: 3, reach: 24, speed: 70, regen: 30, payout: 50, bonus: 150, respawn: 10, special: 'raid', forest: true,
     raidCoins: 0.25, raidGarrison: 0.1,
     desc: 'Five bandit captains who roam the woods separately, ambush columns among the trees, and raid castles for a quarter of their coins. Each pays 50 coins; whoever kills the last captain gets 150 more. They heal at their camp, and a big enough raid on the camp kills every captain there at once.',
   },

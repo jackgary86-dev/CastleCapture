@@ -219,7 +219,7 @@ function marchStart() {
     } else if (M.special === 'raid') {
       c.flee = false;
       if (c.hp < c.maxHp * 0.5 || c.raided) { c.dest = { ...Mo.camp, camp: true }; c.raided = false; }
-      else if (Math.random() < 0.4) {
+      else if (Math.random() < 0.25) {
         const targets = G.planets.filter(p => p.owner && dist(p, Mo.camp) < 560);
         const t = targets.length ? pick(targets) : null;
         c.dest = t ? { x: t.x, y: t.y, id: t.id, raid: true } : null;
@@ -555,15 +555,17 @@ function routeAiColumns() {
 }
 
 // ---------- pointer targets ----------
+// At the whole-map view a creature is a few pixels wide, so sprites, bars and hit areas grow as the view zooms out.
+const monsterScale = () => typeof sc === 'number' && sc > 0 ? Math.max(1, 0.8 / sc) : 1;
 // The creature (or bandit camp) under a world point, for dragging troops onto it.
 function monsterAt(w) {
   if (!G || !G.monster) return null;
-  const scale = typeof sc === 'number' ? sc : 1;
+  const scale = typeof sc === 'number' ? sc : 1, k = monsterScale();
   const hits = [...liveCreatures(), ...(G.monster.camp ? [G.monster.camp] : [])];
   let best = null, bd = Infinity;
   for (const c of hits) {
     const d = Math.hypot(c.x - w.x, (c.y - w.y) * 0.85);
-    if (d < c.r * 1.2 + 12 / scale && d < bd) { best = c; bd = d; }
+    if (d < c.r * 1.2 * k + 12 / scale && d < bd) { best = c; bd = d; }
   }
   return best;
 }
@@ -618,6 +620,8 @@ function drawMonsterGround(now) {
 // The creatures are drawn in the same ink-outlined style as the castles.
 function drawMonster(c, now) {
   const M = MONSTERS[G.monster.id], t = reduceMotion ? 0 : now / 1000, x = c.x, y = c.y, d = c.dir || 1;
+  const k = monsterScale();
+  ctx.save(); ctx.translate(x, y); ctx.scale(k, k); ctx.translate(-x, -y);
   const hovered = typeof ptr === 'object' && ptr.hover === c;
   if (hovered) {
     ctx.save(); ctx.translate(x, y + 8); ctx.scale(1, 0.5);
@@ -689,15 +693,17 @@ function drawMonster(c, now) {
     poly([[x, y - 20], [x + 9, y - 18 + wave], [x, y - 14]], '#1a1410');
   }
   ctx.lineJoin = 'miter';
+  ctx.restore();
 }
 
 // Health bars with a coloured segment per army for the damage it has dealt, and the creature's name.
 function drawMonsterBars(now) {
   const Mo = G.monster;
   if (!Mo) return;
-  const M = MONSTERS[Mo.id];
+  const M = MONSTERS[Mo.id], k = monsterScale();
   for (const c of Mo.creatures) {
     if (c.dead) continue;
+    ctx.save(); ctx.translate(c.x, c.y); ctx.scale(k, k); ctx.translate(-c.x, -c.y);
     const w = M.count ? 34 : 48, h = 5, x = c.x - w / 2, y = c.y + 14;
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(x - 1, y - 1, w + 2, h + 2, 2); ctx.fill();
     let px = x;
@@ -707,11 +713,12 @@ function drawMonsterBars(now) {
     }
     ctx.fillStyle = '#e8e0cc'; ctx.fillRect(px, y, Math.max(0, x + w - px), h);
     ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.strokeRect(x, y, w, h);
-    const label = M.count ? `Captain ${Math.ceil(c.hp)}` : `${M.name.replace(/^the /, '')} ${Math.ceil(c.hp)}`;
+    const label = `${M.captains ? M.captains[c.idx % M.captains.length] : (M.title || M.name).replace(/^the /i, '')} ${Math.ceil(c.hp)}`;
     ctx.font = `700 ${M.count ? 9 : 11}px "Alegreya Sans", system-ui, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,8,6,0.8)'; ctx.strokeText(label, c.x, y + h + 2);
     ctx.fillStyle = c.hp / c.maxHp < SWARM_AT ? '#ffb3ad' : PARCH; ctx.fillText(label, c.x, y + h + 2);
+    ctx.restore();
   }
   if (Mo.respawnWave !== null && !liveCreatures().length && Mo.warned) {
     // The wave before it returns, a warning is drawn where it will appear: at the lair or camp, or anywhere.
@@ -765,12 +772,14 @@ function drawMonsterFx(f, now) {
 // The simulation reports through 'monster' events; the page turns them into banners. Headless runs have no toast().
 on('monster', e => {
   if (typeof toast !== 'function' || !G || G.cfg.demo) return;
-  const M = e.monster, name = M.name[0].toUpperCase() + M.name.slice(1);
+  const M = e.monster, title = M.title || M.name, name = title[0].toUpperCase() + title.slice(1);
+  const captain = e.creature && M.captains ? M.captains[e.creature.idx % M.captains.length] : null;
   const who = o => o === 1 ? 'You' : army(o).full;
   const whose = o => o === 1 ? 'your' : `${army(o).name}'s`;
   if (e.kind === 'slain') {
     const extra = e.last && M.bonus ? ` The last captain: +${M.bonus} bonus.` : '';
-    toast(e.o === 1 ? `You slew ${M.name}!` : `${who(e.o)} slays ${M.name}!`, `${e.o === 1 ? 'You take' : `${lordOf(e.o).short} takes`} the bounty: ${Math.round(e.coins)} coins.${extra}`, col(e.o));
+    const slainName = captain || title;
+    toast(e.o === 1 ? `You slew ${slainName}!` : `${who(e.o)} slays ${slainName}!`, `${e.o === 1 ? 'You take' : `${lordOf(e.o).short} takes`} the bounty: ${Math.round(e.coins)} coins.${extra}`, col(e.o));
     sfx.horn(e.o === 1);
   } else if (e.kind === 'warning') toast(`${name} stirs`, `It returns next wave${G.monster.lair ? ' to its lair' : G.monster.camp ? ' to its camp' : ', far from every castle'}.`, M.color);
   else if (e.kind === 'spawn') { toast(`${name} is abroad again`, M.desc, M.color); sfx.drum(); }
