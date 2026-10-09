@@ -6,6 +6,12 @@ A medieval real-time strategy game that runs in the browser. Choose one of five 
 
 Open `index.html` in any modern browser. There's no build step and nothing to install.
 
+### Install on Windows
+
+To get a Start menu and desktop shortcut, double-click `install/Install Castle Siege.cmd`. The installer needs no admin rights. It copies the game to `%LOCALAPPDATA%\Programs\Castle Siege`, and the shortcuts open it in its own Edge app window, or in the default browser if Edge is missing. It also lists the game under Settings > Apps, so you can uninstall it there.
+
+Run the installer again after pulling new commits to update the game. Saved games live in the browser's storage, so updating or uninstalling never touches them. The game's fonts load from Google Fonts. Offline, it falls back to the system's serif and sans-serif fonts.
+
 ## Features
 
 - **Five armies**, each with its own castles, banners, soldiers, homeland map, music, strengths, special power and AI personality, commanded by a **named rival lord** who taunts you and plays in character.
