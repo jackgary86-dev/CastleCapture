@@ -948,23 +948,31 @@ btnAll.addEventListener('click', selectAll);
 btnPower.addEventListener('click', playerPower);
 $('btnFight').addEventListener('click', startBattle);
 
-const btnSound = $('btnSound');
-function toggleSound() {
-  sfx.setMuted(!sfx.muted);
-  btnSound.textContent = sfx.muted ? 'Muted' : 'Sound on';
-  btnSound.setAttribute('aria-pressed', String(!sfx.muted));
+// Header toggles carry an icon and a label; at mid widths only the icon shows and the label stays for
+// screen readers (see .tb-ic / .tb-lbl in index.html).
+const SPEAKER = '<path d="M3 6h3l4-3v10l-4-3H3z" fill="currentColor"/>';
+const TOGGLE_ICONS = {
+  sound: SPEAKER + '<path d="M12 5.5a3.5 3.5 0 0 1 0 5M13.5 3.5a6 6 0 0 1 0 9" stroke="currentColor" fill="none" stroke-width="1.3" stroke-linecap="round"/>',
+  muted: SPEAKER + '<path d="M11.5 6l3.5 4M15 6l-3.5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  music: '<path d="M6 12V3.5l7-1.5V10" stroke="currentColor" fill="none" stroke-width="1.4"/><circle cx="4.5" cy="12" r="1.8" fill="currentColor"/><circle cx="11.5" cy="10" r="1.8" fill="currentColor"/>',
+  quiet: '<path d="M6 12V3.5l7-1.5V10" stroke="currentColor" fill="none" stroke-width="1.4" opacity="0.5"/><circle cx="4.5" cy="12" r="1.8" fill="currentColor" opacity="0.5"/><circle cx="11.5" cy="10" r="1.8" fill="currentColor" opacity="0.5"/><path d="M2 2l13 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+};
+function setToggle(btn, icon, label) {
+  btn.innerHTML = `<svg class="tb-ic" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">${TOGGLE_ICONS[icon]}</svg><span class="tb-lbl"></span>`;
+  btn.querySelector('.tb-lbl').textContent = label;
 }
+
+const btnSound = $('btnSound');
+const showSound = () => { setToggle(btnSound, sfx.muted ? 'muted' : 'sound', sfx.muted ? 'Muted' : 'Sound on'); btnSound.setAttribute('aria-pressed', String(!sfx.muted)); };
+function toggleSound() { sfx.setMuted(!sfx.muted); showSound(); }
 btnSound.addEventListener('click', toggleSound);
-btnSound.textContent = sfx.muted ? 'Muted' : 'Sound on';
+showSound();
 
 const btnMusic = $('btnMusic');
-function toggleMusic() {
-  sfx.music.setOn(!sfx.music.on);
-  btnMusic.textContent = sfx.music.on ? 'Music on' : 'Music off';
-  btnMusic.setAttribute('aria-pressed', String(sfx.music.on));
-}
+const showMusic = () => { setToggle(btnMusic, sfx.music.on ? 'music' : 'quiet', sfx.music.on ? 'Music on' : 'Music off'); btnMusic.setAttribute('aria-pressed', String(sfx.music.on)); };
+function toggleMusic() { sfx.music.setOn(!sfx.music.on); showMusic(); }
 btnMusic.addEventListener('click', toggleMusic);
-btnMusic.textContent = sfx.music.on ? 'Music on' : 'Music off';
+showMusic();
 
 resize();
 toMenu();

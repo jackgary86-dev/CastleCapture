@@ -36,6 +36,18 @@ h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; 
 /* On phones the status line wraps rather than widening the page (#56). */
 @media (max-width: 560px) { #status { white-space: normal; } }
 .tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.tb-ic { display: none; vertical-align: -3px; }
+/* Laptop and tablet widths: drop the group labels and key hints, show sound and music as icons,
+   and tighten the buttons so the controls stay on one row. */
+@media (min-width: 561px) and (max-width: 1199px) {
+  .tools { gap: 4px; }
+  .tools .sendctl > span, .tools .sendctl kbd { display: none; }
+  .tools .sendctl button:first-of-type { border-left: 0; }
+  .tools .sendctl button { padding: 5px 7px; }
+  .tools > button { padding: 5px 8px; }
+  .tb-ic { display: inline-block; }
+  .tb-lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 button { font: inherit; font-weight: 500; color: var(--text); background: transparent; border: 1px solid var(--edge); border-radius: 4px; padding: 5px 12px; cursor: pointer; }
 button:hover:not(:disabled) { border-color: var(--muted); }
 button:focus-visible { outline: 2px solid #e9b43b; outline-offset: 2px; }
