@@ -56,7 +56,11 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 - **Rally points:** right-drag (or Shift-drag, or long-press then drag on touch) from one of your castles to another, and its new troops march there automatically, leaving 5 at home. Right-click the castle to clear it; the route also breaks if either castle is lost.
 - **Upkeep:** a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when.
 - **Bigger castles** train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.
-- **Space** selects all your castles. **[** and **]** (or the Speed buttons) change the game speed: 1×, 1.5× or 2×. **P** pauses. **M** mutes the sound.
+- **Space** selects all your castles. **[** and **]** (or the Speed buttons) change the game speed: 1×, 1.5× or 2×. **P** pauses. **M** mutes sound effects and **N** the music.
+
+## Music
+
+Each homeland has its own synthesised theme (no audio files): a lute-like air in the Vale of Aldmere, droning saws and frame drums on the Red Steppe, slow bells in the Frostmark Fjords, a Hijaz melody and hand drums in the Sunscorched Sands, and a beating drone in Nyxhollow Mire. The music swells with the fighting, adding drums and quicker, higher lines when armies are on the march, clashing, or using a special power. The Music button or **N** turns it on or off, separately from the sound effects.
 
 ## Modes
 
