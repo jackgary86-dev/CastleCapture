@@ -72,9 +72,9 @@
     const fog = hex(T.fog);
     if (fog) { const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, alpha(fog, 0.45)); g.addColorStop(0.6, alpha(fog, 0)); c.fillStyle = g; c.fillRect(0, 0, W, H); }
     // A river, or a lava fissure that glows: a wandering ribbon across the map.
-    const lava = hex(T.lava), pool = hex(T.pool);
-    if (lava || (T.pools > 0 && pool)) {
-      const col = lava || pool;
+    const lava = hex(T.lava), pool = hex(T.pool), water = hex(T.water) || pool;
+    if (lava || (T.river && water) || (T.pools > 0 && pool)) {
+      const col = lava || water;
       const pts = []; let x = -10, y = H * (0.3 + rnd() * 0.4);
       while (x < W + 10) { pts.push([x, y]); x += 18 + rnd() * 14; y += (rnd() - 0.5) * 26; y = Math.max(12, Math.min(H - 12, y)); }
       if (lava) { c.strokeStyle = alpha(lava, 0.35); c.lineWidth = 11; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); pts.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py)); c.stroke(); }
@@ -87,18 +87,19 @@
     }
     // Pools where the theme has standing water but no river in this thumbnail.
     if (pool && T.pools > 3) for (let i = 0; i < 3; i++) { c.fillStyle = pool; c.beginPath(); c.ellipse(rnd() * W, rnd() * H, 6 + rnd() * 8, 3 + rnd() * 4, 0, 0, Math.PI * 2); c.fill(); }
-    // Roads: the five realms round a central keep.
+    // Roads: the five realms round a central keep. Forest tracks are drawn dashed.
+    const forest = T.forest === true ? 1 : (T.forest || 0);
     const cx = W / 2, cy = H / 2 + 2, R = Math.min(W, H) * 0.4;
     const posts = ARMY_IDS.map((_, i) => { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; return [cx + Math.cos(a) * R * 1.2, cy + Math.sin(a) * R * 0.85]; });
-    c.strokeStyle = alpha(hex(T.road) || '#8d7a55', 0.8); c.lineWidth = 1.5; c.setLineDash(T.forest ? [3, 3] : []);
+    c.strokeStyle = alpha(hex(T.road) || '#8d7a55', 0.8); c.lineWidth = 1.5; c.setLineDash(forest ? [3, 3] : []);
     for (let i = 0; i < 5; i++) {
       c.beginPath(); c.moveTo(...posts[i]); c.lineTo(cx, cy); c.stroke();
       c.beginPath(); c.moveTo(...posts[i]); c.lineTo(...posts[(i + 1) % 5]); c.stroke();
     }
     c.setLineDash([]);
     // Scenery: trees in the theme's style, boulders and rocks.
-    const trees = Math.min(120, (T.trees || 40) + (T.forest || 0) * 20), tree = T.tree || 'oak';
-    const dark = mixc(bg, '#000000', 0.35), leaf = mixc(field, '#1c2a16', 0.45);
+    const trees = Math.min(120, (T.trees || 40) + forest * 20), tree = T.tree || 'oak';
+    const dark = mixc(bg, '#000000', 0.35), leaf = hex(T.wood) || mixc(field, '#1c2a16', 0.45);
     for (let i = 0; i < trees; i++) {
       const x = rnd() * W, y = rnd() * H;
       if (Math.hypot(x - cx, y - cy) < 11) continue;
