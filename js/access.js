@@ -83,7 +83,12 @@ drawCastle = function (p, now) {
 let kbFocus = null;   // the castle the keyboard cursor is on
 on('newGame', () => { kbFocus = null; });
 
-const castleName = p => p.owner === 0 ? 'Unclaimed keep' : p.owner === 1 ? 'Your castle' : `${army(p.owner).name} castle`;
+// Names the castle's kind (fortress, war camp, village) when it has one.
+const KIND_NAME = { fortress: 'fortress', camp: 'war camp', village: 'village' };
+const castleName = p => {
+  const kind = KIND_NAME[p.kind] || (p.owner === 0 ? 'keep' : 'castle');
+  return p.owner === 0 ? `Unclaimed ${kind}` : p.owner === 1 ? `Your ${kind}` : `${army(p.owner).name} ${kind}`;
+};
 const describe = p => `${castleName(p)}, ${Math.floor(p.units)} troops${sel.has(p) ? ', selected' : ''}`;
 
 function moveFocus(p) { kbFocus = p; announce(describe(p)); }
@@ -124,7 +129,8 @@ function confirmKey(sendHere) {
 }
 
 addEventListener('keydown', e => {
-  if (!playable() || e.target.closest('button, input, select, textarea, a')) return;
+  // Key events can target the document or window, which have no closest().
+  if (!playable() || (e.target.closest && e.target.closest('button, input, select, textarea, a'))) return;
   const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
   if (e.key === 'Tab') { e.preventDefault(); cycleOwn(e.shiftKey); }
   else if (dirs[e.key]) { e.preventDefault(); stepFocus(...dirs[e.key]); }
