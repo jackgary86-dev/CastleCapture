@@ -43,16 +43,42 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .sendctl button { border: 0; border-left: 1px solid var(--edge); border-radius: 0; padding: 5px 9px; font-variant-numeric: tabular-nums; }
 .sendctl button[aria-pressed="true"] { background: var(--army); color: var(--army-ink); font-weight: 800; }
 .sendctl button kbd { font: inherit; font-size: 10px; opacity: 0.6; margin-right: 3px; }
-#btnPower { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--army) 35%, transparent) var(--charge, 0%), transparent var(--charge, 0%)); }
-#btnPower svg { width: 16px; height: 16px; color: var(--army); flex: none; }
-#btnPower.ready { border-color: var(--army); background: color-mix(in srgb, var(--army) 22%, transparent); animation: glow 1.6s ease-in-out infinite; }
-#btnPower.active { border-color: var(--army); background: var(--army); color: var(--army-ink); font-weight: 800; }
-#btnPower.active svg { color: var(--army-ink); }
-@keyframes glow { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--army) 35%, transparent); } }
-#board { flex: 1; position: relative; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; overflow: hidden; }
+/* Special power panel, top left of the map */
+#powerPanel { position: absolute; top: 12px; left: 12px; width: min(290px, calc(100% - 24px)); padding: 10px 12px; border-radius: 6px;
+  background: rgb(23 20 14 / 0.9); border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); display: grid; gap: 6px; z-index: 1; }
+#powerPanel.ready { border-color: var(--army); animation: glow 1.6s ease-in-out infinite; }
+#powerPanel.active { border-color: var(--army); background: color-mix(in srgb, var(--army) 28%, rgb(23 20 14 / 0.92)); }
+#btnPower { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; text-align: left; width: 100%; }
+#btnPower:disabled { opacity: 1; cursor: default; }
+#btnPower:hover:not(:disabled) .pp-name { text-decoration: underline; }
+.pp-ring { position: relative; flex: none; width: 46px; height: 46px; }
+.pp-ring svg.ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.pp-ring .track { fill: none; stroke: var(--line); stroke-width: 4; }
+.pp-ring .fill { fill: none; stroke: var(--army); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.2s linear; }
+.pp-emblem { position: absolute; inset: 11px; color: var(--army); }
+.pp-emblem svg { width: 100%; height: 100%; display: block; }
+.pp-head { display: grid; min-width: 0; }
+.pp-name { font-family: var(--display); font-size: 19px; line-height: 1.1; color: var(--text); }
+.pp-state { font-size: 13px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+#powerPanel.ready .pp-state, #powerPanel.active .pp-state { color: var(--army); }
+.pp-desc { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+#ppMore { display: none; justify-self: start; padding: 0; border: 0; font-size: 12px; color: var(--muted); text-decoration: underline; background: none; }
+@keyframes glow { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--army) 35%, transparent); } }
+@media (prefers-reduced-motion: reduce) { #powerPanel.ready { animation: none; } }
+@media (max-width: 560px) {
+  #powerPanel { width: auto; max-width: calc(100% - 24px); padding: 8px 10px; }
+  .pp-ring { width: 38px; height: 38px; }
+  .pp-emblem { inset: 9px; }
+  .pp-name { font-size: 16px; }
+  #powerPanel:not(.expanded) .pp-desc { display: none; }
+  #ppMore { display: block; }
+}
+#board { flex: 1; position: relative; min-height: 0; border: 2px solid var(--edge); border-radius: 6px; overflow: hidden; container-type: inline-size; }
+/* Keep the battle announcement clear of the power panel when the board is too narrow for both side by side. */
+@container (max-width: 1000px) { #toast { top: 150px; } }
+@container (max-width: 560px) { #toast { top: 76px; } }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-#toast { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 2px solid var(--toast, var(--army)); color: var(--text); font-family: var(--display); font-size: 20px; text-align: center; pointer-events: none; text-wrap: balance; }
+#toast { position: absolute; top: 14px; left: 50%; z-index: 2; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 2px solid var(--toast, var(--army)); color: var(--text); font-family: var(--display); font-size: 20px; text-align: center; pointer-events: none; text-wrap: balance; }
 #toast small { display: block; font-family: var(--ui); font-size: 13px; color: var(--muted); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: rgb(23 20 14 / 0.45); }
 
@@ -146,7 +172,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <button data-pct="0.75"><kbd>3</kbd>75%</button>
         <button data-pct="1"><kbd>4</kbd>100%</button>
       </div>
-      <button id="btnPower" title="Special power (Q)" disabled><span id="powerIcon"></span><span id="powerText">Special power</span></button>
       <button id="btnAll" title="Select all your castles (Space)" disabled>Select all</button>
       <button id="btnSound" title="Sound (M)">Sound on</button>
       <button id="btnPause" title="Pause (P)" disabled>Pause</button>
@@ -154,6 +179,17 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   </header>
   <div id="board">
     <canvas id="cv"></canvas>
+    <div id="powerPanel" role="group" aria-label="Special power" hidden>
+      <button id="btnPower" title="Use special power (Q)" disabled>
+        <span class="pp-ring">
+          <svg class="ring" viewBox="0 0 46 46" aria-hidden="true"><circle class="track" cx="23" cy="23" r="20"/><circle class="fill" id="ppFill" cx="23" cy="23" r="20" stroke-dasharray="125.66" stroke-dashoffset="125.66"/></svg>
+          <span class="pp-emblem" id="ppEmblem"></span>
+        </span>
+        <span class="pp-head"><span class="pp-name" id="ppName">Special power</span><span class="pp-state" id="ppState" aria-live="polite"></span></span>
+      </button>
+      <p class="pp-desc" id="ppDesc"></p>
+      <button id="ppMore" aria-expanded="false" aria-controls="ppDesc">What does it do?</button>
+    </div>
     <div id="toast" hidden></div>
     <div id="taunt" hidden></div>
 
@@ -202,7 +238,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
           <ul class="rules">
             <li><b>Drag</b> from your castle to any castle to send troops. Keys <b>1–4</b> or the <b>scroll wheel</b> choose how many: 25%, 50%, 75% or all.</li>
             <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
-            <li><b>Special power:</b> press <b>Q</b> or the power button. It's ready 45 seconds into the battle, then recharges for five minutes.</li>
+            <li><b>Special power:</b> press <b>Q</b> or click the power panel in the top left of the map. The panel shows what your power does and counts down until it's ready: 45 seconds into the battle, then every five minutes.</li>
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
@@ -1546,7 +1582,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   // ---------- HUD ----------
   const strengthEl = document.getElementById('strength'), statusEl = document.getElementById('status');
-  const btnPower = document.getElementById('btnPower'), powerText = document.getElementById('powerText'), powerIcon = document.getElementById('powerIcon');
+  const powerPanel = document.getElementById('powerPanel'), btnPower = document.getElementById('btnPower');
+  const ppFill = document.getElementById('ppFill'), ppEmblem = document.getElementById('ppEmblem'), ppName = document.getElementById('ppName');
+  const ppState = document.getElementById('ppState'), ppDesc = document.getElementById('ppDesc'), ppMore = document.getElementById('ppMore');
+  const RING = 2 * Math.PI * 20;
+  let ppArmy = null;
   const toastEl = document.getElementById('toast'), tauntEl = document.getElementById('taunt');
   let hudTick = 0, toastTimer = 0, tauntTimer = 0;
   let tauntsOn = store.get('cs-taunts', true);
@@ -1573,28 +1613,44 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       const label = G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name} vs ${rivals}` : `${DIFF_NAME[G.cfg.diff]} · vs ${rivals}`;
       statusEl.textContent = `${label} · ${fmtTime(G.time)}`;
     }
-    // Power button.
-    const playing = !G.cfg.demo && !G.over;
-    const A = ARMIES[G.cfg.demo ? myArmy : G.fac[1]];
-    powerIcon.innerHTML = svg(A.emblem);
-    btnPower.classList.remove('ready', 'active');
-    if (!playing) {
-      btnPower.disabled = true; powerText.textContent = A.power.name; btnPower.style.setProperty('--charge', '0%');
-      return;
-    }
-    const pw = G.pw[1], total = pw.until > 0 ? RECHARGE : FIRST_CHARGE;
-    if (G.time < pw.until) {
-      btnPower.classList.add('active'); btnPower.disabled = true;
-      powerText.textContent = `${A.power.name} ${Math.ceil(pw.until - G.time)}s`;
-    } else if (pw.ready > 0) {
-      btnPower.disabled = true;
-      powerText.textContent = `${A.power.name} ${fmtTime(Math.ceil(pw.ready))}`;
-      btnPower.style.setProperty('--charge', `${(100 * (1 - pw.ready / total)).toFixed(1)}%`);
-    } else {
-      btnPower.classList.add('ready'); btnPower.disabled = false;
-      powerText.textContent = `${A.power.name} · Q`;
-    }
+    updatePowerPanel();
   }
+
+  // Special power panel: name, description, and a countdown ring until it can be used.
+  function updatePowerPanel() {
+    powerPanel.hidden = !G || G.cfg.demo || G.over;
+    if (powerPanel.hidden) return;
+    const id = G.fac[1], A = ARMIES[id], pw = G.pw[1];
+    if (ppArmy !== id) {
+      ppArmy = id;
+      ppEmblem.innerHTML = svg(A.emblem);
+      ppName.textContent = A.power.name;
+      ppDesc.textContent = A.power.desc;
+    }
+    const active = G.time < pw.until, ready = !active && pw.ready <= 0;
+    let fill, state;
+    if (active) {
+      const left = pw.until - G.time;
+      fill = left / A.power.dur;
+      state = `Active · ${Math.ceil(left)}s left`;
+    } else if (!ready) {
+      fill = 1 - pw.ready / (pw.until > 0 ? RECHARGE : FIRST_CHARGE);
+      state = `Ready in ${fmtTime(Math.ceil(pw.ready))}`;
+    } else {
+      fill = 1;
+      state = 'Ready · press Q';
+    }
+    powerPanel.classList.toggle('ready', ready);
+    powerPanel.classList.toggle('active', active);
+    btnPower.disabled = !ready || !playable();
+    ppFill.style.strokeDashoffset = (RING * (1 - Math.max(0, Math.min(1, fill)))).toFixed(2);
+    if (ppState.textContent !== state) ppState.textContent = state;
+  }
+  ppMore.addEventListener('click', () => {
+    const open = powerPanel.classList.toggle('expanded');
+    ppMore.setAttribute('aria-expanded', String(open));
+    ppMore.textContent = open ? 'Hide details' : 'What does it do?';
+  });
 
   // ---------- loop ----------
   let last = performance.now();

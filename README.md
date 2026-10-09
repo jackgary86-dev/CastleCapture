@@ -37,7 +37,7 @@ Each army is commanded by a named lord when it's your rival. They introduce them
 - **Drag** from one of your castles to any castle to send troops.
 - **Keys 1–4** or the **scroll wheel** choose how many to send: 25%, 50%, 75% or all.
 - **Drag across** several of your castles to attack from all of them, or **tap** castles to select them and then tap a target.
-- **Q** or the power button uses your army's special power.
+- **Q** or the power panel in the top left of the map uses your army's special power. The panel shows the power's name, what it does, and a countdown until it's ready.
 - **Armies that meet on the road fight.** The stronger column marches on with what's left.
 - **Red banners** over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.
 - **Bigger castles** train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.
