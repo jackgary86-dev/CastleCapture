@@ -674,7 +674,7 @@ function roadBattles() {
       if (a.owner === 1) G.stats.roadLost += m / sa; else if (b.owner === 1) G.stats.roadLost += m / sb;
       fought = true;
       G.fx.push({ kind: 'clash', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, age: 0 });
-      emit('clash', { attacker: a.owner, defender: b.owner, road: true });
+      emit('clash', { attacker: a.owner, defender: b.owner, road: true, lost: { [a.owner]: m / sa, [b.owner]: m / sb } });
     }
   }
   if (fought) G.packets = G.packets.filter(k => k.n > 0.05);
