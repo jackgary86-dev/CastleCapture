@@ -56,6 +56,15 @@ on('capture', ({ o, was, castle }) => {
   if (was === 1) sel.delete(castle);
   if (!G.cfg.demo && (o === 1 || was === 1)) sfx.horn(o === 1);
 });
+// Taking a special castle for the first time explains what it does.
+on('capture', ({ o, castle }) => {
+  if (o !== 1 || !castle.kind || G.cfg.demo) return;
+  G.kindsSeen ??= [];
+  if (G.kindsSeen.includes(castle.kind)) return;
+  G.kindsSeen.push(castle.kind);
+  const K = CASTLE_KINDS[castle.kind];
+  toast(`You took a ${K.name.toLowerCase()}`, K.desc, army(1).color);
+});
 on('build', ({ o, unit: U }) => {
   if (G.cfg.demo) return;
   toast(o === 1 ? `You build a ${U.name}` : `${army(o).full} builds a ${U.name}`, o === 1 ? U.desc : U.desc.replace(/\bYour\b/g, 'Their'), col(o));
@@ -107,7 +116,7 @@ function updateCastlePanel() {
   const units = Math.floor(p.units), key = `${p.id}|${units}|${lvl(p, 'walls')}|${lvl(p, 'barracks')}`;
   if (key === castlePanelKey) return;
   castlePanelKey = key;
-  document.getElementById('cpInfo').textContent = `${units} troops · Walls ${ROMAN[lvl(p, 'walls')]} · Barracks ${ROMAN[lvl(p, 'barracks')]}`;
+  document.getElementById('cpInfo').textContent = `${kindOf(p) ? kindOf(p).name + ' · ' : ''}${units} troops · Walls ${ROMAN[lvl(p, 'walls')]} · Barracks ${ROMAN[lvl(p, 'barracks')]}`;
   for (const kind of ['walls', 'barracks']) {
     const btn = kind === 'walls' ? document.getElementById('btnWalls') : document.getElementById('btnBarracks');
     const T = UPG_TEXT[kind], L = lvl(p, kind), cost = upgradeCost(p, kind), ok = canUpgrade(p, kind);

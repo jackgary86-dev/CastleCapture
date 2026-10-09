@@ -249,6 +249,7 @@ function drawCastle(p, now) {
   const roofCol = p.owner ? army(p.owner).roof : '#6f6a5e';
   const glow = p.owner ? c : '#5a5468';
   const flags = CASTLE[style](p, s, baseY, tier, roofCol, glow);
+  if (p.kind) drawKindDetail(p, s, baseY);
   const [flagOwner, raise] = bannerState(p);
   for (const [fx, fy] of flags) drawFlag(fx, fy, s * 0.6, flagOwner, now, p.id, raise);
 
@@ -287,14 +288,75 @@ function drawCastle(p, now) {
       ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.beginPath(); tri.forEach(([tx, ty], i2) => i2 ? ctx.lineTo(tx, ty) : ctx.moveTo(tx, ty)); ctx.closePath(); ctx.stroke();
     }
   }
+  // Kind badge to the right of the plaque; the plaque itself and its left side stay unchanged.
+  if (p.kind) drawKindBadge(p, p.x + tw / 2 + 3, py, th);
   // Hourglass beside the plaque when upkeep is slowing training: amber at half speed, red at a quarter.
   const up = p.owner ? upkeepOf(p) : 1;
   if (up < 1) {
-    const hx = p.x + tw / 2 + 5, hy = py + th / 2, hs = th * 0.38;
+    const hx = p.x + tw / 2 + 5 + (p.kind ? th + 3 : 0), hy = py + th / 2, hs = th * 0.38;
     ctx.fillStyle = up < 0.5 ? WARN : '#e9b43b';
     ctx.beginPath(); ctx.moveTo(hx - hs * 0.7, hy - hs); ctx.lineTo(hx + hs * 0.7, hy - hs); ctx.lineTo(hx, hy);
     ctx.lineTo(hx + hs * 0.7, hy + hs); ctx.lineTo(hx - hs * 0.7, hy + hs); ctx.lineTo(hx, hy); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+}
+
+// A village's reach, drawn faintly on the ground in its owner's colour.
+function drawVillageAuras(now) {
+  const R = CASTLE_KINDS.village.aura;
+  for (const v of G.planets) {
+    if (v.kind !== 'village' || !v.owner) continue;
+    ctx.save(); ctx.translate(v.x, v.y + v.r * 0.4); ctx.scale(1, 0.62);
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fillStyle = alpha(col(v.owner), 0.05); ctx.fill();
+    ctx.setLineDash([6, 8]); ctx.lineDashOffset = reduceMotion ? 0 : -now / 80;
+    ctx.strokeStyle = alpha(col(v.owner), 0.35); ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Ground-level detail that marks a castle's kind: an outer rampart, a ring of tents, or cottages.
+function drawKindDetail(p, s, baseY) {
+  if (p.kind === 'fortress') {
+    const w = s * 2.5, h = s * 0.26, x = p.x - w / 2, y = baseY - h + s * 0.08;
+    ctx.fillStyle = '#857e70'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x + w * 0.6, y, w * 0.4, h);
+    ctx.fillStyle = '#857e70'; crenels(x, y, w, Math.max(2, s * 0.1));
+    ctx.fillStyle = INK; ctx.fillRect(p.x - s * 0.16, y + h * 0.15, s * 0.32, h * 0.85);
+  } else if (p.kind === 'camp') {
+    const band = p.owner ? col(p.owner) : '#8a7a5a';
+    for (const dx of [-1.25, 1.25]) {
+      const tx = p.x + dx * s, ty = baseY + s * 0.05, tw2 = s * 0.42, th2 = s * 0.42;
+      poly([[tx - tw2, ty], [tx + tw2, ty], [tx, ty - th2]], '#e3d6b6');
+      poly([[tx - tw2 * 0.45, ty - th2 * 0.45], [tx + tw2 * 0.45, ty - th2 * 0.45], [tx, ty - th2]], band);
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx, ty - th2 * 0.5); ctx.stroke();
+    }
+  } else if (p.kind === 'village') {
+    const roof = p.owner ? army(p.owner).roof : '#7a5a3a';
+    for (const [dx, dy, k] of [[-1.3, 0.05, 1], [1.25, 0.1, 0.85], [-0.95, 0.32, 0.75]]) {
+      const hx = p.x + dx * s, hy = baseY + dy * s, hw = s * 0.36 * k, hh = s * 0.26 * k;
+      ctx.fillStyle = '#d9c9a3'; ctx.fillRect(hx - hw / 2, hy - hh, hw, hh);
+      poly([[hx - hw * 0.62, hy - hh], [hx + hw * 0.62, hy - hh], [hx, hy - hh - hw * 0.55]], roof);
+      ctx.fillStyle = INK; ctx.fillRect(hx - hw * 0.1, hy - hh * 0.55, hw * 0.2, hh * 0.55);
+    }
+  }
+}
+
+// Small badge beside the garrison plaque naming the kind: a shield, crossed swords or a cottage.
+function drawKindBadge(p, x, y, size) {
+  ctx.fillStyle = PARCH; ctx.beginPath(); ctx.roundRect(x, y, size, size, 2); ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = 0.9; ctx.stroke();
+  const cx = x + size / 2, cy = y + size / 2, r = size * 0.32;
+  ctx.fillStyle = INK; ctx.strokeStyle = INK;
+  if (p.kind === 'fortress') {
+    ctx.beginPath(); ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy - r); ctx.lineTo(cx + r, cy); ctx.quadraticCurveTo(cx + r, cy + r * 0.8, cx, cy + r * 1.15);
+    ctx.quadraticCurveTo(cx - r, cy + r * 0.8, cx - r, cy); ctx.closePath(); ctx.fill();
+  } else if (p.kind === 'camp') {
+    ctx.lineWidth = size * 0.12; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx + r, cy - r); ctx.moveTo(cx + r, cy + r); ctx.lineTo(cx - r, cy - r); ctx.stroke();
+    ctx.lineCap = 'butt';
+  } else {
+    ctx.beginPath(); ctx.moveTo(cx - r, cy + r); ctx.lineTo(cx - r, cy - r * 0.1); ctx.lineTo(cx, cy - r * 1.05); ctx.lineTo(cx + r, cy - r * 0.1); ctx.lineTo(cx + r, cy + r); ctx.closePath(); ctx.fill();
   }
 }
 
@@ -567,6 +629,7 @@ function draw(now) {
   drawScenery(now);
   for (const u of G.units) drawUnitRange(u, now, col(u.owner));
   drawRallies(now);
+  drawVillageAuras(now);
   const spin = reduceMotion ? 0 : now / 1100;
   const ring = G.theme.ring;
 

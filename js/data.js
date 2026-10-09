@@ -22,6 +22,15 @@ const UPGRADE = {
   archer: { reach: [32, 46, 62, 80], every: [1.1, 0.9, 0.7, 0.55], kill: [0.6, 1, 1.4, 1.9] },
 };
 const ROMAN = ['0', 'I', 'II', 'III'];
+// Special castle kinds, given to about a quarter of the unclaimed keeps. A captured castle keeps its kind.
+// def multiplies wall strength, prod multiplies training; a village trains nothing but speeds up its owner's castles nearby.
+// worth is how much more (or less) an AI wants the castle than its size alone suggests.
+const CASTLE_KINDS = {
+  fortress: { name: 'Fortress', def: 2, prod: 1, worth: 0.85, desc: 'Every defender counts double.' },
+  camp: { name: 'War camp', def: 0.7, prod: 1.6, worth: 1.5, desc: 'Trains 60% faster, but its walls are weak: defenders count 0.7.' },
+  village: { name: 'Village', def: 1, prod: 0, worth: 1.3, aura: 150, auraBoost: 0.25, desc: 'Trains no troops, but your castles within reach train 25% faster.' },
+};
+const KIND_SHARE = 0.25;
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
 const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
 const MAP_UNITS = {

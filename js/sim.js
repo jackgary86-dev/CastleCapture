@@ -96,10 +96,35 @@ function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
 let G = null;
 
 // Builds a fresh battle from `cfg`. `portrait` rotates the map for tall screens; the UI decides it.
+// Give about a quarter of the unclaimed keeps a special kind. genMap gives every mirrored copy of a keep the same
+// size and garrison, so copies are grouped by those and always get the same kind, keeping the map fair.
+function assignKinds(planets, seed) {
+  const rnd = mulberry((seed ^ 0x5bd1e995) >>> 0);
+  const groups = new Map();
+  for (const p of planets) {
+    if (p.owner) continue;
+    const key = `${p.r.toFixed(3)}|${p.units}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(p);
+  }
+  const list = [...groups.values()];
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+  const kinds = Object.keys(CASTLE_KINDS);
+  const want = Math.round(planets.filter(p => !p.owner).length * KIND_SHARE);
+  let given = 0, k = Math.floor(rnd() * kinds.length);
+  for (const g of list) {
+    if (given >= want) break;
+    const kind = kinds[k++ % kinds.length];
+    for (const p of g) p.kind = kind;
+    given += g.length;
+  }
+}
+
 function newGame(cfg, portrait = false) {
   const players = cfg.armies.length;
   const theme = THEMES[ARMIES[cfg.map].map];
   const map = genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral });
+  assignKinds(map.planets, cfg.seed);
   const owners = players === 2 ? [1, 2] : [1, 2, 3];
   const aiIds = cfg.demo ? [1, 2] : owners.slice(1);
   G = {
@@ -134,12 +159,21 @@ const roadOf = o => atkOf(o) * army(o).stats.road;
 const bribes = (o, t) => t.owner === 0 && G.fac[o] === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
 const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1) * bribes(o, t);
 const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
+const kindOf = p => p.kind ? CASTLE_KINDS[p.kind] : null;
+// Villages speed up their owner's other castles within reach: +25% for each, up to +50%.
+function villageBoost(p) {
+  if (!p.owner || p.kind === 'village') return 1;
+  const V = CASTLE_KINDS.village;
+  let n = 0;
+  for (const v of G.planets) if (v.kind === 'village' && v.owner === p.owner && dist(v, p) <= V.aura) n++;
+  return Math.min(1.5, 1 + V.auraBoost * n);
+}
 const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o && dist(u, p) <= MAP_UNITS.ward.range);
 // Upkeep: a castle feeding a big garrison trains slower, which stops one castle hoarding an army forever.
 const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPKEEP_AT ? 0.5 : 1;
-const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) : 0;
+const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) : 0;
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.
-const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1);
+const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1);
 // Enemy Great Wards halve marching speed inside them.
 const slowedAt = k => G.units.some(u => u.type === 'ward' && u.owner !== k.owner && dist(u, k) <= MAP_UNITS.ward.range);
 const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] : 0), 0);
@@ -431,6 +465,11 @@ function aiThink(ai) {
     }
     if (!chosen.length || need <= 2 || sum < need) continue;
     let worth = (t.r * PROD + 0.4) * (t.owner === 0 ? pz.neutralBias : pz.enemyBias * bold);
+    // Special kinds: war camps and villages are prizes; a village is worth more the more of our castles it would speed up.
+    if (t.kind) {
+      worth *= CASTLE_KINDS[t.kind].worth;
+      if (t.kind === 'village') worth *= 1 + 0.3 * mine.filter(m => dist(m, t) <= CASTLE_KINDS.village.aura).length;
+    }
     if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
     if (id === 'kharzul' && t === ai.focus) worth *= 2.5;
     if (id === 'nyx') {
