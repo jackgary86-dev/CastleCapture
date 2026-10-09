@@ -941,6 +941,7 @@ function endGame(win) {
   $('endRoad').textContent = Math.round(G.stats.roadLost);
   $('endPowers').textContent = G.stats.powerUses;
   G.history.push({ t: G.time, v: G.owners.map(totalOf) });
+  endOv.hidden = false;   // shown before renderSummary so the chart has a width to draw into
   toastEl.hidden = true;
   chartW = 0;
   renderSummary();
