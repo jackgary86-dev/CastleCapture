@@ -724,12 +724,15 @@ function renderResume() {
   const me = ARMIES[d.cfg.armies[0]], foes = d.cfg.armies.slice(1).map(id => ARMIES[id].name).join(' & ');
   const mins = Math.round((Date.now() - d.savedAt) / 60000);
   const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
-  $('resumeText').textContent = `${me.name} vs ${foes} in ${ARMIES[d.cfg.map].homeland}, ${fmtTime(d.state.time || 0)} in. Saved ${ago}.`;
+  $('resumeText').textContent = `${me.name} vs ${foes} in ${placeName(d.cfg)}, ${fmtTime(d.state.time || 0)} in. Saved ${ago}.`;
 }
 addEventListener('pagehide', saveBattle);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveBattle(); });
 setInterval(() => { if (G && !G.paused) saveBattle(); }, 10000);
 
+// Where a battle is fought: the army's homeland, or the Grand Campaign map's name.
+const placeName = cfg => cfg.mode === 'grand' && typeof GRAND_MAPS !== 'undefined' && GRAND_MAPS[cfg.grandMap]
+  ? GRAND_MAPS[cfg.grandMap].name : ARMIES[cfg.map].homeland;
 function play(cfg) {
   clearSave();
   lastCfg = cfg;
@@ -742,7 +745,7 @@ function play(cfg) {
   tauntEl.hidden = true;
   // The rival lords introduce themselves before the battle starts.
   const rivals = cfg.armies.slice(1);
-  $('lordHead').textContent = rivals.length > 1 ? `Your rivals in ${ARMIES[cfg.map].homeland}` : `Your rival in ${ARMIES[cfg.map].homeland}`;
+  $('lordHead').textContent = rivals.length > 1 ? `Your rivals in ${placeName(cfg)}` : `Your rival in ${placeName(cfg)}`;
   $('lordList').innerHTML = rivals.map(id => {
     const L = LORDS[id], A = ARMIES[id];
     return `<div class="lord">${portraitHtml(id)}<div><h3>${L.name}</h3><div class="title">${L.title[0].toUpperCase() + L.title.slice(1)} · ${A.full}<span class="chip" style="--c:${A.color};--ci:${A.ink}">${A.role}</span></div><q>${L.challenge}</q></div></div>`;
@@ -756,7 +759,7 @@ function startBattle() {
   G.intro = false;
   lordOv.hidden = true;
   const me = ARMIES[G.cfg.armies[0]], foes = G.cfg.armies.slice(1).map(id => ARMIES[id].full).join(' and ');
-  toast(`${ARMIES[G.cfg.map].homeland}`, `${me.full} against ${foes}`, me.color);
+  toast(placeName(G.cfg), `${me.full} against ${foes}`, me.color);
 }
 function toMenu() {
   renderResume();
@@ -906,7 +909,7 @@ function endGame(win) {
   $('endTitle').textContent = win ? 'Victory' : 'Defeat';
   $('endTitle').className = win ? 'result-win' : 'result-lose';
   $('endText').textContent = win
-    ? (lv === LEVELS.length ? `The High Throne has fallen. ${me.full} rules the realm.` : lv ? `${LEVELS[lv - 1].name} is yours. ${LEVELS[lv].name} awaits.` : `${me.name} banners fly over every castle in ${G.theme === THEMES[me.map] ? 'your homeland' : ARMIES[G.cfg.map].homeland}.`)
+    ? (lv === LEVELS.length ? `The High Throne has fallen. ${me.full} rules the realm.` : lv ? `${LEVELS[lv - 1].name} is yours. ${LEVELS[lv].name} awaits.` : `${me.name} banners fly over every castle in ${G.cfg.mode !== 'grand' && G.theme === THEMES[me.map] ? 'your homeland' : placeName(G.cfg)}.`)
     : defeatText();
   // The rival lord has the last word: the strongest survivor if you lost, the last one standing if you won.
   const lordO = win ? G.owners[G.owners.length - 1] : G.owners.slice(1).sort((a, b) => totalOf(b) - totalOf(a))[0];
@@ -914,7 +917,7 @@ function endGame(win) {
   $('endQuote').innerHTML = `${portraitHtml(G.fac[lordO])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
   $('endQuote').querySelector('q').textContent = pick(L.lines[!win ? 'victory' : G.surrendered.has(lordO) ? 'surrender' : 'defeat']);
   tauntEl.hidden = true;
-  $('seedLine').hidden = !!lv;
+  $('seedLine').hidden = !!lv || G.cfg.mode === 'grand';
   $('seedVal').textContent = G.cfg.seed;
   $('endTime').textContent = fmtTime(G.time);
   $('endCaps').textContent = G.caps;
