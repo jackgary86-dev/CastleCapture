@@ -172,6 +172,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <button data-pct="0.75"><kbd>3</kbd>75%</button>
         <button data-pct="1"><kbd>4</kbd>100%</button>
       </div>
+      <div class="sendctl" id="speedCtl" role="group" aria-label="Game speed">
+        <span>Speed</span>
+        <button data-speed="1" aria-pressed="true" title="Normal speed ([)">1×</button>
+        <button data-speed="1.5" title="Faster">1.5×</button>
+        <button data-speed="2" title="Fastest (])">2×</button>
+      </div>
       <button id="btnAll" title="Select all your castles (Space)" disabled>Select all</button>
       <button id="btnSound" title="Sound (M)">Sound on</button>
       <button id="btnPause" title="Pause (P)" disabled>Pause</button>
@@ -242,7 +248,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
-            <li><b>Space</b> selects all your castles. <b>P</b> pauses. <b>M</b> mutes.</li>
+            <li><b>Space</b> selects all your castles. <b>[</b> and <b>]</b> change the game speed (1×, 1.5× or 2×). <b>P</b> pauses. <b>M</b> mutes.</li>
           </ul>
         </div>
       </div>
@@ -1656,7 +1662,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    if (G && !G.over && !G.paused && !G.intro) update(dt);
+    if (G && !G.over && !G.paused && !G.intro) {
+      // Faster speeds run extra small steps, so road battles and arrivals stay as precise as at normal speed.
+      let left = dt * (G.cfg.demo ? 1 : gameSpeed);
+      while (left > 1e-6 && !G.over) { const step = Math.min(left, 1 / 60); update(step); left -= step; }
+    }
     for (const s of [...sel]) if (s.owner !== 1) sel.delete(s);
     draw(now);
     if ((hudTick += dt) > 0.2) { hudTick = 0; hud(); }
@@ -1687,6 +1697,19 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     sel.clear();
   }
   function playerPower() { if (playable() && usePower(1)) hud(); }
+
+  // ---------- game speed ----------
+  const SPEEDS = [1, 1.5, 2];
+  let gameSpeed = SPEEDS.includes(store.get('cs-speed', 1)) ? store.get('cs-speed', 1) : 1;
+  const speedCtl = document.getElementById('speedCtl');
+  function setSpeed(v) {
+    gameSpeed = v;
+    store.set('cs-speed', v);
+    speedCtl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.speed === v)));
+  }
+  speedCtl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSpeed(+b.dataset.speed); });
+  const stepSpeed = d => setSpeed(SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, SPEEDS.indexOf(gameSpeed) + d))]);
+  setSpeed(gameSpeed);
 
   // ---------- send amount ----------
   const PCTS = [0.25, 0.5, 0.75, 1];
@@ -1750,6 +1773,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
     else if (e.key >= '1' && e.key <= '4') setSendPct(PCTS[+e.key - 1]);
     else if (e.key === 'q' || e.key === 'Q') playerPower();
+    else if (e.key === '[') stepSpeed(-1);
+    else if (e.key === ']') stepSpeed(1);
     else if (e.key === 'm' || e.key === 'M') toggleSound();
     else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
     else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }

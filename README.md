@@ -41,7 +41,7 @@ Each army is commanded by a named lord when it's your rival. They introduce them
 - **Armies that meet on the road fight.** The stronger column marches on with what's left.
 - **Red banners** over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.
 - **Bigger castles** train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.
-- **Space** selects all your castles. **P** pauses. **M** mutes the sound.
+- **Space** selects all your castles. **[** and **]** (or the Speed buttons) change the game speed: 1×, 1.5× or 2×. **P** pauses. **M** mutes the sound.
 
 ## Modes
 
