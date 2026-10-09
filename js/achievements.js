@@ -22,11 +22,19 @@ const ACHIEVEMENTS = [
   { id: 'allLords', name: 'Bane of Lords', desc: 'Beat every lord on Warlord.', goal: 5, progress: r => r.lordsBeatenHard.length },
   { id: 'ambush', name: 'Ambush Master', desc: 'Destroy 100 enemy troops in battles on the road.', goal: 100, progress: r => Math.floor(r.ambushed) },
   { id: 'conqueror', name: 'Conqueror', desc: 'Capture 100 castles.', goal: 100, progress: r => r.castles },
+  // The Grand Campaign (#63): its wins count here, not towards the battle achievements above.
+  { id: 'grandWin', name: 'Crowned', desc: 'Win a Grand Campaign.' },
+  { id: 'grandWarlord', name: 'Emperor', desc: 'Win a Grand Campaign on Warlord difficulty.' },
+  { id: 'grandMaps', name: 'Lord of Every Land', desc: 'Win a Grand Campaign on every map.', get goal() { return grandMapCount(); }, progress: r => r.grandMapsWon.length },
+  { id: 'slayer', name: 'Monster Slayer', desc: 'Land the killing blow on a Grand Campaign monster.', goal: 1, progress: r => r.slain },
+  { id: 'hunter', name: 'Beast Hunter', desc: 'Slay 10 Grand Campaign monsters.', goal: 10, progress: r => r.slain },
 ];
+function grandMapCount() { return typeof GRAND_MAPS === 'object' ? Object.keys(GRAND_MAPS).length : 1; }
 
 const blankRecords = () => ({
   battles: 0, wins: 0, losses: 0, castles: 0, ambushed: 0,
   byArmy: {}, byLord: {}, best: {}, armiesWon: [], lordsBeatenHard: [],
+  grandPlayed: 0, grandWon: 0, grandMapsWon: [], slain: 0,
 });
 function loadAchievements() {
   const d = store.get(ACH_KEY, null);
@@ -66,8 +74,52 @@ function lowestShare() {
   return low;
 }
 
+// Unlock whatever the records now qualify for, plus any achievements in `earned`; returns the new ones.
+function unlockEarned(earned = new Set()) {
+  for (const a of ACHIEVEMENTS) if (a.goal && a.progress(ach.rec) >= a.goal) earned.add(a.id);
+  const fresh = ACHIEVEMENTS.filter(a => earned.has(a.id) && !ach.unlocked[a.id]);
+  for (const a of fresh) ach.unlocked[a.id] = Date.now();
+  saveAchievements();
+  return fresh;
+}
+
+// A Grand Campaign counts towards its own achievements and records, and towards the career totals
+// (castles captured, troops destroyed on the road), but not towards battles won and lost.
+function grandEnded(win) {
+  const r = ach.rec;
+  r.grandPlayed++;
+  r.castles += G.caps;
+  r.ambushed += ambushedThisBattle();
+  const earned = new Set();
+  if (win) {
+    r.grandWon++;
+    const map = G.cfg.grandMap || 'realm';
+    if (!r.grandMapsWon.includes(map)) r.grandMapsWon.push(map);
+    earned.add('grandWin');
+    if (G.cfg.diff === 'hard') earned.add('grandWarlord');
+  }
+  showUnlocks(unlockEarned(earned));
+}
+
+// Slaying a map monster unlocks on the spot, with a banner, since a campaign can run for an hour.
+on('monster', e => {
+  if (e.kind !== 'slain' || e.o !== 1 || !G || G.cfg.demo) return;
+  ach.rec.slain++;
+  const fresh = unlockEarned();
+  if (!fresh.length) return;
+  refreshAchButton();
+  // After the slaying banner (3.2 s), one achievement banner at a time.
+  const game = G;
+  fresh.forEach((a, i) => setTimeout(() => {
+    if (G !== game || G.over) return;
+    toast(`Achievement unlocked: ${a.name}`, a.desc, army(1).color);
+    sfx.chime();
+  }, 3300 * (i + 1)));
+});
+
 on('end', ({ win }) => {
   if (!G || G.cfg.demo || G.cfg.tutorial) return;
+  if (G.mode === 'grand') { grandEnded(win); return; }
   const r = ach.rec, me = G.fac[1], rivals = G.owners.slice(1).map(o => G.fac[o]), diff = G.cfg.diff;
   r.battles++;
   if (win) r.wins++; else r.losses++;
@@ -94,12 +146,7 @@ on('end', ({ win }) => {
     if (G.units.some(u => u.owner === 1)) earned.add('builder');
     if (G.cfg.level === LEVELS.length) earned.add('campaign');
   }
-  for (const a of ACHIEVEMENTS) if (a.goal && a.progress(r) >= a.goal) earned.add(a.id);
-
-  const fresh = ACHIEVEMENTS.filter(a => earned.has(a.id) && !ach.unlocked[a.id]);
-  for (const a of fresh) ach.unlocked[a.id] = Date.now();
-  saveAchievements();
-  showUnlocks(fresh);
+  showUnlocks(unlockEarned(earned));
 });
 
 // ---------- end screen and menu ----------
@@ -186,6 +233,7 @@ function renderAchievements() {
     ['Battles', r.battles], ['Won', r.wins], ['Lost', r.losses], ['Win rate', rate],
     ['Castles captured', r.castles], ['Enemy troops destroyed on the road', Math.floor(r.ambushed)],
     ['Fastest win, Squire', best('easy')], ['Fastest win, Knight', best('medium')], ['Fastest win, Warlord', best('hard')],
+    ['Grand Campaigns', r.grandPlayed], ['Grand Campaigns won', r.grandWon], ['Map monsters slain', r.slain],
   ];
   const dl = document.getElementById('achRecords');
   dl.innerHTML = '';
