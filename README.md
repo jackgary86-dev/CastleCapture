@@ -63,6 +63,10 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 
 Each homeland has its own synthesised theme (no audio files): a lute-like air in the Vale of Aldmere, droning saws and frame drums on the Red Steppe, slow bells in the Frostmark Fjords, a Hijaz melody and hand drums in the Sunscorched Sands, and a beating drone in Nyxhollow Mire. The music swells with the fighting, adding drums and quicker, higher lines when armies are on the march, clashing, or using a special power. The Music button or **N** turns it on or off, separately from the sound effects.
 
+## Achievements and records
+
+Thirteen achievements, from First Blood and Lightning War (win in under 2 minutes) to Bane of Lords (beat every lord on Warlord) and Conqueror (capture 100 castles). New ones appear on the victory screen. The menu's achievements sheet also keeps your records: battles, wins and losses, fastest wins at each difficulty, castles captured, enemy troops destroyed on the road, and your record with each army and against each lord. Everything is saved in your browser.
+
 ## Modes
 
 - **Skirmish:** Pick your rival (or a random one), 1 or 2 rivals, and whether to invade their homeland or defend yours. Difficulty is Squire, Knight or Warlord.
