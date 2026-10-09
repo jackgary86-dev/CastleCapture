@@ -2,7 +2,7 @@
 // Headless balance test: every army fights every other army with the AI playing both sides,
 // and the run fails if any army's win rate leaves the agreed band.
 //
-//   node tools/balance.js                 # 4 games per pairing on Warlord, 600 s cap, band 25–75%
+//   node tools/balance.js                 # 4 games per pairing on Warlord, 600 s cap, band 33–67%
 //   node tools/balance.js --games 8 --diff medium --seconds 900 --band 0.35,0.65
 //   node tools/balance.js --json          # machine-readable results
 //   node tools/balance.js --fps 30        # coarser, faster simulation step (default 60, as in the game)
@@ -22,8 +22,9 @@ const opt = (name, def) => {
 const GAMES = +opt('games', 4);
 const DIFF = opt('diff', 'hard');
 const SECONDS = +opt('seconds', 600);
-// The agreed band is deliberately wide to start with (see issue #47); tighten it as the armies are retuned.
-const [BAND_LO, BAND_HI] = opt('band', '0.25,0.75').split(',').map(Number);
+// The agreed band (see issue #47), tightened from 25–75% once every army sat inside 38–63% at 8 games on
+// Warlord and Knight; tighten it again as the armies are retuned.
+const [BAND_LO, BAND_HI] = opt('band', '0.33,0.67').split(',').map(Number);
 const JSON_OUT = process.argv.includes('--json');
 const MODE = opt('mode', 'battle');
 // Simulate at the game's own step (the browser runs 1/60 s substeps); coarser steps let fast columns skip
