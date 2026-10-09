@@ -19,8 +19,16 @@
   // typeof directly (safe for names no script has declared yet).
   const grandMaps = () => (typeof GRAND_MAPS !== 'undefined' && GRAND_MAPS && typeof GRAND_MAPS === 'object' ? GRAND_MAPS : null);
   const monsters = () => (typeof MONSTERS !== 'undefined' && MONSTERS && typeof MONSTERS === 'object' ? MONSTERS : null);
+  // Starting: #46's own startGrand(mapId, armyId) when it defines one, else the agreed cfg shape
+  // passed to play() once js/grand.js (genGrandMap) is loaded.
+  const grandReady = () => typeof genGrandMap === 'function' && typeof GRAND !== 'undefined' && typeof play === 'function';
+  const startFallback = (mapId, armyId) => {
+    const rivals = ARMY_IDS.filter(id => id !== armyId);
+    const diff = typeof qDiff === 'string' ? qDiff : 'medium';
+    play({ mode: 'grand', seed: Math.floor(Math.random() * 1e9), n: GRAND.castles, diff, armies: [armyId, ...rivals], map: armyId, grandMap: mapId });
+  };
   const fns = {
-    startGrand: () => (typeof startGrand === 'function' ? startGrand : null),
+    startGrand: () => (typeof startGrand === 'function' ? startGrand : grandReady() ? startFallback : null),
     loadGrandSlot: () => (typeof loadGrandSlot === 'function' ? loadGrandSlot : null),
     deleteGrandSlot: () => (typeof deleteGrandSlot === 'function' ? deleteGrandSlot : null),
   };
