@@ -529,6 +529,8 @@ const lordOf = o => LORDS[G.fac[o]];
 const lordSays = (o, kind, force = false) => emit('taunt', { o, kind, force });
 
 function send(owner, sources, target, frac = 0.5, type = 'foot', escort = false) {
+  // Capture the Crown (#66): scouts ride out as one small band from the nearest source (js/crown.js).
+  if (type === 'scout' && G.mode === 'crown' && typeof crownScout === 'function') return crownScout(owner, sources, target);
   let launched = false;
   for (const s of sources) {
     if (s === target || s.owner !== owner || allied(owner, target.owner)) continue;
@@ -869,6 +871,8 @@ function aiThink(ai) {
   const inc = incomingFor(me), pow = incomingPowerFor(me);
   // King of the Hill (#64): each lord's own play for the crowned keep comes first (js/hill.js).
   if (G.mode === 'hill' && typeof hillAi === 'function' && hillAi(ai, P, inc, pow)) return;
+  // Capture the Crown (#66): guarding, moving and scouting for crowns comes first (js/crown.js).
+  if (G.mode === 'crown' && typeof crownAi === 'function' && crownAi(ai, P, inc, pow)) return;
   const enemyCastles = P.filter(p => p.owner && p.owner !== me);
   // Marching distance to the nearest castle in a list: rivers and forests count, not just the crow's flight.
   const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => travel(p, q))) : Infinity;
@@ -982,7 +986,8 @@ function aiThink(ai) {
   // Stalemate breaker: while no castle has changed hands for 90 seconds, caution drains away towards an even fight.
   const ease = Math.min(1, Math.max(0, (G.time - (G.lastCapAt ?? 0) - 90) / 90));
   for (const t of candidates) {
-    const srcs = mine.filter(s => s.units >= pz.keep / 20 * s.r && (!exposed(s) || s.units * (1 - pz.sendFrac) >= s.r * 0.4)).sort((a, b) => travel(a, t) - travel(b, t));
+    const srcs = mine.filter(s => s.units >= pz.keep / 20 * s.r && (!exposed(s) || s.units * (1 - pz.sendFrac) >= s.r * 0.4)
+      && (G.mode !== 'crown' || typeof crownSpare !== 'function' || crownSpare(me, s))).sort((a, b) => travel(a, t) - travel(b, t));
     const chosen = [];
     let sum = 0, sumAll = 0, far = 0, need = Infinity, needS = Infinity, needH = Infinity;
     const siegeOk = AI_SIEGE && t.owner && d !== 'easy' && id !== 'kharzul';
@@ -1021,6 +1026,7 @@ function aiThink(ai) {
     if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
     if (G.monster && typeof monsterWorthMul === 'function') worth *= monsterWorthMul(t, me);
     if (G.mode === 'hill' && typeof hillWorthMul === 'function') worth *= hillWorthMul(ai, t, P);
+    if (G.mode === 'crown' && typeof crownWorthMul === 'function') worth *= crownWorthMul(ai, t, P);
     if (worth <= 0) continue;
     if (id === 'kharzul' && real(t) === ai.focus) worth *= 2.5;
     // Grand Campaign: lords turn on whichever rival has fallen well behind them, so a dying realm gets finished off.
@@ -1291,6 +1297,8 @@ function update(dt) {
   checkSurrender();
   // King of the Hill (#64): the crowned keep scores, and the race can end the battle (js/hill.js).
   if (G.mode === 'hill' && typeof hillTick === 'function' && hillTick(dt)) return;
+  // Capture the Crown (#66): crowns on the road, knockouts and the last crown standing (js/crown.js).
+  if (G.mode === 'crown' && typeof crownTick === 'function' && crownTick(dt)) return;
 
   if (G.cfg.demo) {
     if (!alive(1) || !alive(2) || G.time > 150) newGame(demoCfg(), G.portrait);
@@ -1324,7 +1332,8 @@ const grandSurrenderShare = () =>
   Math.min(GRAND.wearyMax, GRAND.surrenderShare + Math.max(0, G.wave - GRAND.wearyFrom) * GRAND.wearyPerWave);
 function checkSurrender() {
   // King of the Hill (#64) is a race against the clock: nobody gives up, and seats can't fall.
-  if (G.time < 60 || G.mode === 'hill') return;
+  // In Capture the Crown (#66) a realm is out only when its crown is taken.
+  if (G.time < 60 || G.mode === 'hill' || G.mode === 'crown') return;
   const sum = G.owners.reduce((a, o) => a + totalOf(o), 0) || 1;
   for (const o of G.owners.slice(G.cfg.humans || 1)) {   // people never surrender for themselves
     if (G.surrendered.has(o)) continue;
@@ -1363,6 +1372,8 @@ function surrender(o, castles) {
 // Attackers deal damage scaled by their strike strength against the defender's wall strength.
 function arrive(k, t) {
   if (t.owner === k.owner) { t.units += k.n; return; }
+  // Capture the Crown (#66): scouts look inside and report rather than attack (js/crown.js).
+  if (G.mode === 'crown' && typeof crownArrive === 'function' && crownArrive(k, t)) return;
   // A truce agreed while they marched: the column turns back home.
   // If home has fallen meanwhile, they fall back on the nearest castle their lord still holds.
   if (allied(k.owner, t.owner)) {

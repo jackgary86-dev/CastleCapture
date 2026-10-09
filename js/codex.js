@@ -59,7 +59,7 @@
   const para = t => `<p>${esc(t)}</p>`;
   const list = items => `<ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
   const stat = (label, v) => `<div><span>${esc(label)}</span><strong>${esc(v)}</strong></div>`;
-  const lineKinds = { capture: 'Taking one of your castles', lose: 'Losing a castle', power: 'Using their power', counter: 'Striking back', nearDefeat: 'Near defeat', hill: 'Taking the hill', surrender: 'Surrendering', victory: 'Victory', defeat: 'Defeat' };
+  const lineKinds = { capture: 'Taking one of your castles', lose: 'Losing a castle', power: 'Using their power', counter: 'Striking back', nearDefeat: 'Near defeat', hill: 'Taking the hill', crown: 'Seizing a crown', crownLost: 'Losing their crown', surrender: 'Surrendering', victory: 'Victory', defeat: 'Defeat' };
 
   function armyEntry(id) {
     const g = game.armies && game.armies[id], L = game.lords && game.lords[id], a = info.ARMIES[id], T = info.THEMES[a.theme];
@@ -106,6 +106,7 @@
     { id: 'powers', name: 'Special powers', sub: 'One per army' },
     { id: 'hill', name: 'King of the Hill', sub: 'A mode: race for the crown' },
     { id: 'renown', name: 'Renown and the realm map', sub: 'Unlocks, seasons, hall of fame' },
+    { id: 'crown', name: 'Capture the Crown', sub: 'A mode: find the hidden crowns' },
   ];
   const GOLD = '#e9b43b', PALE = '#ece2c6';
   // An army's emblem as plain strokes, the same shapes access.js draws on plaques.
@@ -199,6 +200,27 @@
         stroke(3, PALE); c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx, fy - s * 0.9); c.stroke();
         c.fillStyle = A ? A.color : GOLD; c.beginPath(); c.moveTo(fx, fy - s * 0.9); c.lineTo(fx + s * 0.5, fy - s * 0.72); c.lineTo(fx, fy - s * 0.54); c.closePath(); c.fill();
       });
+    } else if (id === 'crown') {
+      // Three keeps under drifting fog; a crown shows over one, a struck-out crown over another, a scout rides between.
+      const y = H * 0.74, s = 30 * u;
+      c.fillStyle = 'rgba(236,226,198,0.1)'; c.fillRect(0, y - s * 0.4, W, s * 0.9);
+      const paintCrown = (x, cy, r, fill) => {
+        c.fillStyle = fill; c.beginPath(); c.moveTo(x - r, cy + r * 0.6); c.lineTo(x - r, cy - r * 0.4); c.lineTo(x - r * 0.5, cy + r * 0.05);
+        c.lineTo(x, cy - r * 0.75); c.lineTo(x + r * 0.5, cy + r * 0.05); c.lineTo(x + r, cy - r * 0.4); c.lineTo(x + r, cy + r * 0.6); c.closePath(); c.fill();
+      };
+      [0.2, 0.5, 0.8].forEach((f, i) => {
+        const x = W * f;
+        c.fillStyle = PALE; c.fillRect(x - s, y - s * 1.4, s * 2, s * 1.4);
+        for (let k = 0; k < 4; k++) c.fillRect(x - s + k * s * 0.6, y - s * 1.7, s * 0.3, s * 0.3);
+        c.fillStyle = '#17140e'; c.beginPath(); c.arc(x, y - s * 0.35, s * 0.32, Math.PI, 0); c.fill(); c.fillRect(x - s * 0.32, y - s * 0.35, s * 0.64, s * 0.35);
+        if (i === 2) paintCrown(x, y - s * 2.5, s * 0.75, GOLD);
+        if (i === 0) { paintCrown(x, y - s * 2.5, s * 0.55, 'rgba(169,157,128,0.8)'); stroke(4, '#e0362f'); c.beginPath(); c.moveTo(x - s * 0.7, y - s * 2); c.lineTo(x + s * 0.7, y - s * 3); c.stroke(); }
+      });
+      // the scout, a small rider with a pennant
+      const sx = W * 0.35, sy = y + s * 0.2;
+      c.fillStyle = PALE; c.beginPath(); c.ellipse(sx, sy - s * 0.35, s * 0.45, s * 0.2, 0, 0, Math.PI * 2); c.fill();
+      stroke(3, PALE); c.beginPath(); c.moveTo(sx, sy - s * 0.5); c.lineTo(sx, sy - s * 1.3); c.stroke();
+      c.fillStyle = GOLD; c.beginPath(); c.moveTo(sx, sy - s * 1.3); c.lineTo(sx + s * 0.5, sy - s * 1.15); c.lineTo(sx, sy - s * 1.0); c.closePath(); c.fill();
     } else if (id === 'powers') {
       const ids = typeof ARMY_IDS !== 'undefined' ? ARMY_IDS : Object.keys(info.ARMIES);
       ids.forEach((aid, i) => {
@@ -260,6 +282,12 @@
       ]));
       html += section('Spending it', para("Open Profile on the menu. Banners and roof colours change how your castles look and nothing else. A starting map unit (Ballista Tower, Siege Trebuchet or Great Ward) stands beside your home castle at the start of every skirmish and uses up that battle's one map unit; it can be switched off."));
       html += section('The realm map', para(`Winning a Grand Campaign claims its map for the season. Each claimed region adds ${REALM_BONUS.perRegion} troops to your home castle at the start of later Grand Campaigns, at most ${REALM_BONUS.max}, and that can be switched off too. Beginning a new season clears the map and keeps the old one in the hall of fame.`));
+    } else if (id === 'crown' && typeof CROWN !== 'undefined') {
+      html += section('The raid', para(`Found under Modes on the menu, against 1, 2 or all 4 lords, always under fog of war. Every realm hides its crown in one of its castles; take the castle that holds a rival's crown and that realm is out at once, its castles left empty. The last crown wins.`));
+      html += section('Hiding and moving', list([`Your crown starts in your seat. For the first ${CROWN.hideTime} seconds you can hide it in any castle you hold, free and unseen: select the castle and press Hide your crown here.`, `After that, moving it costs ${CROWN.moveCost} coins (every realm starts with ${CROWN.startCoins}) and takes ${CROWN.moveTime} seconds on the road, whatever the distance, escorted by your send % of its castle's garrison.`, 'A crown column can be seen and fought like any other. Whoever destroys it takes the crown.', `After ${CROWN.revealAt / 60} minutes the heralds reveal every crown, so no raid drags on forever.`]));
+      html += section('Finding a crown', list([`Scouts are a troop type of this mode: ${CROWN.scoutTroops} fast riders from your nearest selected castle look inside a castle without attacking it and report whether a crown is there. Archers can still shoot them down.`, 'Capturing a castle also shows whether a crown was there. A report stays fresh on the map for a minute and a half.', 'The crown bar in the header shows what you know of every crown.']));
+      const lords = game.lords ? [['aldmere', 'hides her crown in her biggest castle behind fresh walls and keeps it there, guarded heavily.'], ['kharzul', 'keeps his crown in his own hall and never moves it. He sends no scouts: he hits the fattest castle he can see.'], ['frostmark', 'keeps her crown in her hall and moves it deeper the moment rival scouts find it.'], ['solmara', 'hides his crown anywhere but his seat, scouts more than anyone and pays to keep his crown moving.'], ['nyx', 'hides her crown in a quiet, thinly held castle and fattens a decoy elsewhere; found out, she slips it away.']].filter(([aid]) => game.lords[aid]).map(([aid, t]) => `${game.lords[aid].short} ${t}`) : [];
+      if (lords.length) html += section('How the lords play it', list(['Every lord guesses where a crown is from how heavily castles are held, so a fat decoy garrison draws them.', ...lords]));
     } else {
       html += para('Nothing to show.');
     }

@@ -36,6 +36,10 @@ const ACHIEVEMENTS = [
   { id: 'defense10', name: 'Hold the Line', desc: 'Survive 10 waves of Siege Defense.', goal: 10, progress: r => r.defenseBestWave },
   { id: 'defense20', name: 'Unbroken', desc: 'Survive 20 waves of Siege Defense.', goal: 20, progress: r => r.defenseBestWave },
   { id: 'defense30', name: 'The Last Bastion', desc: 'Survive 30 waves of Siege Defense.', goal: 30, progress: r => r.defenseBestWave },
+  // Capture the Crown (#66): like the other modes, its raids count here and not towards battles won and lost.
+  { id: 'crownWin', name: 'Crown Thief', desc: 'Win a Capture the Crown raid.' },
+  { id: 'crownRoad', name: 'Highway Robbery', desc: "Seize a rival's crown from its column on the road." },
+  { id: 'crownHidden', name: 'Sleight of Hand', desc: 'Win Capture the Crown without rival scouts ever finding your crown.' },
 ];
 function grandMapCount() { return typeof GRAND_MAPS === 'object' ? Object.keys(GRAND_MAPS).length : 1; }
 
@@ -45,6 +49,7 @@ const blankRecords = () => ({
   grandPlayed: 0, grandWon: 0, grandMapsWon: [], slain: 0,
   hillPlayed: 0, hillWon: 0, hillArmiesWon: [], hillBest: {},   // hillBest: fastest time to the goal, by army
   defensePlayed: 0, defenseBestWave: 0, defenseBestScore: 0,
+  crownPlayed: 0, crownWon: 0, crownsTaken: 0,
 });
 function loadAchievements() {
   const d = store.get(ACH_KEY, null);
@@ -169,11 +174,30 @@ function defenseEnded() {
   showUnlocks(unlockEarned());
 }
 
+// Capture the Crown: its own wins, crowns taken, and the career totals.
+function crownEnded(win) {
+  const r = ach.rec, C = G.crown;
+  r.crownPlayed++;
+  r.castles += G.caps;
+  r.ambushed += ambushedThisBattle();
+  const earned = new Set();
+  const mine = C ? G.owners.filter(o => C.out[o] && C.out[o].by === 1) : [];
+  r.crownsTaken += mine.length;
+  if (mine.some(o => C.out[o].road)) earned.add('crownRoad');
+  if (win) {
+    r.crownWon++;
+    earned.add('crownWin');
+    if (C && C.exposed[1] == null) earned.add('crownHidden');
+  }
+  showUnlocks(unlockEarned(earned));
+}
+
 on('end', ({ win }) => {
   if (!G || G.cfg.demo || G.cfg.tutorial) return;
   if (G.mode === 'grand') { grandEnded(win); return; }
   if (G.mode === 'hill') { hillEnded(win); return; }
   if (G.mode === 'defense') { defenseEnded(); return; }
+  if (G.mode === 'crown') { crownEnded(win); return; }
   if ((G.cfg.humans || 1) > 1) return;   // beating a friend at the other keyboard isn't beating a lord
   const r = ach.rec, me = G.fac[1], rivals = G.owners.slice(1).map(o => G.fac[o]), diff = G.cfg.diff;
   r.battles++;
@@ -292,6 +316,7 @@ function renderAchievements() {
     ['Grand Campaigns', r.grandPlayed], ['Grand Campaigns won', r.grandWon], ['Map monsters slain', r.slain],
     ['King of the Hill races', r.hillPlayed], ['King of the Hill won', r.hillWon],
     ['Siege Defense games', r.defensePlayed], ['Most waves held', r.defenseBestWave], ['Best Siege Defense score', r.defenseBestScore],
+    ['Capture the Crown raids', r.crownPlayed], ['Raids won', r.crownWon], ['Crowns taken', r.crownsTaken],
   ];
   const dl = document.getElementById('achRecords');
   dl.innerHTML = '';

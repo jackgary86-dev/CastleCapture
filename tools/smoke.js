@@ -409,6 +409,103 @@ if (hasDefense) {
     if (!rec || rec.score !== 0) throw new Error('the daily score was not stored');
   }`);
 }
+// ---------- 7. Capture the Crown (#66): hide, scout, move (saved and resumed mid-move), seize and win; then lose a crown on the road ----------
+const hasCrown = run('capture the crown check', `typeof startCrown === 'function'`);
+if (hasCrown) {
+  run('capture the crown start, hide and scout', `{
+    Math.random = mulberry(${SEED * 13 + 5});
+    startCrown('aldmere', 2, 'hard');
+    startBattle();
+    if (G.mode !== 'crown' || !G.crown || !G.cfg.fog) throw new Error('Capture the Crown did not start in its own mode under fog');
+    if (UNIT_IDS.includes('scout') || !UNIT_TYPES.scout) throw new Error('scouts should be a troop type outside the T cycle');
+    for (const o of G.owners) if (G.crown.at[o] !== G.planets.find(p => p.owner === o).id) throw new Error('a crown did not start in its seat');
+    // The lords stand aside so the test controls the board; each rival's crown stays in its seat.
+    G.ais = [];
+    for (const o of G.owners) G.crown.picked[o] = true;
+    const seat = G.planets[G.crown.at[1]];
+    seat.units = 120;
+    // Hiding is free and instant in the opening.
+    const keep = G.planets.filter(p => p.owner === 0).sort((a, b) => dist(a, seat) - dist(b, seat))[0];
+    keep.owner = 1; keep.units = 30;
+    const coins = G.coins[1];
+    if (!crownMove(1, keep) || G.crown.at[1] !== keep.id || G.coins[1] !== coins || crownCarrier(1)) throw new Error('hiding the crown in the opening was not free and instant');
+    if (!crownMove(1, seat) || G.crown.at[1] !== seat.id) throw new Error('could not hide the crown back in the seat');
+    hud(); draw(${clock});
+    // When the hiding time runs out, reports from the opening are dropped (crowns may have moved since).
+    G.crown.intel[1][G.crown.at[2]] = { crown: 2, t: 1 };
+    G.time = CROWN.hideTime - 0.01;
+    for (let i = 0; i < 3; i++) update(1 / 30);
+    if (!G.crown.hidden || G.crown.intel[1][G.crown.at[2]]) throw new Error('a report from the opening outlived the hiding time');
+    // Scouts look inside a rival castle and report, without attacking it.
+    const rival = G.planets[G.crown.at[2]], before = rival.owner;
+    setUnitType('scout');
+    sel.clear(); sel.add(seat);
+    playerSend(rival);
+    setUnitType('foot');
+    const sc = G.packets.filter(k => k.owner === 1 && k.type === 'scout');
+    if (sc.length !== 1 || sc[0].n !== CROWN.scoutTroops) throw new Error('scouts did not ride out as one small band');
+    for (let i = 0; i < 30 * 30 && G.packets.some(k => k.type === 'scout'); i++) update(1 / 30);
+    const rep = G.crown.intel[1][rival.id];
+    if (!rep || rep.crown !== 2) throw new Error('the scouts did not report the crown they found');
+    if (rival.owner !== before) throw new Error('scouts attacked the castle');
+    if (G.crown.exposed[2] == null) throw new Error('the rival did not notice the scouts at its crown');
+    hud(); draw(${clock});
+  }`);
+  run('capture the crown move, save and resume', `{
+    const seat = G.planets[G.crown.at[1]], keep = G.planets.find(p => p.owner === 1 && p !== seat);
+    G.time = Math.max(G.time, CROWN.hideTime + 1);
+    G.coins[1] = 40; seat.units = 100;
+    if (!crownMove(1, keep, 0.5)) throw new Error('could not move the crown');
+    const k = crownCarrier(1);
+    if (!k || G.crown.at[1] !== null || G.coins[1] !== 40 - CROWN.moveCost) throw new Error('the crown did not take the road for its price');
+    for (let i = 0; i < 30 * 6; i++) update(1 / 30);
+    hud(); draw(${clock});
+    const t = crownCarrier(1).crown.t, n = crownCarrier(1).n;
+    saveBattle(); resumeBattle(); setPaused(false);
+    G.ais = [];
+    const r = crownCarrier(1);
+    if (G.mode !== 'crown' || !r || !r.hold || Math.abs(r.crown.t - t) > 1e-6 || r.n !== n || r.to !== G.planets[keep.id] || G.crown.at[1] !== null) throw new Error('the crown on the road did not survive a save and resume');
+    if (G.crown.intel[1][G.crown.at[2]] == null) throw new Error('scout reports were lost on resume');
+    for (let i = 0; i < 30 * (CROWN.moveTime + 1) && crownCarrier(1); i++) update(1 / 30);
+    if (crownCarrier(1) || G.crown.at[1] !== keep.id) throw new Error('the crown did not reach its new castle after ' + CROWN.moveTime + ' seconds');
+    hud(); updateCastlePanel(); draw(${clock});
+  }`);
+  run('capture the crown knockout and win', `{
+    const home = G.planets[G.crown.at[1]];
+    for (const o of [2, 3]) {
+      const c = G.planets[G.crown.at[o]], theirs = G.planets.filter(p => p.owner === o).length;
+      launch(1, home, c, 3000, 'foot');
+      for (let i = 0; i < 30 * 60 && !G.crown.out[o]; i++) update(1 / 30);
+      if (!G.crown.out[o] || G.crown.out[o].by !== 1) throw new Error('taking the crown castle of ' + o + ' did not knock it out');
+      if (G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o)) throw new Error('a knocked-out realm kept castles or columns');
+      if (theirs > 1 && !G.planets.some(p => p.prevOwner === o && p.owner === 0)) throw new Error('the castles of the knocked-out realm did not go neutral');
+      if (o === 2 && G.over) throw new Error('the raid ended with a rival crown still standing');
+      hud(); draw(${clock});
+    }
+    if (!G.over || G.won !== true || G.crown.winner !== 1) throw new Error('the last crown standing did not win');
+    if (document.getElementById('endTitle').textContent !== 'The last crown') throw new Error('no Capture the Crown end screen');
+    if (!(ach.rec.crownWon >= 1) || !(ach.rec.crownsTaken >= 2)) throw new Error('the raid was not recorded');
+  }`);
+  run('capture the crown seized on the road', `{
+    startCrown('kharzul', 1, 'medium');
+    startBattle();
+    G.ais = []; G.crown.picked[2] = true;
+    const seat = G.planets[G.crown.at[1]], keep = G.planets.filter(p => p.owner === 0).sort((a, b) => dist(a, seat) - dist(b, seat))[0];
+    keep.owner = 1; seat.units = 60;
+    G.time = CROWN.hideTime + 1;
+    if (!crownMove(1, keep, 0.25)) throw new Error('could not move the crown');
+    const k = crownCarrier(1);
+    for (let i = 0; i < 30 * 3; i++) update(1 / 30);
+    // A rival column meets it on the road and wins.
+    const foe = G.planets.find(p => p.owner === 2);
+    G.packets.push({ owner: 2, from: foe, to: foe, n: 200, str: 1, type: 'foot', escort: false, delay: 0, phase: 0, path: [{ x: foe.x, y: foe.y }], wp: 0, jx: 0, jy: 0, x: k.x + 1, y: k.y + 1 });
+    for (let i = 0; i < 30 && !G.over; i++) update(1 / 30);
+    if (!G.crown.out[1] || G.crown.out[1].by !== 2 || !G.crown.out[1].road) throw new Error('destroying the crown column did not hand the crown to the rival');
+    if (!G.over || G.won !== false) throw new Error('losing the crown did not end the raid in defeat');
+    if (document.getElementById('endTitle').textContent !== 'Your crown is taken') throw new Error('no defeat screen for a lost crown');
+    hud(); draw(${clock});
+  }`);
+}
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', and a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', and a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}.`);

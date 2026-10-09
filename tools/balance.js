@@ -10,8 +10,9 @@
 //   node tools/balance.js --mode grand --map scorched   # ...on one map (realm, scorched, fells, blackwood); 'all' cycles them
 //   node tools/balance.js --mode hill --games 16   # King of the Hill (#64): every pairing races for the crowned keep
 //   node tools/balance.js --mode defense --games 8   # Siege Defense: the AI holds the fortress; median waves per army
+//   node tools/balance.js --mode crown --games 16    # Capture the Crown (#66): every pairing hunts the other's hidden crown
 //
-// Only js/data.js, js/sim.js, js/grand.js, js/hill.js, js/defense.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
+// Only js/data.js, js/sim.js, js/grand.js, js/hill.js, js/defense.js, js/crown.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
 // dependencies. Math.random is seeded per game, so the same arguments always give the same result.
 
 const fs = require('fs');
@@ -37,13 +38,13 @@ const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
-const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/defense.js', 'js/monsters.js']
+const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/defense.js', 'js/crown.js', 'js/monsters.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8'))
   .join('\n;\n');
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, newGame, update, totalOf, march, on, hillCfg, defenseCfg,
+  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
@@ -60,6 +61,7 @@ for (const pair of (opt('set', '') || '').split(',').filter(Boolean)) {
 if (MODE === 'grand') { runGrand(); process.exit(0); }
 if (MODE === 'hill') process.exit(runHill() ? 1 : 0);
 if (MODE === 'defense') process.exit(runDefense() ? 0 : 1);
+if (MODE === 'crown') process.exit(runCrown() ? 1 : 0);
 
 const stat = Object.fromEntries(ids.map(id => [id, { games: 0, decided: 0, wins: 0, powers: 0, units: 0, surrenders: 0 }]));
 const lengths = [];
@@ -296,4 +298,71 @@ function runDefense() {
   for (const r of rows) console.log(`${r.army.padEnd(11)} ${String(r.games).padStart(5)}  ${String(r.medianWaves).padStart(12)}  ${String(r.medianScore).padStart(12)}  ${(r.minutes + ' min').padStart(13)}  ${r.waves.join(' ')}${r.outside ? '   <-- outside the spread' : ''}`);
   console.log(`\nmedian ${median} waves over all games (target 8-15); every army within ${Math.round(SPREAD * 100)}% of it${ok ? '' : ' -- FAILED'}${crashes ? `; ${crashes} crash(es)` : ''}`);
   return ok;
+}
+
+// ---------- Capture the Crown (#66) ----------
+// Every pairing hunts the other's hidden crown under fog, alternating whose homeland it is fought on,
+// with the AI playing both seats (the player's seat hides its crown in character too). A game is decided
+// when one realm holds the last crown; games still running at --seconds (default 1500) are undecided.
+// Two three-way and one five-way game follow for crash coverage. Returns true on failure.
+function runCrown() {
+  const CAP = +opt('seconds', 1500), st = Object.fromEntries(ids.map(id => [id, { games: 0, decided: 0, wins: 0, moves: 0, scouts: 0, road: 0 }]));
+  const lens = [], how = { castle: 0, road: 0 };
+  let fails = 0, undecided = 0;
+  const play = (armies, mapOf, seed, label) => {
+    api.seedRandom(seed);
+    const cfg = api.crownCfg(armies[0], armies.slice(1), DIFF, seed);
+    cfg.map = mapOf;
+    api.newGame(cfg);
+    const G = api.G;
+    G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+    try {
+      // The player's seat losing its crown ends a real game; here the others play on to the last crown.
+      while (G.crown.winner == null && G.time < CAP) { G.over = false; api.update(DT); }
+    } catch (e) {
+      fails++;
+      console.error(`crash in ${label}: ${e.stack}`);
+      return null;
+    }
+    const w = G.crown.winner;
+    if (w == null) undecided++; else lens.push(G.time);
+    for (const o of G.owners) { const x = G.crown.out[o]; if (x && x.by) how[x.road ? 'road' : 'castle']++; }
+    return { G, w };
+  };
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      for (let g = 0; g < GAMES; g++) {
+        const a = ids[i], b = ids[j];
+        const r = play([a, b], g % 2 ? a : b, 6000 + i * 100 + j * 10 + g, `${a} vs ${b} #${g}`);
+        if (!r) continue;
+        for (const o of r.G.owners) {
+          const s = st[r.G.fac[o]];
+          s.games++;
+          s.moves += r.G.crown.moves[o]; s.scouts += r.G.crown.scouts[o];
+          if (r.w != null) { s.decided++; if (o === r.w) s.wins++; }
+        }
+      }
+    }
+  }
+  play(['kharzul', 'frostmark', 'nyx'], 'solmara', 5, 'three-way A');
+  play(['aldmere', 'solmara', 'kharzul'], 'nyx', 9, 'three-way B');
+  play(['aldmere', 'solmara', 'kharzul', 'frostmark', 'nyx'], 'nyx', 11, 'five-way');
+  lens.sort((x, y) => x - y);
+  const rows = ids.map(id => {
+    const s = st[id], rate = s.decided ? s.wins / s.decided : null;
+    return { army: id, lord: api.LORDS[id].short, games: s.games, decided: s.decided, wins: s.wins, winRate: rate,
+      movesPerGame: s.games ? +(s.moves / s.games).toFixed(1) : 0, scoutsPerGame: s.games ? +(s.scouts / s.games).toFixed(1) : 0,
+      outside: rate !== null && s.decided >= MIN_DECIDED && (rate < BAND_LO || rate > BAND_HI) };
+  });
+  const median = lens.length ? Math.round(lens[lens.length >> 1]) : null;
+  if (JSON_OUT) console.log(JSON.stringify({ mode: 'crown', diff: DIFF, gamesPerPairing: GAMES, band: [BAND_LO, BAND_HI], medianLength: median, undecided, crownsTaken: how, crashes: fails, rows }, null, 2));
+  else {
+    console.log(`Castle Siege Capture the Crown: ${DIFF}, ${GAMES} games per pairing, ${CAP}s cap, crowns revealed at ${api.CROWN.revealAt}s, band ${Math.round(BAND_LO * 100)}–${Math.round(BAND_HI * 100)}%`);
+    console.log(`median game ${median}s (${median == null ? '-' : (median / 60).toFixed(1)} min); ${undecided} undecided; crowns taken in castles ${how.castle}, on the road ${how.road}; ${fails} crashes\n`);
+    console.log('army        lord     games decided  wins  rate  moves/game  scouts/game');
+    for (const r of rows) console.log(`${r.army.padEnd(11)} ${r.lord.padEnd(8)} ${String(r.games).padStart(5)} ${String(r.decided).padStart(7)} ${String(r.wins).padStart(5)}  ${r.winRate === null ? '   -' : (Math.round(r.winRate * 100) + '%').padStart(4)}  ${String(r.movesPerGame).padStart(10)}  ${String(r.scoutsPerGame).padStart(11)}${r.outside ? '   <-- outside band' : ''}`);
+  }
+  const failed = fails > 0 || rows.some(r => r.outside);
+  if (failed && !JSON_OUT) console.log('\nFAILED: ' + (fails ? `${fails} crash(es)` : 'an army is outside the win band'));
+  return failed;
 }
