@@ -67,6 +67,12 @@ Each homeland has its own synthesised theme (no audio files): a lute-like air in
 
 Thirteen achievements, from First Blood and Lightning War (win in under 2 minutes) to Bane of Lords (beat every lord on Warlord) and Conqueror (capture 100 castles). New ones appear on the victory screen. The menu's achievements sheet also keeps your records: battles, wins and losses, fastest wins at each difficulty, castles captured, enemy troops destroyed on the road, and your record with each army and against each lord. Everything is saved in your browser.
 
+## Accessibility
+
+- **Colour-blind mode** (menu, or **C**) switches the armies to a colour-blind-safe palette and puts each army's emblem (crown, moon, snowflake, sun, eye) on its garrison plaques and above its marching columns, so kingdoms can be told apart by shape.
+- **Keyboard play:** **Tab** and **Shift+Tab** move between your castles, the **arrow keys** move to the nearest castle in that direction, **Enter** selects your castle or sends your selected troops to an enemy or unclaimed castle, and **Shift+Enter** sends them to any castle, including your own.
+- **Screen readers** hear the focused castle, captures, special powers, map units, surrenders and the result.
+
 ## Modes
 
 - **Skirmish:** Pick your rival (or a random one), 1 or 2 rivals, and whether to invade their homeland or defend yours. Difficulty is Squire, Knight or Warlord.
