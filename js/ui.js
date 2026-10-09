@@ -52,7 +52,8 @@ on('power', ({ o, army: A }) => {
 // ---------- alliances and truces ----------
 const offerCard = document.getElementById('offerCard'), diploPanel = document.getElementById('diploPanel'), btnDiplo = document.getElementById('btnDiplo');
 let offerTimer = 0;
-on('offer', ({ from }) => {
+on('offer', ({ from, to }) => {
+  if (to && to !== 1) return;   // an offer to player 2 is answered on their own card (js/twoplayer.js)
   const id = G.fac[from], L = LORDS[id], A = ARMIES[id];
   offerCard.style.setProperty('--c', A.color);
   offerCard.innerHTML = `${portraitHtml(id)}<div class="offer-body"><b>${L.short}, ${L.title}</b><q></q><small>A truce for ${PACT_TIME} seconds: neither side may attack the other.</small><div class="row"><button class="primary" id="offerYes">Accept</button><button id="offerNo">Refuse</button></div></div>`;

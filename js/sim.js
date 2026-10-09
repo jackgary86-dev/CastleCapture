@@ -544,6 +544,7 @@ const PACT_TIME = 90, OFFER_TIME = 15, PACT_COOLDOWN = 60, DIPLO_EVERY = 3, AMAR
 const pactKey = (a, b) => a < b ? `${a}-${b}` : `${b}-${a}`;
 const pactOf = (a, b) => G.pacts && G.pacts.find(p => ((p.a === a && p.b === b) || (p.a === b && p.b === a)) && G.time < p.until);
 const allied = (a, b) => !!(a && b && a !== b && G.pacts && pactOf(a, b));
+const human = o => o >= 1 && o <= (G.cfg.humans || 1);   // a kingdom a person plays (two-player mode, #12)
 const aliveOwners = () => G.owners.filter(o => G.planets.some(p => p.owner === o));
 const leaderOf = () => aliveOwners().sort((a, b) => totalOf(b) - totalOf(a))[0];
 function canPact(a, b) {
@@ -571,24 +572,24 @@ function lordAccepts(o, from) {
     case 'nyx': return true;                                        // Veyra always says yes
     case 'aldmere': return leaderOf() !== o;                        // Isolde only when she isn't winning
     case 'frostmark': return totalOf(from) > totalOf(o);            // Sigrun only with someone stronger
-    case 'solmara': return leaderOf() !== o && (from !== 1 || G.coins[1] >= AMARU_PRICE);   // Amaru, for a price
+    case 'solmara': return leaderOf() !== o && (!human(from) || G.coins[from] >= AMARU_PRICE);   // Amaru, for a price
     default: return false;
   }
 }
 // A kingdom offers kingdom `to` a truce. The player answers with a card; AI lords answer at once.
 function proposeTruce(from, to) {
   if (!canPact(from, to)) return 'unavailable';
-  if (to === 1) {
+  if (human(to)) {
     if (G.offer) return 'unavailable';
     G.offer = { from, to, until: G.time + OFFER_TIME };
-    emit('offer', { from });
+    emit('offer', { from, to });
     return 'pending';
   }
   const yes = lordAccepts(to, from);
-  if (yes && from === 1 && G.fac[to] === 'solmara') G.coins[1] -= AMARU_PRICE;
+  if (yes && human(from) && G.fac[to] === 'solmara') G.coins[from] -= AMARU_PRICE;
   if (yes) makePact(from, to);
   else G.pactCool[pactKey(from, to)] = G.time + PACT_COOLDOWN;
-  if (from === 1) lordSays(to, yes ? 'accept' : 'refuse', true);
+  if (human(from)) lordSays(to, yes ? 'accept' : 'refuse', true);
   return yes ? 'accepted' : 'refused';
 }
 function answerOffer(yes) {
@@ -599,11 +600,11 @@ function answerOffer(yes) {
   else G.pactCool[pactKey(o.from, o.to)] = G.time + PACT_COOLDOWN;
   emit('offerAnswered', { from: o.from, yes });
 }
-// The player breaks a truce. The other lord takes it badly.
-function breakPact(o) {
-  const p = pactOf(1, o);
+// A player breaks a truce. The other lord takes it badly.
+function breakPact(o, by = 1) {
+  const p = pactOf(by, o);
   if (!p) return;
-  endPact(p, 1);
+  endPact(p, by);
   lordSays(o, 'betrayed', true);
 }
 function diplomacyTick() {

@@ -35,7 +35,7 @@
     seg.innerHTML = `<button data-two="off" aria-pressed="${!twoOn}">Off</button><button data-two="on" aria-pressed="${twoOn}">On</button>`;
     const note = document.createElement('p');
     note.id = 'twoNote'; note.style.fontSize = '13px';
-    note.innerHTML = 'A second player takes the rival army, chosen above, with the keyboard: <b>W A S D</b> move the cursor, <b>E</b> selects a castle or sends to the one under the cursor, <b>F</b> selects all, <b>R</b> uses their power, <b>Shift+1–4</b> set how many to send. Fog of war is off for two players.';
+    note.innerHTML = 'A second player takes the rival army, chosen above, with the keyboard: <b>W A S D</b> move the cursor, <b>E</b> selects a castle or sends to the one under the cursor, <b>F</b> selects all, <b>R</b> uses their power, <b>Shift+1–4</b> set how many to send, <b>T</b> offers or breaks a truce with the lord under the cursor and <b>Y</b> / <b>N</b> answer one. Fog of war is off for two players.';
     fogSeg.after(label, seg, note);
     note.hidden = !twoOn;
     seg.addEventListener('click', e => {
@@ -88,7 +88,52 @@
     else if (e.code === 'KeyF') { e.preventDefault(); for (const p of mine()) sel2.add(p); }
     else if (e.code === 'KeyR') { e.preventDefault(); if (usePower(ME)) { sfx.drum(); hud(); } }
     else if (e.shiftKey && /^Digit[1-4]$/.test(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); sendPcts[ME] = PCTS[+e.code.slice(5) - 1]; }
+    else if (e.code === 'KeyT') { e.preventDefault(); diplomacyKey(); }
+    else if ((e.code === 'KeyY' || e.code === 'KeyN') && G.offer && G.offer.to === ME) { e.preventDefault(); answerOffer(e.code === 'KeyY'); }
   }, true);
+
+  // ---------- truces for player 2 ----------
+  // T offers the lord whose castle is under the cursor a truce, or breaks the one running with them.
+  function diplomacyKey() {
+    const o = cursor && cursor.owner;
+    if (!o || o === ME) { toast('Diplomacy', 'Put the cursor on a rival castle, then press T to offer that lord a truce or break one.', army(ME).color); return; }
+    const L = lordOf(o);
+    if (pactOf(ME, o)) { breakPact(o, ME); toast(`Player 2 breaks the truce with ${L.short}`, `${army(ME).name} and ${army(o).name} are at war again.`, army(ME).color); return; }
+    const r = proposeTruce(ME, o);
+    const text = r === 'accepted' ? `${L.short} accepts. Neither side may attack the other for ${PACT_TIME} seconds.`
+      : r === 'refused' ? `${L.short} refuses.`
+      : r === 'pending' ? `${L.short} is deciding.`
+      : 'No truce is possible now: it needs three kingdoms still standing, no truce already, and the cooling-off time to have passed.';
+    toast(`Player 2 offers ${L.short} a truce`, text, army(o).color);
+  }
+  // An offer made to player 2 waits on its own card until they press Y or N.
+  const p2offer = document.createElement('div');
+  p2offer.id = 'p2offer'; p2offer.hidden = true; p2offer.setAttribute('role', 'dialog'); p2offer.setAttribute('aria-label', 'A lord offers player 2 a truce');
+  board.append(p2offer);
+  let offerTimer2 = 0;
+  on('offer', ({ from, to }) => {
+    if (to !== ME || !G || G.cfg.humans !== 2) return;
+    const id = G.fac[from], L = LORDS[id];
+    p2offer.style.setProperty('--c', ARMIES[id].color);
+    p2offer.innerHTML = `${portraitHtml(id)}<div><b>To Player 2: ${L.short}, ${L.title}</b><q></q><small>A truce for ${PACT_TIME} seconds. <kbd>Y</kbd> accept · <kbd>N</kbd> decline</small></div>`;
+    p2offer.querySelector('q').textContent = pick(L.lines.offer || ['A truce?']);
+    p2offer.hidden = false;
+    clearTimeout(offerTimer2);
+    offerTimer2 = setTimeout(() => { p2offer.hidden = true; }, OFFER_TIME * 1000 + 500);
+  });
+  on('offerAnswered', () => { p2offer.hidden = true; });
+  on('newGame', () => { p2offer.hidden = true; });
+  on('pact', ({ a, b }) => {
+    if (!G || G.cfg.humans !== 2 || G.cfg.demo || (a !== ME && b !== ME) || a === 1 || b === 1) return;
+    const o = a === ME ? b : a;
+    toast(`Player 2: truce with ${lordOf(o).short}`, `For ${PACT_TIME} seconds ${army(ME).name} and ${army(o).name} cannot attack each other.`, army(o).color);
+  });
+  on('pactEnd', ({ a, b, by, expired }) => {
+    if (!G || G.cfg.humans !== 2 || G.cfg.demo || (a !== ME && b !== ME) || a === 1 || b === 1) return;
+    const o = a === ME ? b : a;
+    if (by && by !== ME) toast(`${lordOf(by).short} breaks the truce with Player 2!`, `${army(by).full} can attack ${army(ME).name} again.`, army(by).color);
+    else if (expired) toast(`Player 2's truce with ${lordOf(o).short} has ended`, `${army(ME).name} is at war again.`, army(o).color);
+  });
 
   // ---------- drawing: threats, selection, cursor and the status panel ----------
   const p2hud = document.createElement('div');
@@ -122,7 +167,8 @@
     // Status panel: army, send amount and power state for player 2.
     const pw = G.pw[ME], activePw = G.time < pw.until;
     const power = G.over ? '' : activePw ? `${A.power.name} active` : pw.ready <= 0 ? `${A.power.name} ready · <kbd>R</kbd>` : `${A.power.name} in ${fmtTime(pw.ready)}`;
-    const text = `<b>Player 2 · ${A.name}</b>Send ${Math.round(sendPcts[ME] * 100)}% · ${sel2.size} selected<br>${power}`;
+    const truces = (G.pacts || []).filter(p => (p.a === ME || p.b === ME) && G.time < p.until).map(p => `Truce with ${lordOf(p.a === ME ? p.b : p.a).short} ${Math.ceil(p.until - G.time)}s`).join(' · ');
+    const text = `<b>Player 2 · ${A.name}</b>Send ${Math.round(sendPcts[ME] * 100)}% · ${sel2.size} selected<br>${power}${truces ? `<br>${truces}` : ''}`;
     if (text !== hudText) { p2hud.innerHTML = text; hudText = text; }
     p2hud.style.setProperty('--c', A.color);
     if (p2hud.hidden) p2hud.hidden = false;
