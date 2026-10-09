@@ -45,13 +45,13 @@
   const SLOT_KEY = i => `cs-grand-${i}`;
   const slot = i => { const d = store.get(SLOT_KEY(i), null); return d && typeof d === 'object' && d.map !== undefined ? d : null; };
   // A save written by another version of the game can't be restored; it is listed so it can be deleted.
-  const stale = d => typeof SAVE_VERSION !== 'undefined' && d.v !== undefined && d.v !== SAVE_VERSION;
+  const stale = d => typeof SAVE_VERSION !== 'undefined' && d.v !== SAVE_VERSION;
   const ago = t => {
     const mins = Math.round((Date.now() - (t || 0)) / 60000);
     return mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
   };
   const slotMap = d => { const src = grandMaps(); return (src && src[d.map] && src[d.map].name) || (FALLBACK_MAP[d.map] && FALLBACK_MAP[d.map].name) || 'The Realm'; };
-  const slotLine = d => `${slotMap(d)} · Wave ${d.wave || 1} · ${d.armiesLeft != null ? `${d.armiesLeft} armies left` : 'five armies'} · saved ${ago(d.savedAt)}`;
+  const slotLine = d => `${slotMap(d)} · Wave ${Math.floor(+d.wave) || 1} · ${d.armiesLeft != null ? `${Math.floor(+d.armiesLeft) || 0} armies left` : 'five armies'} · saved ${ago(d.savedAt)}`;
 
   // ---------- map previews ----------
   // A small painted thumbnail in the style of art/launch-bg.js: the map's ground, water or lava,

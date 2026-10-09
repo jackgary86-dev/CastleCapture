@@ -17,7 +17,7 @@ const ACHIEVEMENTS = [
   { id: 'comeback', name: 'Back From the Brink', desc: 'Win after falling below a fifth of the troops on the map.' },
   { id: 'threeWay', name: 'Crown of Three', desc: 'Win a battle against two rivals at once.' },
   { id: 'builder', name: 'Master Builder', desc: 'Win with your map unit still standing on the field.' },
-  { id: 'campaign', name: 'The High Throne', desc: 'Win the final campaign battle.' },
+  { id: 'campaign', name: 'The High Throne', desc: "Win the last chapter of an army's story campaign." },
   { id: 'allArmies', name: 'Five Banners', desc: 'Win with every army.', goal: 5, progress: r => r.armiesWon.length },
   { id: 'allLords', name: 'Bane of Lords', desc: 'Beat every lord on Warlord.', goal: 5, progress: r => r.lordsBeatenHard.length },
   { id: 'ambush', name: 'Ambush Master', desc: 'Destroy 100 enemy troops in battles on the road.', goal: 100, progress: r => Math.floor(r.ambushed) },
@@ -120,6 +120,7 @@ on('monster', e => {
 on('end', ({ win }) => {
   if (!G || G.cfg.demo || G.cfg.tutorial) return;
   if (G.mode === 'grand') { grandEnded(win); return; }
+  if ((G.cfg.humans || 1) > 1) return;   // beating a friend at the other keyboard isn't beating a lord
   const r = ach.rec, me = G.fac[1], rivals = G.owners.slice(1).map(o => G.fac[o]), diff = G.cfg.diff;
   r.battles++;
   if (win) r.wins++; else r.losses++;
@@ -144,7 +145,7 @@ on('end', ({ win }) => {
     if (lowestShare() < 0.2) earned.add('comeback');
     if (G.owners.length > 2) earned.add('threeWay');
     if (G.units.some(u => u.owner === 1)) earned.add('builder');
-    if (G.cfg.level === LEVELS.length) earned.add('campaign');
+    if (G.cfg.campaign && CAMPAIGNS[G.cfg.campaign] && G.cfg.chapter === CAMPAIGNS[G.cfg.campaign].length) earned.add('campaign');
   }
   showUnlocks(unlockEarned(earned));
 });
@@ -267,8 +268,9 @@ document.getElementById('achReset').addEventListener('click', e => {
   // Two clicks to erase, since this can't be undone.
   if (Date.now() - resetArmed > 4000) {
     resetArmed = Date.now();
-    e.currentTarget.textContent = 'Click again to erase everything';
-    setTimeout(() => { e.currentTarget.textContent = 'Erase achievements and records'; }, 4000);
+    const btn = e.currentTarget;   // currentTarget is null once the click has been handled
+    btn.textContent = 'Click again to erase everything';
+    setTimeout(() => { btn.textContent = 'Erase achievements and records'; }, 4000);
     return;
   }
   resetArmed = 0;

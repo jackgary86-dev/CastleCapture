@@ -85,7 +85,7 @@ const sfx = (() => {
     if (musicLevel > 0.6 && s16 % 2 === 1) burst(t, 0.03, { vol: 0.03, type: 'highpass', freq: 6000, out });
   }
   function schedule() {
-    if (!ac || ac.state !== 'running' || !musicOn) return;
+    if (!ac || ac.state !== 'running' || !musicOn || muted) return;
     // Ease towards the target intensity so the music swells and settles rather than jumping.
     musicLevel += (musicTarget - musicLevel) * 0.03;
     musicBus.gain.value = MUSIC_VOL * (0.75 + 0.25 * musicLevel);
@@ -98,20 +98,20 @@ const sfx = (() => {
   }
   function startMusic() {
     if (!ac || timer) return;
-    musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL; musicBus.connect(ac.destination);
+    musicBus = ac.createGain(); musicBus.gain.value = musicOn && !muted ? MUSIC_VOL : 0; musicBus.connect(ac.destination);
     timer = setInterval(schedule, 25);
   }
 
   return {
     music: {
       get on() { return musicOn; },
-      setOn(v) { musicOn = v; store.set('cs-music', v); if (musicBus) musicBus.gain.value = v ? MUSIC_VOL : 0; },
+      setOn(v) { musicOn = v; store.set('cs-music', v); if (musicBus) musicBus.gain.value = v && !muted ? MUSIC_VOL : 0; },
       setTheme(t) { if (THEME_MUSIC[t] && t !== musicTheme) { musicTheme = t; step = 0; nextAt = 0; } },
       setIntensity(x) { musicTarget = Math.max(0, Math.min(1, x)); },
     },
     unlock() { ensure(); if (ac && ac.state === 'suspended') ac.resume(); startMusic(); },
     get muted() { return muted; },
-    setMuted(v) { muted = v; store.set('cs-muted', v); },
+    setMuted(v) { muted = v; store.set('cs-muted', v); if (musicBus) musicBus.gain.value = v || !musicOn ? 0 : MUSIC_VOL; },   // mute covers the music too
     drum() {
       if (!ready()) return;
       const t = ac.currentTime;

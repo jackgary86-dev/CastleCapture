@@ -36,7 +36,7 @@
     const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
     try { paintGalleryPanel(cv.getContext('2d'), TW, TH, panel); } catch {}
     b.append(cv);
-    const name = document.createElement('b'); name.textContent = panel.kind === 'army' ? entry.name : entry.name;
+    const name = document.createElement('b'); name.textContent = entry.name;
     const sub = document.createElement('small'); sub.textContent = panel.kind === 'army' ? `${entry.role} · ${entry.lord.split(',')[0]}` : entry.title;
     b.append(name, sub);
     b.setAttribute('aria-label', `Open the codex entry for ${entry.name}`);
@@ -71,7 +71,7 @@
       html += section('Strength', para(g.strength));
       const s = g.stats;
       html += section('Stats', `<div class="codex-stats">${stat('Attack', s.atk + '×')}${stat('Defence', s.def + '×')}${stat('Speed', s.speed + '×')}${stat('Training', s.prod + '×')}${stat('On the road', s.road + '×')}${stat('Vs keeps', s.neutral + '×')}</div>`);
-      html += section(`Special power: ${g.power.name}`, para(`${g.power.desc} Lasts ${g.power.dur} seconds; ready 45 seconds into a battle, then every five minutes.`));
+      html += section(`Special power: ${g.power.name}`, para(`${g.power.desc} Lasts ${g.power.dur} seconds; ready ${FIRST_CHARGE} seconds into a battle, then every ${Math.round(RECHARGE / 60)} minutes.`));
       const saves = typeof AI_UNIT !== 'undefined' && typeof MAP_UNITS !== 'undefined' && MAP_UNITS[AI_UNIT[id]];
       html += section('As a rival', para(g.personality + (saves ? ` Saves coins for a ${saves.name}.` : '')));
       if (typeof UNIT_TYPES !== 'undefined') html += section('Troop types', list(Object.values(UNIT_TYPES).map(u => `${u.name}: ${u.desc}`)) + (id === 'kharzul' ? para('Torvek trusts his horses and never fields catapults.') : AI_SIEGE ? '' : para('As a rival, this army rides cavalry to reinforce but does not field catapults yet.')));
@@ -211,7 +211,7 @@
     if (id === 'troops' && typeof UNIT_TYPES !== 'undefined') {
       html += section('Choosing a type', para('The Troops buttons in the command bar, or T, set the type every column you send from then on will be. A castle trains plain troops; the type is chosen when they march.'));
       html += table(['Type', 'Speed', 'Against castles', 'On the road', 'Best for'], Object.values(UNIT_TYPES).map(t => [t.name, x(t.speed), x(t.siege), x(t.road), t.desc]));
-      html += section('Using them', list(['Cavalry reach a threatened castle long before foot, and catch enemy columns on the road, but bounce off walls.', 'Catapults crack castles open but crawl and lose road fights: send foot alongside, or wait until the road is clear.', 'The rival lords field foot and cavalry; the AI keeps its catapults for sieges with an escort.']));
+      html += section('Using them', list(['Cavalry reach a threatened castle long before foot, and catch enemy columns on the road, but bounce off walls.', 'Catapults crack castles open but crawl and lose road fights: send foot alongside, or wait until the road is clear.', AI_SIEGE ? 'The rival lords field all three; the AI keeps its catapults for sieges with an escort.' : 'The rival lords field foot and cavalry, never catapults.']));
     } else if (id === 'kinds' && typeof CASTLE_KINDS !== 'undefined') {
       html += section('Special castles', para('About a quarter of the unclaimed keeps on a map are special. Each carries a badge beside its troop count, and keeps its kind when captured.'));
       html += table(['Kind', 'Badge', 'Defence', 'Training', 'Effect'], Object.values(CASTLE_KINDS).map(k => [k.name, k.name === 'Fortress' ? 'Shield' : k.name === 'War camp' ? 'Crossed swords' : 'Cottage', x(k.def), k.prod ? x(k.prod) : 'none', k.desc]));

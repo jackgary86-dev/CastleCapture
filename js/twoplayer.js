@@ -81,15 +81,16 @@
   // Capture phase, so a shifted digit is claimed here before ui.js's plain 1 to 4 handler sees it
   // (on most layouts Shift+3 is '#', but not on all).
   addEventListener('keydown', e => {
-    if (!inPlay() || (e.target.closest && e.target.closest('button, input, select, textarea, a'))) return;
+    if (!inPlay() || e.ctrlKey || e.metaKey || e.altKey || (e.target.closest && e.target.closest('button, input, select, textarea, a'))) return;
     const dirs = { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
     if (dirs[e.code]) { e.preventDefault(); step(...dirs[e.code]); }
     else if (e.code === 'KeyE') { e.preventDefault(); confirm(e.shiftKey); }
     else if (e.code === 'KeyF') { e.preventDefault(); for (const p of mine()) sel2.add(p); }
     else if (e.code === 'KeyR') { e.preventDefault(); if (usePower(ME)) { sfx.drum(); hud(); } }
     else if (e.shiftKey && /^Digit[1-4]$/.test(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); sendPcts[ME] = PCTS[+e.code.slice(5) - 1]; }
-    else if (e.code === 'KeyT') { e.preventDefault(); diplomacyKey(); }
-    else if ((e.code === 'KeyY' || e.code === 'KeyN') && G.offer && G.offer.to === ME) { e.preventDefault(); answerOffer(e.code === 'KeyY'); }
+    // T, Y and N are player 2's in a two-player game; stop ui.js's troop cycle and music toggle seeing them.
+    else if (e.code === 'KeyT') { e.preventDefault(); e.stopImmediatePropagation(); diplomacyKey(); }
+    else if ((e.code === 'KeyY' || e.code === 'KeyN') && G.offer && G.offer.to === ME) { e.preventDefault(); e.stopImmediatePropagation(); answerOffer(e.code === 'KeyY'); }
   }, true);
 
   // ---------- truces for player 2 ----------

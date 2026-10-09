@@ -503,7 +503,7 @@ function usePower(o) {
   pw.ready = rechargeTime();
   pw.until = G.time + A.power.dur;
   if (A.power.id === 'crows') {
-    const targets = G.planets.filter(p => p.owner && p.owner !== o).sort((a, b) => b.units - a.units).slice(0, 3);
+    const targets = G.planets.filter(p => p.owner && p.owner !== o && !allied(o, p.owner)).sort((a, b) => b.units - a.units).slice(0, 3);
     for (const t of targets) { t.units *= 0.6; G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
   }
   emit('power', { o, army: A });
@@ -562,7 +562,7 @@ function makePact(a, b) {
   emit('pact', { a, b });
 }
 function endPact(p, by) {
-  p.until = G.time;
+  p.until = G.time; p.done = true;   // done: diplomacyTick must not announce it again as expired
   G.pactCool[pactKey(p.a, p.b)] = G.time + PACT_COOLDOWN;
   emit('pactEnd', { a: p.a, b: p.b, by });
 }
@@ -851,7 +851,7 @@ function aiThink(ai) {
   aiBuyUnit(ai, mine);
 
   // Sigrun: the moment her blizzard lifts, strike the castles that attacked her.
-  if (id === 'frostmark' && ai.counter && G.time >= G.pw[me].until) {
+  if (id === 'frostmark' && ai.counter && !G.pw[me].queued && G.time >= G.pw[me].until) {
     const targets = P.filter(p => ai.counter.has(p.id) && p.owner && p.owner !== me).sort((a, b) => a.units - b.units);
     ai.counter = null;
     if (targets.length) {
@@ -866,7 +866,7 @@ function aiThink(ai) {
     const srcs = mine.filter(p => p.units >= Math.max(14, pz.keep));
     if (!srcs.length) return;
     const s = pick(srcs);
-    let ts = P.filter(p => p.owner !== me && (p.owner === 0 || !mustering())).sort((a, b) => travel(s, a) - travel(s, b)).slice(0, 5);
+    let ts = P.filter(p => p.owner !== me && !allied(me, p.owner) && (p.owner === 0 || !mustering())).sort((a, b) => travel(s, a) - travel(s, b)).slice(0, 5);
     // Aggressive armies prefer enemy castles even on easy; defensive ones prefer quiet expansion.
     const enemies = ts.filter(t => t.owner), neutrals = ts.filter(t => !t.owner);
     if (pz.enemyBias > 1.5 && enemies.length) ts = enemies;
@@ -1100,7 +1100,9 @@ function mapUnits(dt) {
         if (d <= bd) { bd = d; target = k; }
       }
       if (!target) { u.cd = 0.1; continue; }
-      target.n -= 1;
+      const kill = Math.min(1, target.n);
+      target.n -= kill;
+      if (target.owner === 1) G.stats.roadLost += kill;
       bolted = true;
       u.cd = 0.33;
       u.aim = Math.atan2(target.y - (u.y - 14), target.x - u.x);
@@ -1120,7 +1122,7 @@ function mapUnits(dt) {
     sh.age += dt;
     if (sh.age >= sh.dur && !sh.done) {
       sh.done = true;
-      if (sh.t.owner && sh.t.owner !== sh.u.owner) {
+      if (sh.t.owner && sh.t.owner !== sh.u.owner && !allied(sh.t.owner, sh.u.owner)) {
         sh.t.units = Math.max(0, sh.t.units - sh.dmg);
         G.fx.push({ kind: 'impact', x: sh.t.x, y: sh.t.y, r: sh.t.r, age: 0 });
         emit('clash', { attacker: sh.u.owner, defender: sh.t.owner });
@@ -1329,7 +1331,13 @@ function surrender(o, castles) {
 function arrive(k, t) {
   if (t.owner === k.owner) { t.units += k.n; return; }
   // A truce agreed while they marched: the column turns back home.
-  if (allied(k.owner, t.owner)) { if (k.from && k.from.owner === k.owner) k.from.units += k.n; return; }
+  // If home has fallen meanwhile, they fall back on the nearest castle their lord still holds.
+  if (allied(k.owner, t.owner)) {
+    const home = k.from && k.from.owner === k.owner ? k.from
+      : G.planets.filter(p => p.owner === k.owner).sort((a, b) => dist(a, k) - dist(b, k))[0];
+    if (home) home.units += k.n;
+    return;
+  }
   const A = strikeOf(k.owner, t) * (k.str || 1) * unitOf(k).siege, D = defAt(t);
   t.units -= k.n * A / D;
   G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
@@ -1339,7 +1347,7 @@ function arrive(k, t) {
     t.owner = k.owner; t.units = -t.units * D / A;
     if (k.owner === 1) G.caps++;
     const capturer = G.ais.find(a => a.id === k.owner);
-    if (capturer) capturer.recentCaps.push(G.time);
+    if (capturer) capturer.recentCaps = capturer.recentCaps.filter(s => G.time - s < 15).concat(G.time);
     if (was === 1) lordSays(k.owner, 'capture');
     else if (k.owner === 1 && was) lordSays(was, 'lose');
     emit('capture', { o: k.owner, was, castle: t });

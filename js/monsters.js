@@ -158,17 +158,23 @@ function spawnMonster(rnd = Math.random) {
     });
   }
   if (M.roads) for (const c of Mo.creatures) planRoad(c);
-  Mo.spawnedAt = G.wave || 1;
 }
 
 // ---------- the wave loop ----------
-// Called from update() every step. Wave changes are noticed here rather than through the 'wave' event, so
-// the headless runner (which may open the next march the moment one ends) and the page behave the same.
-function monstersTick(dt) {
+// A finished wave heals the monster and may bring it back. grandTick() calls this the moment the plan phase
+// opens, so the player and the lords plan against the monster as it will march; update() calls it too, for
+// the first wave and for saves from before this was called at the wave's end.
+function monstersWave() {
   const Mo = G.monster;
   if (!Mo) return;
   const wave = G.wave || 1;
   if (Mo.waveSeen !== wave) { if (Mo.waveSeen) marchEnd(); Mo.waveSeen = wave; }
+}
+function monstersTick(dt) {
+  const Mo = G.monster;
+  if (!Mo) return;
+  const wave = G.wave || 1;
+  monstersWave();
   if (G.phase === 'march' && Mo.marchWave !== wave) { Mo.marchWave = wave; marchStart(); }
   rebindTargets();
   if (G.phase !== 'march') return;
@@ -217,7 +223,6 @@ function marchStart() {
       c.asleep = !c.route || Math.random() < 0.45;
       if (!c.asleep) { c.dest = c.route[c.route.length - 1]; c.step = 0; }
     } else if (M.special === 'raid') {
-      c.flee = false;
       if (c.hp < c.maxHp * 0.5 || c.raided) { c.dest = { ...Mo.camp, camp: true }; c.raided = false; }
       else if (Math.random() < 0.25) {
         const targets = G.planets.filter(p => p.owner && dist(p, Mo.camp) < 560);
@@ -240,7 +245,12 @@ function marchEnd() {
     if (c.dead) continue;
     // It regenerates when nobody fought it this wave (the dragon only on its perch, bandits faster at camp).
     const allowed = M.special === 'fire' ? c.perched : true;
-    if (!c.hit && allowed) c.hp = Math.min(c.maxHp, c.hp + M.regen * (c.atCamp ? 2 : 1));
+    if (!c.hit && allowed && c.hp < c.maxHp) {
+      c.hp = Math.min(c.maxHp, c.hp + M.regen * (c.atCamp ? 2 : 1));
+      // Healed wounds come off the damage tally too, so the bar's shares and the consolation coins stay honest.
+      const dealt = Object.values(c.dmg).reduce((a, d) => a + d, 0), left = c.maxHp - c.hp;
+      if (dealt > left) for (const o in c.dmg) c.dmg[o] *= left / dealt;
+    }
     c.dest = null;
     if (M.special === 'smash') { c.asleep = true; planRoad(c); }
   }
@@ -334,7 +344,7 @@ function breatheFire(c) {
   emit('monster', { kind: 'fire', monster: M, o: target.owner, castle: target.n === undefined ? target : null, lost: burnt });
 }
 
-// The Cyclops walks into a castle: a third of the garrison and one upgrade level are lost.
+// The Cyclops walks into a castle: 30% of the garrison (smashGarrison) and one upgrade level are lost.
 function smashCastle(c, p) {
   const M = MONSTERS[G.monster.id];
   if (!p) return;
@@ -495,7 +505,7 @@ function monsterAi(ai) {
   }
   if (id === 'kharzul' || id === 'nyx') {
     // Torvek and Veyra throw in everything nearby.
-    sent = send(me, near.filter(p => dist(p, c) < 420).slice(0, 3), c, 0.7);
+    sent = send(me, near.filter(p => dist(p, c) < 560).slice(0, 3), c, 0.7);
   } else if (id === 'solmara') {
     // Amaru sends exactly enough to finish it, from the nearest castles.
     let left = need - already;
@@ -505,8 +515,9 @@ function monsterAi(ai) {
       if (n >= 3 && send(me, [p], c, n / p.units)) { sent = true; left -= n; }
     }
   } else {
-    // Isolde and Sigrun only join when they already have troops close by.
-    const close = near.filter(p => dist(p, c) < 200);
+    // Isolde and Sigrun only join when they already have troops close by. "Close" has to reach past a bandit's
+    // camp: a wounded captain heals half its health there in a wave, so a lord who waits for it never gets one.
+    const close = near.filter(p => dist(p, c) < 320);
     if (close.length) sent = send(me, close.slice(0, 2), c, 0.5);
   }
   if (sent) ai.monsterWave = G.wave;

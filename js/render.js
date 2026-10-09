@@ -16,6 +16,10 @@ function resize() {
   if (G) { sc = Math.min(cw / G.w, ch / G.h); ox = (cw - G.w * sc) / 2; oy = (ch - G.h * sc) / 2; }
 }
 new ResizeObserver(resize).observe(board);
+// Moving the window to a screen with another scale changes devicePixelRatio without resizing the board.
+(function watchDpr() {
+  matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`).addEventListener('change', () => { resize(); watchDpr(); }, { once: true });
+})();
 
 const ptr = { down: false, moved: false, sx: 0, sy: 0, wx: 0, wy: 0, start: null, wasSel: false, hover: null };
 const sel = new Set();   // the player's selected castles

@@ -26,8 +26,21 @@
     nyx:       { name: 'Nyxhollow', full: 'The Nyxhollow Covenant',      lord: 'The Hollow Matron Veyra, Mother of Crows', role: 'Attack',   theme: 'mire',   castle: 'spires',    soldier: 'hood' },
   };
   const MONSTERS = {
+    wyrm: {
+      name: 'The Wyrm of the Wastes', title: 'The Serpent Between the Keeps', sub: 'The Five Realms · wanders, ambushes columns · 600 health · 150 coins', theme: 'vale',
+      map: 'The Five Realms', health: 600, bounty: 150, respawn: 10, strength: '3 troops for every 1 it fights',
+      story: 'When the five kingdoms first marched against each other, the Wyrm came up out of the dry country to the east and found the roads between them full of soldiers. It has followed the armies ever since. It does not want castles and has never climbed a wall; it wants the columns strung out on the open road, and the more the realms make war, the fatter it grows. Every lord has sworn to kill it, and every lord has quietly let it eat a rival\'s army first.',
+      abilities: [
+        'Wanderer: roams the open country between the realms, skirting the castles rather than attacking them.',
+        'Ambush: any column that passes within its reach is bitten, three troops for every one it fights.',
+        'Turns to fight: troops sent at it are met head on once they come close, so it cannot simply be outrun.',
+        'Regrowth: heals when a whole wave passes without anyone fighting it, so a wounded Wyrm has to be finished quickly.',
+      ],
+      tactics: 'Route columns around it rather than past it; a short detour costs less than a bitten army. When it is wounded, every lord comes for the bounty, so strike in the same wave with enough troops to land the last blow yourself, from castles close enough that it cannot heal before you arrive.',
+      quote: 'It has no lair. It lives wherever the armies are.',
+    },
     dragon: {
-      name: 'The Red Dragon', title: 'Vaelthyr, the Red', sub: 'The Scorched Reach · flies, breathes fire · 700 health · 180 coins', theme: 'scorched',
+      name: 'The Red Dragon', title: 'Vaelthyr the Red', sub: 'The Scorched Reach · flies, breathes fire · 700 health · 180 coins', theme: 'scorched',
       map: 'The Scorched Reach', health: 700, bounty: 180, respawn: 10, strength: '3 troops for every 1 it fights',
       story: 'The Reach was green once. Then Vaelthyr came down from the north wind, burned the forests to ash and made the mountain at the centre his bed. For a hundred years the five kingdoms paid him tribute in cattle and gold; now the tribute has stopped, and he collects it himself. He sleeps on the hoard inside the Cinder Spire, and every few waves he wakes hungry and goes looking for whatever is marching below.',
       abilities: [
@@ -45,7 +58,7 @@
       story: 'The standing stones of the Fells were raised by giants, and Grom is the last of them. He is older than any kingdom and remembers none of them. He sleeps for years in the boulder fields and walks the old road when he wakes, looking for the stone circles his people built; a castle on a hill looks enough like one that he will try to put it right, and that is how castles are smashed. He does not hate anyone. He is simply very large.',
       abilities: [
         'Road-bound: slow and heavy, he follows the roads, so his route for the coming wave can be read from where he stands.',
-        'Castle smash: a castle in his path loses a third of its garrison and one level of its walls.',
+        'Castle smash: a castle in his path loses 30% of its garrison and one level of its walls or barracks.',
         'Crushing blows: the hardest hitter of the three monsters, killing four troops for every one he fights.',
         'Deep sleeper: he sleeps where he stops; troops that attack a sleeping Grom deal half again as much damage that wave.',
       ],
@@ -68,13 +81,16 @@
     },
   };
   const GRAND = {
+    realm:     { sub: 'All five homelands around a green heart. Open roads between the keeps, and a serpent on them.' },
     scorched:  { sub: 'Volcanic badlands. Lava fissures cross at basalt bridges; the richest keeps ring the lair.' },
     fells:     { sub: 'High moorland of standing stones and fog. Hill forts, boulder fields, a slow road-bound giant.' },
     blackwood: { sub: 'Forest and river country. Ferry crossings, slow forest tracks, robber towers in the trees.' },
   };
 
+  THEMES.realm = { ...THEMES.vale, name: 'The Five Realms' };
+
   const PANELS = [
-    ...ARMY_IDS.map(id => ({ kind: 'army', id })),
+    ...Object.keys(ARMIES).map(id => ({ kind: 'army', id })),   // this file's ARMIES: gallery.html has no data.js
     ...['vale', 'steppe', 'tundra', 'desert', 'mire'].map(id => ({ kind: 'map', id })),
     ...Object.keys(GRAND).map(id => ({ kind: 'grand', id })),
     ...Object.keys(MONSTERS).map(id => ({ kind: 'monster', id })),
@@ -205,6 +221,38 @@
   };
 
   // ---- monsters ----
+  function wyrm(ctx, W, H, u, rnd) {
+    const green = '#5f8a4e', dark = '#34522c', belly = '#c8d79a';
+    // An S-shaped body in overlapping segments, tail at the left and rearing head at the right.
+    const pts = [];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40, x = W * (0.12 + t * 0.6), y = H * (0.8 - t * 0.12) + Math.sin(t * Math.PI * 2.2) * 34 * u;
+      pts.push([x, y, (6 + t * 20) * u]);
+    }
+    for (const [x, y, r] of pts) { ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(x, y + r * 0.25, r * 1.1, r, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const [x, y, r] of pts) { ctx.fillStyle = green; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.88, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const [x, y, r] of pts) { ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(x, y + r * 0.55, r * 0.6, r * 0.25, 0, 0, Math.PI * 2); ctx.fill(); }
+    // Spines along the back.
+    pts.forEach(([x, y, r], i) => { if (i % 3 === 0 && i < 40) poly(ctx, [[x - r * 0.3, y - r * 0.7], [x + r * 0.3, y - r * 0.7], [x, y - r * 1.4]], dark); });
+    // Neck rearing up to the head.
+    const [nx, ny, nr] = pts[40], hx = nx + 46 * u, hy = ny - 96 * u;
+    ctx.strokeStyle = dark; ctx.lineCap = 'round'; ctx.lineWidth = nr * 1.9;
+    ctx.beginPath(); ctx.moveTo(nx, ny); ctx.quadraticCurveTo(nx + 40 * u, ny - 20 * u, hx, hy); ctx.stroke();
+    ctx.strokeStyle = green; ctx.lineWidth = nr * 1.6;
+    ctx.beginPath(); ctx.moveTo(nx, ny); ctx.quadraticCurveTo(nx + 40 * u, ny - 20 * u, hx, hy); ctx.stroke();
+    // Head: a long skull with an open jaw, fangs, a frill and one amber eye.
+    poly(ctx, [[hx - 22 * u, hy - 14 * u], [hx + 20 * u, hy - 22 * u], [hx + 70 * u, hy - 8 * u], [hx + 64 * u, hy + 2 * u], [hx - 16 * u, hy + 8 * u]], green);
+    poly(ctx, [[hx - 12 * u, hy + 10 * u], [hx + 58 * u, hy + 14 * u], [hx + 52 * u, hy + 26 * u], [hx - 14 * u, hy + 24 * u]], dark);
+    ctx.fillStyle = '#3a1414'; poly(ctx, [[hx - 10 * u, hy + 6 * u], [hx + 62 * u, hy + 2 * u], [hx + 56 * u, hy + 13 * u], [hx - 10 * u, hy + 11 * u]], '#3a1414');
+    for (let i = 0; i < 5; i++) { const x = hx + (8 + i * 11) * u; poly(ctx, [[x, hy + 3 * u], [x + 4 * u, hy + 3 * u], [x + 2 * u, hy + 10 * u]], '#f3ead6'); }
+    for (let i = 0; i < 4; i++) poly(ctx, [[hx - (14 + i * 4) * u, hy - (8 + i * 6) * u], [hx - (4 + i * 4) * u, hy - (12 + i * 6) * u], [hx - (26 + i * 6) * u, hy - (26 + i * 9) * u]], i % 2 ? dark : '#7aa860');
+    ctx.fillStyle = '#ffc840'; ctx.beginPath(); ctx.ellipse(hx + 22 * u, hy - 10 * u, 5 * u, 3.5 * u, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1a1410'; ctx.fillRect(hx + 21 * u, hy - 13 * u, 2 * u, 6 * u);
+    // A broken column on the road it has been following.
+    ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = 6 * u; ctx.beginPath(); ctx.moveTo(W * 0.04, H * 0.95); ctx.quadraticCurveTo(W * 0.5, H * 0.86, W * 0.98, H * 0.93); ctx.stroke();
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i < 2 ? '#3a6fc0' : '#2a2a2a'; ctx.fillRect(W * (0.84 + i * 0.022), H * 0.9 + (rnd() - 0.5) * 4 * u, 3 * u, 7 * u); }
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(W * 0.42, H * 0.88, W * 0.32, 10 * u, 0, 0, Math.PI * 2); ctx.fill();
+  }
   function dragon(ctx, W, H, u, rnd) {
     const cx = W * 0.52, cy = H * 0.52, red = '#b8302a', dark = '#6e1a16', belly = '#e8a060';
     // Crag to perch on.
@@ -311,14 +359,14 @@
     } else if (panel.kind === 'map' || panel.kind === 'grand') {
       const T = THEMES[panel.id];
       landscape(ctx, W, H, T, rnd, { sunX: 0.72, sunColor: panel.id === 'mire' || panel.id === 'blackwood' ? '#d8c8f0' : panel.id === 'scorched' ? '#ffb070' : '#fff1e0' });
-      const owner = ARMY_IDS.find(id => ARMIES[id].theme === panel.id);
+      const owner = Object.keys(ARMIES).find(id => ARMIES[id].theme === panel.id);
       if (owner) { const C = L.ARMY[owner]; L[ARMIES[owner].castle](ctx, W * 0.26, H * 0.71, 20 * u, C, u, rnd); }
       const sub = panel.kind === 'grand' ? GRAND[panel.id].sub : `Homeland of ${ARMIES[owner].full}`;
       caption(ctx, W, H, T.name, sub, panel.kind === 'grand' ? '#ff8c42' : L.ARMY[owner].color);
     } else {
       const M = MONSTERS[panel.id], T = THEMES[M.theme];
       landscape(ctx, W, H, T, rnd, { sunX: 0.22, sunColor: panel.id === 'dragon' ? '#ffb070' : '#d8e0f0' });
-      ({ dragon, cyclops, bandits })[panel.id](ctx, W, H, u, rnd);
+      ({ wyrm, dragon, cyclops, bandits })[panel.id](ctx, W, H, u, rnd);
       caption(ctx, W, H, M.name, M.sub, '#e0362f');
     }
     finish(ctx, W, H, rnd);

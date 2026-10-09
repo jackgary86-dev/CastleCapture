@@ -141,10 +141,11 @@ function renderThumb() {
   if (!show) return;
   const pw = G.pw[1], A = army(1), tb = document.getElementById('tbPower');
   const active = G.time < pw.until, ready = !active && pw.ready <= 0;
-  document.getElementById('tbPowerIcon').innerHTML = svg(A.emblem);
+  const icon = document.getElementById('tbPowerIcon');
+  if (icon.dataset.army !== G.fac[1]) { icon.innerHTML = svg(A.emblem); icon.dataset.army = G.fac[1]; }
   document.getElementById('tbPowerText').textContent = active ? `${Math.ceil(pw.until - G.time)}s` : ready ? 'Power' : fmtTime(Math.ceil(pw.ready));
-  tb.disabled = !ready || G.paused;
-  tb.classList.toggle('ready', ready && !G.paused);
+  tb.disabled = !ready || !playable() || handsOff();
+  tb.classList.toggle('ready', ready && playable() && !handsOff());
   document.getElementById('tbSend').textContent = `Send ${Math.round(sendPct * 100)}%`;
   document.getElementById('tbFit').hidden = cam.z <= 1.001;
 }

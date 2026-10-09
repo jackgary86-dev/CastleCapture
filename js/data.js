@@ -67,7 +67,7 @@ const SIEGE_ESCORT = 0.4;       // share of an AI catapult force sent as foot ma
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
 // Grand Campaign (#46): a wave-based mode with all five armies on one large map.
 const GRAND = {
-  castles: 51,                 // 5 starting castles, a central keep, and 13 neutral keeps per realm
+  castles: 51,                 // 5 starting castles, a central keep, and 9 neutral keeps per realm
   radius: 1000,                // realm radius in world units (the regular battle map is 1000 x 640)
   start: 40,                   // starting troops
   waveSeconds: 20,             // length of each march window, in game seconds
@@ -212,10 +212,6 @@ const LORDS = {
       power: ['By the Oath of Stone!'],
       nearDefeat: ['Even good walls fall. Remember that I built them.'],
       slay: ['A beast is only a wall that moves. It has stopped moving.'],
-      slay: ['Its head rides on my saddle now!'],
-      slay: ['The north hunts too.'],
-      slay: ['A fine investment. The hide alone is worth the troops.'],
-      slay: ['The crows will feast for a month.'],
       victory: ['Patience wins every siege. You had none.'],
       defeat: ['The vale is yours. Keep its walls in good repair.'],
       surrender: ['I yield. Keep the walls standing; they deserve better than this war.'],
@@ -230,6 +226,7 @@ const LORDS = {
     bio: 'Warlord of the clans. He has never built a wall and never retreated.',
     challenge: "Your walls are just firewood I haven't burned yet.",
     lines: {
+      slay: ['Its head rides on my saddle now!'],
       capture: ['Burn it. We ride on.', 'Ha! Next!'],
       lose: ["Keep it. I'll take two of yours.", 'A pile of sticks. I have more.'],
       power: ['The moon is red! RIDE!'],
@@ -246,6 +243,7 @@ const LORDS = {
     bio: 'Eldest jarl of the fjords. Silent for long stretches, then sudden and brutal.',
     challenge: 'Come north, then.',
     lines: {
+      slay: ['The north hunts too.'],
       capture: ['You left it open to the cold.'],
       lose: ['Hm.'],
       power: ['Winter takes them.'],
@@ -264,6 +262,7 @@ const LORDS = {
     bio: 'The richest ruler in the realm, who treats every war as a trade negotiation.',
     challenge: 'Every castle has a price. Yours is cheap.',
     lines: {
+      slay: ['A fine investment. The hide alone is worth the troops.'],
       capture: ['Bought and paid for.', 'A bargain.'],
       lose: ['A small expense.', 'Put it on my account.'],
       power: ['Open the treasury!'],
@@ -282,6 +281,7 @@ const LORDS = {
     bio: 'High witch of the Covenant, who speaks in whispers and seems to know your next move.',
     challenge: 'The crows told me you would come.',
     lines: {
+      slay: ['The crows will feast for a month.'],
       capture: ['Empty halls echo so sweetly.', 'I saw that coming. Did you?'],
       lose: ['Take it. The mire will take it back.'],
       power: ['Fly, my darlings. Feast.'],

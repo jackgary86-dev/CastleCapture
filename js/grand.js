@@ -95,6 +95,7 @@ function grandTick(dt) {
   if (G.marchLeft > 0 || G.over) return;
   G.phase = 'plan';
   G.wave++;
+  if (typeof monstersWave === 'function') monstersWave();
   emit('wave', { wave: G.wave, phase: 'plan' });
 }
 

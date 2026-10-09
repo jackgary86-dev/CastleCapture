@@ -93,12 +93,16 @@ const castleName = p => {
 const describe = p => { const k = G.cfg.fog ? knownOf(1, p) : p; return `${castleName(k)}, ${Math.floor(k.units)} troops${k !== p ? ' when last seen' : ''}${sel.has(p) ? ', selected' : ''}`; };
 
 function moveFocus(p) { kbFocus = p; announce(describe(p)); }
+// Steps through your castles. Past the last one (or before the first) it lets go and returns false, so Tab
+// moves on to the page's buttons rather than trapping the keyboard on the map.
 function cycleOwn(back) {
   const mine = G.planets.filter(p => p.owner === 1).sort((a, b) => a.y - b.y || a.x - b.x);
-  if (!mine.length) return;
+  if (!mine.length) return false;
   const i = mine.indexOf(kbFocus);
-  const next = i < 0 ? (back ? mine.length - 1 : 0) : (i + (back ? -1 : 1) + mine.length) % mine.length;
+  const next = i < 0 ? (back ? mine.length - 1 : 0) : i + (back ? -1 : 1);
+  if (next < 0 || next >= mine.length) { kbFocus = null; return false; }
   moveFocus(mine[next]);
+  return true;
 }
 // The nearest castle roughly in the pressed direction (within 60 degrees), favouring ones straight ahead.
 function stepFocus(dx, dy) {
@@ -116,6 +120,7 @@ function stepFocus(dx, dy) {
   if (best) moveFocus(best); else announce('No castle that way');
 }
 function confirmKey(sendHere) {
+  if (handsOff()) return;
   if (!kbFocus) { cycleOwn(false); return; }
   const t = kbFocus;
   const sending = sel.size && (sendHere || t.owner !== 1) && [...sel].some(s => s !== t);
@@ -133,10 +138,10 @@ addEventListener('keydown', e => {
   // Key events can target the document or window, which have no closest().
   if (!playable() || (e.target.closest && e.target.closest('button, input, select, textarea, a'))) return;
   const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
-  if (e.key === 'Tab') { e.preventDefault(); cycleOwn(e.shiftKey); }
+  if (e.key === 'Tab') { if (cycleOwn(e.shiftKey)) e.preventDefault(); }
   else if (dirs[e.key]) { e.preventDefault(); stepFocus(...dirs[e.key]); }
   else if (e.key === 'Enter') { e.preventDefault(); confirmKey(e.shiftKey); }
-  else if (e.key === 'c' || e.key === 'C') setCbMode(!cbMode);
+  else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey) setCbMode(!cbMode);
 });
 
 // Keyboard cursor and colour-blind column emblems, drawn over the finished frame.

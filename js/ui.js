@@ -78,7 +78,7 @@ on('pactEnd', ({ a, b, by, expired }) => {
   if (by && by !== 1) toast(`${lordOf(by).short} breaks the truce!`, `${army(by).full} can attack you again.`, army(by).color);
   else if (expired) toast(`The truce with ${lordOf(o).short} has ended`, 'You are at war again.', army(o).color);
 });
-on('newGame', () => { offerCard.hidden = true; diploPanel.hidden = true; });
+on('newGame', () => { offerCard.hidden = true; diploPanel.hidden = true; lastDiploHtml = ''; });
 
 // The diplomacy panel lists every living rival lord, with an offer or a running truce.
 function renderDiplo() {
@@ -88,10 +88,14 @@ function renderDiplo() {
     const status = p ? `Truce, ${Math.ceil(p.until - G.time)}s left` : 'At war';
     const action = p ? `<button data-break="${o}">Break truce</button>`
       : `<button data-offer="${o}" ${canPact(1, o) ? '' : 'disabled'}>Offer truce${G.fac[o] === 'solmara' ? ` (${AMARU_PRICE} coins)` : ''}</button>`;
-    return `<div class="diplo-row" style="--c:${army(o).color}">${portraitHtml(G.fac[o])}<div><b>${L.short}</b><small>${status}</small></div>${action}</div>`;
+    return { o, status, html: `<div class="diplo-row" style="--c:${army(o).color}">${portraitHtml(G.fac[o])}<div><b>${L.short}</b><small data-status="${o}"></small></div>${action}</div>` };
   });
-  diploPanel.innerHTML = `<div class="diplo-head"><b>Diplomacy</b><button id="diploClose" aria-label="Close">✕</button></div>${rows.join('')}`;
+  // Rebuilt only when a row or button changes, so a focused or half-clicked button survives the countdown ticking.
+  const html = `<div class="diplo-head"><b>Diplomacy</b><button id="diploClose" aria-label="Close">✕</button></div>${rows.map(r => r.html).join('')}`;
+  if (html !== lastDiploHtml) { diploPanel.innerHTML = html; lastDiploHtml = html; }
+  for (const r of rows) diploPanel.querySelector(`[data-status="${r.o}"]`).textContent = r.status;
 }
+let lastDiploHtml = '';
 diploPanel.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.id === 'diploClose') { diploPanel.hidden = true; return; }
@@ -161,6 +165,7 @@ function hud() {
   // Under fog the bar shows rivals as the player knows them: remembered garrisons and columns in sight.
   const totals = G.owners.map(o => [o, o === 1 || !G.cfg.fog || G.cfg.demo ? totalOf(o) : knownTotal(1, o)]);
   const sum = totals.reduce((a, [, v]) => a + v, 0) || 1;
+  strengthEl.setAttribute('aria-label', `Army strength: ${totals.map(([o, v]) => `${o === 1 ? 'you' : army(o).name} ${Math.round(v / sum * 100)}%`).join(', ')}`);
   strengthEl.innerHTML = totals.map(([o, v]) => `<span title="${army(o).full}" style="width:${(v / sum * 100).toFixed(1)}%;background:${col(o)}"></span>`).join('');
   if (G.cfg.demo) {
     statusEl.textContent = `${army(1).name} vs ${army(2).name}`;
@@ -215,8 +220,10 @@ function updateCastlePanel() {
   }
 }
 // Upgrade every selected castle that can afford it.
+// True while a Grand Campaign march runs (grand-ui.js), when powers, upgrades, the shop and sends wait.
+const handsOff = () => typeof marching === 'function' && marching();
 function playerUpgrade(kind) {
-  if (!G || G.cfg.demo || G.over || G.intro || G.paused) return;
+  if (!G || G.cfg.demo || G.over || G.intro || G.paused || handsOff()) return;
   let any = false;
   for (const p of sel) if (p.owner === 1 && upgrade(p, kind)) any = true;
   if (any) { castlePanelKey = ''; updateCastlePanel(); }
@@ -251,7 +258,7 @@ function updatePowerPanel() {
   }
   powerPanel.classList.toggle('ready', ready);
   powerPanel.classList.toggle('active', active);
-  btnPower.disabled = !ready || !playable();
+  btnPower.disabled = !ready || !playable() || handsOff();
   ppFill.style.strokeDashoffset = (RING * (1 - Math.max(0, Math.min(1, fill)))).toFixed(2);
   if (ppState.textContent !== state) ppState.textContent = state;
 }
@@ -321,13 +328,14 @@ function playerSend(t, owner = 1) {
   }
   s.clear();
 }
-function playerPower() { if (playable() && usePower(1)) hud(); }
+function playerPower() { if (playable() && !handsOff() && usePower(1)) hud(); }
 
 // ---------- treasury and map-unit shop ----------
 const trEl = document.getElementById('treasury'), shopEl = document.getElementById('shop'), btnShop = document.getElementById('btnShop'), trNote = document.getElementById('trNote');
 let shopOpen = false, lastShopHtml = '', noteFlash = null;
 
 function setShop(open) {
+  if (open && handsOff()) return;
   shopOpen = open;
   btnShop.setAttribute('aria-expanded', String(open));
   renderTreasury();
@@ -356,22 +364,27 @@ function renderTreasury() {
   trNote.hidden = true;
   shopEl.hidden = !shopOpen;
   if (!shopOpen) return;
+  const whens = {};
   const html = Object.entries(MAP_UNITS).map(([id, U]) => {
     const can = coins >= U.price;
     const when = can ? 'Click to buy, then place it on the map'
       : income > 0 ? `Affordable in ${fmtTime(Math.ceil((U.price - coins) / income * 60))}` : `Need ${Math.ceil(U.price - coins)} more coins`;
+    whens[id] = when;
     return `<button class="unit${can ? ' can' : ''}" data-unit="${id}" ${can ? '' : 'disabled'}>
       <span class="u-top"><span class="u-name">${U.name}</span><span class="u-kind">${U.kind}</span><span class="u-price">${U.price} coins</span></span>
       <span class="u-desc">${U.desc} Range ${U.range}.</span>
-      <span class="u-when">${when}</span></button>`;
+      <span class="u-when"></span></button>`;
   }).join('') + '<p class="tr-note">You can buy <b>one</b> map unit per battle.</p>';
+  // The countdowns tick in place; the buttons are only rebuilt when one becomes affordable or not, so a click
+  // that starts on a button isn't lost to a rebuild before it ends.
   if (html !== lastShopHtml) { shopEl.innerHTML = html; lastShopHtml = html; }
+  for (const [id, when] of Object.entries(whens)) shopEl.querySelector(`[data-unit="${id}"] .u-when`).textContent = when;
 }
 
 btnShop.addEventListener('click', () => setShop(!shopOpen));
 shopEl.addEventListener('click', e => {
   const b = e.target.closest('button[data-unit]');
-  if (!b || b.disabled || !playable()) return;
+  if (!b || b.disabled || !playable() || handsOff()) return;
   G.placing = b.dataset.unit;
   ptr.placeHover = false;
   sel.clear();
@@ -389,7 +402,6 @@ function placeAt(e) {
   renderTreasury();
   return true;
 }
-cv.addEventListener('contextmenu', e => { if (G && G.placing) e.preventDefault(); });
 // ---------- game speed ----------
 const SPEEDS = [1, 1.5, 2];
 let gameSpeed = SPEEDS.includes(store.get('cs-speed', 1)) ? store.get('cs-speed', 1) : 1;
@@ -435,7 +447,7 @@ setUnitType(unitType);
 // ---------- rally points ----------
 const rallyDrag = { from: null, timer: 0 };
 function beginRally(p) { rallyDrag.from = p; sel.clear(); ptr.down = false; ptr.hover = null; }
-cv.addEventListener('contextmenu', e => { if (playable()) e.preventDefault(); });
+cv.addEventListener('contextmenu', e => { if (playable() || (G && G.placing)) e.preventDefault(); });
 
 cv.addEventListener('pointerdown', e => {
   if (!playable()) return;
@@ -498,6 +510,8 @@ function setPaused(v) {
   btnPause.textContent = v ? 'Resume' : 'Pause';
 }
 addEventListener('keydown', e => {
+  // Leave browser shortcuts (Ctrl+P, Ctrl+U, Ctrl+1...) and typing in the menu's fields alone.
+  if (e.ctrlKey || e.metaKey || e.altKey || (e.target.closest && e.target.closest('input, select, textarea'))) return;
   if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
   else if (e.key >= '1' && e.key <= '4' && !e.shiftKey) setSendPct(PCTS[+e.key - 1]);   // Shift+1-4 belong to player 2 (#12)
   else if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.shiftKey) cycleUnit();
@@ -513,7 +527,6 @@ addEventListener('keydown', e => {
   else if (e.key === 'Escape' && G && G.placing) cancelPlacing();
   else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (sels[2] && sels[2].size) sels[2].clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }   // player 2's selection too (#12)
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
 
 // ---------- menus ----------
 const $ = id => document.getElementById(id);
@@ -727,7 +740,8 @@ function renderResume() {
   $('resumeText').textContent = `${me.name} vs ${foes} in ${placeName(d.cfg)}, ${fmtTime(d.state.time || 0)} in. Saved ${ago}.`;
 }
 addEventListener('pagehide', saveBattle);
-document.addEventListener('visibilitychange', () => { if (document.hidden) saveBattle(); });
+// Hiding the tab pauses the battle and saves it.
+document.addEventListener('visibilitychange', () => { if (document.hidden) { setPaused(true); saveBattle(); } });
 setInterval(() => { if (G && !G.paused) saveBattle(); }, 10000);
 
 // Where a battle is fought: the army's homeland, or the Grand Campaign map's name.
@@ -770,7 +784,7 @@ function toMenu() {
 }
 // ---------- end-of-battle summary chart ----------
 // Army colours carry identity; dash patterns and direct labels back them up, since blue and violet sit close for some readers.
-const SERIES_DASH = [[], [7, 4], [2, 3]];
+const SERIES_DASH = [[], [7, 4], [2, 3], [1, 4], [10, 3, 2, 3]];   // one per owner, up to five
 const CHART_INK = '#ece2c6', CHART_MUTED = '#a99d80', CHART_GRID = 'rgba(236,226,198,0.12)';
 const seriesName = o => o === 1 ? 'You' : lordOf(o).short;
 const niceStep = raw => { const p = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 5, 10].map(m => m * p).find(s => s >= raw); };
@@ -927,7 +941,6 @@ function endGame(win) {
   $('endRoad').textContent = Math.round(G.stats.roadLost);
   $('endPowers').textContent = G.stats.powerUses;
   G.history.push({ t: G.time, v: G.owners.map(totalOf) });
-  endOv.hidden = false;
   toastEl.hidden = true;
   chartW = 0;
   renderSummary();

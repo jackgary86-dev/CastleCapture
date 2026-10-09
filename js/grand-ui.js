@@ -36,6 +36,7 @@ function orderText(o) {
 }
 
 let ordersKey = '';
+on('newGame', () => { ordersKey = ''; });   // a loaded campaign can share a key with the old one but not its order objects
 function renderOrders() {
   const show = isGrand() && !G.over && !G.cfg.demo;
   ordersPanel.hidden = !show;
@@ -89,8 +90,6 @@ hud = function () {
 
 // ---------- input: plan freely, then hands off while the armies march ----------
 const marching = () => isGrand() && G.phase === 'march' && !G.cfg.demo;
-// Map drags and clicks do nothing during the march window.
-cv.addEventListener('pointerdown', e => { if (marching()) { e.stopImmediatePropagation(); } }, true);
 addEventListener('keydown', e => {
   if (!isGrand() || G.cfg.demo || G.over) return;
   if (e.target.closest && e.target.closest('button, input, select, textarea, a')) return;
@@ -110,6 +109,7 @@ addEventListener('keydown', e => {
 on('wave', ({ wave, phase }) => {
   if (!isGrand() || G.cfg.demo) return;
   renderOrders();
+  if (phase === 'march' && shopOpen) setShop(false);   // the shop waits for the next plan phase too
   if (phase === 'plan') toast(`Wave ${wave}`, 'Plan your moves, then march.', army(1).color);
 });
 on('order', () => renderOrders());
@@ -134,6 +134,9 @@ cv.addEventListener('pointerdown', e => {
   pan = { x: e.clientX, y: e.clientY };
   e.stopImmediatePropagation();
 }, true);
+// Clicks on castles and the monster do nothing during the march window. Registered after the pan listener,
+// so dragging empty ground still pans.
+cv.addEventListener('pointerdown', e => { if (marching()) { e.stopImmediatePropagation(); } }, true);
 addEventListener('pointermove', e => {
   if (!pan) return;
   panBy(pan.x - e.clientX, pan.y - e.clientY);
@@ -235,8 +238,13 @@ function importGrandSave(text) {
   const hasProto = v => !!v && typeof v === 'object' && (Object.prototype.hasOwnProperty.call(v, '__proto__') || Object.values(v).some(hasProto));
   if (!d || typeof d !== 'object' || !d.cfg || d.cfg.mode !== 'grand' || !d.state || !Array.isArray(d.planets) || hasProto(d)) return 'That file is not a saved campaign.';
   if (d.v !== SAVE_VERSION) return 'That campaign was saved by another version of the game.';
+  if (!Number.isFinite(d.wave) || !Number.isFinite(d.state.wave)) return 'That file is not a saved campaign.';
+  // Keep the current Continue save until the file has actually loaded.
+  const prev = store.get(grandSlotKey(0), null);
   store.set(grandSlotKey(0), d);
-  return loadGrandSlot(0) ? '' : 'That campaign could not be restored.';
+  if (loadGrandSlot(0)) return '';
+  if (prev) store.set(grandSlotKey(0), prev); else deleteGrandSlot(0);
+  return 'That campaign could not be restored.';
 }
 
 // ---------- the save box on the pause sheet ----------
