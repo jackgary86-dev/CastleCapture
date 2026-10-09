@@ -202,6 +202,10 @@ const LORDS = {
       victory: ['Patience wins every siege. You had none.'],
       defeat: ['The vale is yours. Keep its walls in good repair.'],
       surrender: ['I yield. Keep the walls standing; they deserve better than this war.'],
+      offer: ['Let us not bleed each other while the strongest grows fat. Ninety seconds of peace?'],
+      accept: ['Agreed. Keep your word as I keep mine.'],
+      refuse: ['No. Aldmere does not bargain from strength.'],
+      betrayed: ['So much for your word.'],
     },
   },
   kharzul: {
@@ -216,6 +220,8 @@ const LORDS = {
       victory: ['The steppe wind blows over your ashes.'],
       defeat: ['You ride well, for a wall-builder.'],
       surrender: ['Bah! We ride for the steppe. This is not over.'],
+      refuse: ['A truce? Ha! My horses do not stop.', 'Talk is for wall-builders.'],
+      betrayed: ['A snake! I will remember this.'],
     },
   },
   frostmark: {
@@ -231,6 +237,9 @@ const LORDS = {
       victory: ['The north keeps its own.'],
       defeat: ['Spring comes early this year.'],
       surrender: ['We go north. Enough.'],
+      accept: ['Agreed. For now.'],
+      refuse: ['No.'],
+      betrayed: ['The north remembers.'],
     },
   },
   solmara: {
@@ -245,6 +254,10 @@ const LORDS = {
       victory: ['The sands are mine. Send me the bill.'],
       defeat: ['Well played. Name your price.'],
       surrender: ['Let us call it a business loss. I withdraw.'],
+      offer: ['A pause in the fighting is good for trade. Ninety seconds of peace?'],
+      accept: ['A pleasure doing business.'],
+      refuse: ['Not at that price.'],
+      betrayed: ['A breach of contract. You will pay for it.'],
     },
   },
   nyx: {
@@ -259,6 +272,9 @@ const LORDS = {
       victory: ['Sleep now. The crows will keep watch.'],
       defeat: ['The crows did not see this. How interesting.'],
       surrender: ['The Covenant withdraws into the mire. For now.'],
+      accept: ['Of course, darling. Peace.'],
+      betray: ['Did you think the crows would wait?', 'Peace was such a short little thing.'],
+      betrayed: ['Treachery? How delightfully familiar.'],
     },
   },
 };

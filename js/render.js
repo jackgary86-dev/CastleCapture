@@ -363,6 +363,14 @@ function drawKindBadge(p, x, y, size) {
 }
 
 // Each army's soldier.
+// A small white pennant with a stripe in the player's colour: this castle's kingdom has a truce with you.
+function drawTruceMark(p) {
+  const x = p.x + p.r * 0.95, y = p.y - p.r * 1.25;
+  ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y + 12); ctx.lineTo(x, y - 2); ctx.stroke();
+  poly([[x, y - 2], [x + 10, y + 1], [x, y + 4]], '#f6f1e2');
+  ctx.strokeStyle = col(1); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x + 1, y + 1); ctx.lineTo(x + 7, y + 1.2); ctx.stroke();
+}
+
 function soldier(x, y, o, t, dir, style) {
   const c = col(o), step = reduceMotion ? 0 : Math.sin(t);
   ctx.strokeStyle = INK; ctx.lineWidth = 0.9;
@@ -795,7 +803,7 @@ function draw(now) {
   items.sort((a, b) => a.y - b.y);
   for (const it of items) {
     if (it.u) { drawUnit(it.u, now); continue; }
-    if (it.p) { if (G.cfg.fog && !G.cfg.demo) drawRemembered(it.p, now); else drawCastle(it.p, now); continue; }
+    if (it.p) { if (G.cfg.fog && !G.cfg.demo) drawRemembered(it.p, now); else drawCastle(it.p, now); if (!G.cfg.demo && allied(1, it.p.owner)) drawTruceMark(it.p); continue; }
     const k = it.k, dir = k.dir || 1, style = army(k.owner).soldier, isFrozen = frozen(k.owner);
     const figures = Math.min(Math.ceil(k.n), 3);
     if (powerOn(k.owner, 'bloodMoon')) {

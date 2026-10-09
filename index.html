@@ -198,6 +198,21 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 /* Lords: portraits, taunts and the pre-battle card */
 .portrait { flex: none; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid var(--c, var(--edge)); background: var(--timber); }
 .portrait svg { width: 100%; height: 100%; display: block; }
+#offerCard { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); z-index: 3; width: min(440px, calc(100% - 28px)); display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 8px; background: var(--parchment); color: var(--ink); border: 3px solid var(--c); box-shadow: 0 12px 40px rgb(0 0 0 / 0.5); }
+#offerCard .portrait { width: 56px; height: 56px; }
+#offerCard .offer-body { display: grid; gap: 4px; min-width: 0; }
+#offerCard q { font-family: var(--display); font-size: 18px; line-height: 1.25; quotes: "\201C" "\201D"; }
+#offerCard small { color: var(--ink-soft); }
+#offerCard .row { margin-top: 4px; }
+#offerCard button { color: var(--ink); border-color: #9c8656; }
+#offerCard button.primary { background: #2f5ea8; border-color: #23477f; color: #f4ecd6; font-weight: 700; }
+#diploPanel { position: absolute; right: 12px; bottom: 12px; z-index: 3; width: min(320px, calc(100% - 24px)); padding: 10px; border-radius: 6px; background: rgb(23 20 14 / 0.94); border: 2px solid var(--edge); display: grid; gap: 8px; }
+.diplo-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--display); font-size: 18px; }
+.diplo-head button { padding: 0 8px; }
+.diplo-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.diplo-row .portrait { width: 38px; height: 38px; }
+.diplo-row small { display: block; color: var(--muted); font-size: 12px; }
+.diplo-row button { font-size: 13px; padding: 4px 8px; }
 #taunt { position: absolute; left: 14px; bottom: 14px; max-width: min(420px, calc(100% - 28px)); display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; border-radius: 40px 6px 6px 40px; background: rgb(23 20 14 / 0.92); border: 2px solid var(--c); pointer-events: none; }
 #taunt .portrait { width: 48px; height: 48px; }
 #taunt b { display: block; font-size: 13px; color: var(--c); }
@@ -415,6 +430,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
         <button data-speed="2" title="Fastest (])">2×</button>
       </div>
       <button id="btnAll" title="Select all your castles (Space)" disabled>Select all</button>
+      <button id="btnDiplo" title="Offer or break truces with the rival lords" hidden>Diplomacy</button>
       <button id="btnSound" title="Sound effects (M)">Sound on</button>
       <button id="btnMusic" title="Music (N)">Music on</button>
       <button id="btnPause" title="Pause (P)" disabled>Pause</button>
@@ -460,6 +476,8 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
     </div>
     <div id="toast" hidden></div>
     <div id="taunt" hidden></div>
+    <div id="offerCard" role="dialog" aria-label="A lord offers a truce" hidden></div>
+    <div id="diploPanel" role="dialog" aria-label="Diplomacy" hidden></div>
 
     <div class="overlay" id="menu">
       <div id="menuTitle">
@@ -558,6 +576,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
             <li><b>Saving:</b> an unfinished battle is saved in this browser when you close or hide the tab, and every 10 seconds. Resume it from the top of this menu. Retreating to the menu abandons it.</li>
             <li><b>Upkeep:</b> a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when. Spread big armies out or put them to work.</li>
             <li><b>Rivers</b> can only be crossed at bridges, so bridges become chokepoints. <b>Forests</b> slow marching troops. While aiming, the dashed line shows the route each column will take.</li>
+            <li><b>Truces</b> (three or more kingdoms): use <b>Diplomacy</b> to offer a rival lord a 90-second truce, or accept one when it's offered. Allies can't attack each other, their columns pass on the road, and their castles fly a white pennant. Isolde and Amaru offer truces when they're second; Amaru wants 15 coins; Torvek never agrees; and Veyra always says yes.</li>
             <li><b>Weather</b> drifts across each homeland: rain on the vale, dust storms on the steppe, snow in the fjords, heat (and dust) in the desert, marsh fog (and rain) in the mire. It slows marching, training or sight for a minute or so, except for the army whose homeland it is. <b>Night</b> falls every four minutes and trains troops up to 10% slower.</li>
             <li><b>Fog of war</b> (optional): you only see near your own castles and marching columns. Castles out of sight show what you last saw, greyed. Send troops out to scout. The rival lords play by the same rules.</li>
             <li><b>Free-for-all</b> pits you against all four other armies at once on a bigger map. The rival lords fight each other too.</li>

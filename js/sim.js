@@ -362,6 +362,7 @@ function newGame(cfg, portrait = false) {
     coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
     roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0, sight: {}, sightClock: 0,
     weather: { kind: 'clear', prev: 'clear', since: -WEATHER_FADE, until: WEATHER_FIRST },
+    pacts: [], pactCool: {}, lastOffer: {}, offer: null, diploClock: 0,
     seen: Object.fromEntries(owners.map(o => [o, map.planets.map(p => ({ owner: p.owner, units: p.units }))])),
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
   };
@@ -447,7 +448,7 @@ function archersTick(dt) {
     const a = archerStats(p);
     let target = null, best = a.range;
     for (const k of G.packets) {
-      if (k.owner === p.owner || k.delay > 0 || k.n <= 0.05) continue;
+      if (k.owner === p.owner || k.delay > 0 || k.n <= 0.05 || allied(k.owner, p.owner)) continue;
       const d = Math.hypot(k.x - p.x, k.y - p.y);
       if (d < best) { best = d; target = k; }
     }
@@ -516,7 +517,7 @@ const lordSays = (o, kind, force = false) => emit('taunt', { o, kind, force });
 function send(owner, sources, target, frac = 0.5) {
   let launched = false;
   for (const s of sources) {
-    if (s === target || s.owner !== owner) continue;
+    if (s === target || s.owner !== owner || allied(owner, target.owner)) continue;
     const n = Math.floor(s.units * frac);
     if (n < 1) continue;
     s.units -= n;
@@ -530,6 +531,102 @@ function send(owner, sources, target, frac = 0.5) {
     launch(owner, s, target, n);
   }
   return launched;
+}
+
+// ---------- alliances and truces ----------
+// In battles of three or more kingdoms, two kingdoms can agree a truce: for PACT_TIME seconds neither
+// can attack the other, their columns pass on the road, and their archers and map units hold fire.
+// The lords' personalities decide who offers and who accepts; Veyra accepts and then betrays.
+const PACT_TIME = 90, OFFER_TIME = 15, PACT_COOLDOWN = 60, DIPLO_EVERY = 3, AMARU_PRICE = 15;
+const pactKey = (a, b) => a < b ? `${a}-${b}` : `${b}-${a}`;
+const pactOf = (a, b) => G.pacts && G.pacts.find(p => ((p.a === a && p.b === b) || (p.a === b && p.b === a)) && G.time < p.until);
+const allied = (a, b) => !!(a && b && a !== b && G.pacts && pactOf(a, b));
+const aliveOwners = () => G.owners.filter(o => G.planets.some(p => p.owner === o));
+const leaderOf = () => aliveOwners().sort((a, b) => totalOf(b) - totalOf(a))[0];
+function canPact(a, b) {
+  if (!G.pacts || a === b || allied(a, b) || aliveOwners().length < 3) return false;
+  if (![a, b].every(o => aliveOwners().includes(o))) return false;
+  return G.time >= (G.pactCool[pactKey(a, b)] ?? -1);
+}
+function makePact(a, b) {
+  const p = { a, b, since: G.time, until: G.time + PACT_TIME, betrayAt: null, betrayer: null };
+  // Veyra smiles, shakes hands, and counts the seconds.
+  const nyx = [a, b].find(o => G.fac[o] === 'nyx' && G.ais.some(ai => ai.id === o));
+  if (nyx) { p.betrayer = nyx; p.betrayAt = G.time + 45 + Math.random() * 25; }
+  G.pacts.push(p);
+  emit('pact', { a, b });
+}
+function endPact(p, by) {
+  p.until = G.time;
+  G.pactCool[pactKey(p.a, p.b)] = G.time + PACT_COOLDOWN;
+  emit('pactEnd', { a: p.a, b: p.b, by });
+}
+// Does lord o take a truce offered by `from`?
+function lordAccepts(o, from) {
+  switch (G.fac[o]) {
+    case 'kharzul': return false;                                   // Torvek never stops
+    case 'nyx': return true;                                        // Veyra always says yes
+    case 'aldmere': return leaderOf() !== o;                        // Isolde only when she isn't winning
+    case 'frostmark': return totalOf(from) > totalOf(o);            // Sigrun only with someone stronger
+    case 'solmara': return leaderOf() !== o && (from !== 1 || G.coins[1] >= AMARU_PRICE);   // Amaru, for a price
+    default: return false;
+  }
+}
+// A kingdom offers kingdom `to` a truce. The player answers with a card; AI lords answer at once.
+function proposeTruce(from, to) {
+  if (!canPact(from, to)) return 'unavailable';
+  if (to === 1) {
+    if (G.offer) return 'unavailable';
+    G.offer = { from, to, until: G.time + OFFER_TIME };
+    emit('offer', { from });
+    return 'pending';
+  }
+  const yes = lordAccepts(to, from);
+  if (yes && from === 1 && G.fac[to] === 'solmara') G.coins[1] -= AMARU_PRICE;
+  if (yes) makePact(from, to);
+  else G.pactCool[pactKey(from, to)] = G.time + PACT_COOLDOWN;
+  if (from === 1) lordSays(to, yes ? 'accept' : 'refuse', true);
+  return yes ? 'accepted' : 'refused';
+}
+function answerOffer(yes) {
+  const o = G.offer;
+  if (!o) return;
+  G.offer = null;
+  if (yes && canPact(o.from, o.to)) makePact(o.from, o.to);
+  else G.pactCool[pactKey(o.from, o.to)] = G.time + PACT_COOLDOWN;
+  emit('offerAnswered', { from: o.from, yes });
+}
+// The player breaks a truce. The other lord takes it badly.
+function breakPact(o) {
+  const p = pactOf(1, o);
+  if (!p) return;
+  endPact(p, 1);
+  lordSays(o, 'betrayed', true);
+}
+function diplomacyTick() {
+  if (!G.pacts || G.cfg.demo) return;
+  if (G.offer && G.time >= G.offer.until) answerOffer(false);
+  for (const p of G.pacts) {
+    if (G.time >= p.until) continue;
+    if (p.betrayAt && G.time >= p.betrayAt) {
+      endPact(p, p.betrayer);
+      if (p.a === 1 || p.b === 1) lordSays(p.betrayer, 'betray', true);
+    } else if (![p.a, p.b].every(o => aliveOwners().includes(o))) endPact(p, null);
+  }
+  // Expired truces cool down before they can be renewed.
+  for (const p of G.pacts) if (G.time >= p.until && !p.done) { p.done = true; G.pactCool[pactKey(p.a, p.b)] ??= G.time + PACT_COOLDOWN; emit('pactEnd', { a: p.a, b: p.b, by: null, expired: true }); }
+  G.pacts = G.pacts.filter(p => G.time < p.until || !p.done || G.time - p.until < 5);
+  // Isolde and Amaru, when second, offer a truce so they can turn on the leader.
+  const alive = aliveOwners();
+  if (alive.length < 3) return;
+  const ranked = [...alive].sort((a, b) => totalOf(b) - totalOf(a));
+  const second = ranked[1];
+  if (!G.ais.some(ai => ai.id === second) || !['aldmere', 'solmara'].includes(G.fac[second])) return;
+  if (G.time - (G.lastOffer[second] ?? -99) < 45) return;
+  const partner = ranked.find(o => o !== second && o !== ranked[0] && canPact(second, o));
+  if (!partner) return;
+  G.lastOffer[second] = G.time;
+  proposeTruce(second, partner);
 }
 
 // ---------- fog of war ----------
@@ -571,6 +668,7 @@ function incomingFor(o) {
 
 // March n troops (already taken from s) to target as columns along the path.
 function launch(owner, s, target, n) {
+  if (allied(owner, target.owner)) { s.units += n; return; }
   if (owner === 1) G.stats.sent += n;
   const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
   // Set off towards the first waypoint (a bridge, or the target itself).
@@ -791,7 +889,7 @@ function aiThink(ai) {
 
   if (aiUpgrade(ai, mine, enemyCastles, inc, pz)) return;
 
-  let candidates = P.filter(t => t.owner !== me && (t.owner === 0 || !mustering()));
+  let candidates = P.filter(t => t.owner !== me && (t.owner === 0 || !mustering()) && !allied(me, t.owner));
   // Sigrun holds her army home early, taking only neutrals and near-empty castles.
   if (id === 'frostmark' && G.time < 100 && bold === 1) candidates = candidates.filter(t => t.owner === 0 || t.units < 5);
   // Amaru's first minute: claim every keep on his side of the map, and nothing that brings him close to a rival.
@@ -914,7 +1012,7 @@ function mapUnits(dt) {
     if (u.type === 'ballista') {
       let target = null, bd = MAP_UNITS.ballista.range;
       for (const k of G.packets) {
-        if (k.owner === u.owner || k.delay > 0 || k.n <= 0.05) continue;
+        if (k.owner === u.owner || k.delay > 0 || k.n <= 0.05 || allied(k.owner, u.owner)) continue;
         const d = dist(u, k);
         if (d <= bd) { bd = d; target = k; }
       }
@@ -925,7 +1023,7 @@ function mapUnits(dt) {
       u.aim = Math.atan2(target.y - (u.y - 14), target.x - u.x);
       G.fx.push({ kind: 'bolt', x: u.x, y: u.y - 14, x1: target.x, y1: target.y - 3, age: 0 });
     } else if (u.type === 'trebuchet') {
-      const target = G.planets.filter(p => p.owner && p.owner !== u.owner && dist(u, p) <= MAP_UNITS.trebuchet.range).sort((a, b) => b.units - a.units)[0];
+      const target = G.planets.filter(p => p.owner && p.owner !== u.owner && !allied(p.owner, u.owner) && dist(u, p) <= MAP_UNITS.trebuchet.range).sort((a, b) => b.units - a.units)[0];
       if (!target) { u.cd = 0.5; continue; }
       G.shots.push({ u, t: target, age: 0, dur: 1.1, dmg: Math.max(4, target.units * 0.15) });
       u.fired = G.time;
@@ -994,6 +1092,7 @@ function aiBuyUnit(ai, mine) {
 function update(dt) {
   G.time += dt;
   if (G.weather) updateWeather();
+  if (G.pacts && (G.diploClock += dt) >= DIPLO_EVERY) { G.diploClock = 0; diplomacyTick(); }
   if (G.cfg.fog && (G.sightClock += dt) >= SIGHT_EVERY) { G.sightClock = 0; updateSight(); }
   for (const p of G.planets) {
     const cap = capOf(p);
@@ -1139,6 +1238,8 @@ function surrender(o, castles) {
 // Attackers deal damage scaled by their strike strength against the defender's wall strength.
 function arrive(k, t) {
   if (t.owner === k.owner) { t.units += k.n; return; }
+  // A truce agreed while they marched: the column turns back home.
+  if (allied(k.owner, t.owner)) { if (k.from && k.from.owner === k.owner) k.from.units += k.n; return; }
   const A = strikeOf(k.owner, t) * (k.str || 1), D = defAt(t);
   t.units -= k.n * A / D;
   G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
@@ -1181,7 +1282,7 @@ function roadBattles() {
     const a = act[i];
     for (let j = i + 1; a.n > 0.05 && j < act.length && act[j].x - a.x < R; j++) {
       const b = act[j];
-      if (b.n <= 0.05 || b.owner === a.owner || Math.abs(b.y - a.y) >= R) continue;
+      if (b.n <= 0.05 || b.owner === a.owner || Math.abs(b.y - a.y) >= R || allied(a.owner, b.owner)) continue;
       const sa = roadOf(a.owner) * (a.str || 1), sb = roadOf(b.owner) * (b.str || 1);
       const m = Math.min(a.n * sa, b.n * sb);
       a.n -= m / sa; b.n -= m / sb;

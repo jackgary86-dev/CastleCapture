@@ -49,6 +49,58 @@ on('power', ({ o, army: A }) => {
   sfx.power(o === 1);
   if (o !== 1) taunt(o, 'power', true);
 });
+// ---------- alliances and truces ----------
+const offerCard = document.getElementById('offerCard'), diploPanel = document.getElementById('diploPanel'), btnDiplo = document.getElementById('btnDiplo');
+let offerTimer = 0;
+on('offer', ({ from }) => {
+  const id = G.fac[from], L = LORDS[id], A = ARMIES[id];
+  offerCard.style.setProperty('--c', A.color);
+  offerCard.innerHTML = `${portraitHtml(id)}<div class="offer-body"><b>${L.short}, ${L.title}</b><q></q><small>A truce for ${PACT_TIME} seconds: neither side may attack the other.</small><div class="row"><button class="primary" id="offerYes">Accept</button><button id="offerNo">Refuse</button></div></div>`;
+  offerCard.querySelector('q').textContent = pick(L.lines.offer || ['A truce?']);
+  offerCard.hidden = false;
+  offerCard.querySelector('#offerYes').onclick = () => answerOffer(true);
+  offerCard.querySelector('#offerNo').onclick = () => answerOffer(false);
+  clearTimeout(offerTimer);
+  offerTimer = setTimeout(() => { offerCard.hidden = true; }, OFFER_TIME * 1000 + 500);
+});
+on('offerAnswered', () => { offerCard.hidden = true; renderDiplo(); });
+on('pact', ({ a, b }) => {
+  renderDiplo();
+  if (G.cfg.demo) return;
+  if (a === 1 || b === 1) { const o = a === 1 ? b : a; toast(`Truce with ${lordOf(o).short} of ${army(o).name}`, `For ${PACT_TIME} seconds neither of you can attack the other. Their castles fly a white pennant.`, army(o).color); }
+  else toast(`${lordOf(a).short} and ${lordOf(b).short} agree a truce`, `${army(a).full} and ${army(b).full} will leave each other alone for now.`, '#cbbb92');
+});
+on('pactEnd', ({ a, b, by, expired }) => {
+  renderDiplo();
+  if (G.cfg.demo || (a !== 1 && b !== 1)) return;
+  const o = a === 1 ? b : a;
+  if (by && by !== 1) toast(`${lordOf(by).short} breaks the truce!`, `${army(by).full} can attack you again.`, army(by).color);
+  else if (expired) toast(`The truce with ${lordOf(o).short} has ended`, 'You are at war again.', army(o).color);
+});
+on('newGame', () => { offerCard.hidden = true; diploPanel.hidden = true; });
+
+// The diplomacy panel lists every living rival lord, with an offer or a running truce.
+function renderDiplo() {
+  if (!G || diploPanel.hidden) return;
+  const rows = G.owners.slice(1).filter(o => G.planets.some(p => p.owner === o)).map(o => {
+    const L = lordOf(o), p = pactOf(1, o);
+    const status = p ? `Truce, ${Math.ceil(p.until - G.time)}s left` : 'At war';
+    const action = p ? `<button data-break="${o}">Break truce</button>`
+      : `<button data-offer="${o}" ${canPact(1, o) ? '' : 'disabled'}>Offer truce${G.fac[o] === 'solmara' ? ` (${AMARU_PRICE} coins)` : ''}</button>`;
+    return `<div class="diplo-row" style="--c:${army(o).color}">${portraitHtml(G.fac[o])}<div><b>${L.short}</b><small>${status}</small></div>${action}</div>`;
+  });
+  diploPanel.innerHTML = `<div class="diplo-head"><b>Diplomacy</b><button id="diploClose" aria-label="Close">✕</button></div>${rows.join('')}`;
+}
+diploPanel.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'diploClose') { diploPanel.hidden = true; return; }
+  if (b.dataset.offer) proposeTruce(1, +b.dataset.offer);
+  if (b.dataset.break) breakPact(+b.dataset.break);
+  renderDiplo();
+});
+btnDiplo.addEventListener('click', () => { diploPanel.hidden = !diploPanel.hidden; renderDiplo(); });
+setInterval(() => { if (G && !diploPanel.hidden) renderDiplo(); }, 1000);
+
 on('powerReady', ({ o }) => { if (o === 1 && !G.cfg.demo) sfx.chime(); });
 on('weather', ({ kind, prev }) => {
   if (G.cfg.demo) return;
@@ -97,7 +149,9 @@ function hud() {
     const rivals = G.owners.slice(1).map(o => `${lordOf(o).short} of ${army(o).name}`).join(' & ');
     const label = G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name} vs ${rivals}` : `${DIFF_NAME[G.cfg.diff]} · vs ${rivals}`;
     const sky = [G.weather && G.weather.kind !== 'clear' ? WEATHER[G.weather.kind].name : '', nightAmt() > 0.5 ? 'Night' : ''].filter(Boolean).join(', ');
-    statusEl.textContent = `${label} · ${fmtTime(G.time)}${sky ? ' · ' + sky : ''}`;
+    const truces = (G.pacts || []).filter(p => (p.a === 1 || p.b === 1) && G.time < p.until).map(p => `Truce with ${lordOf(p.a === 1 ? p.b : p.a).short} ${Math.ceil(p.until - G.time)}s`);
+    statusEl.textContent = [`${label} · ${fmtTime(G.time)}`, sky, ...truces].filter(Boolean).join(' · ');
+    btnDiplo.hidden = !(G.owners.length >= 3 && !G.over);
   }
   updatePowerPanel();
   updateCastlePanel();
@@ -227,6 +281,13 @@ function planetAt(w) {
 const playable = () => G && !G.cfg.demo && !G.over && !G.paused && !G.intro;
 
 function playerSend(t) {
+  // A truce holds: say so rather than silently doing nothing.
+  if (allied(1, t.owner)) {
+    const p = pactOf(1, t.owner);
+    toast(`Truce with ${lordOf(t.owner).short}`, `${Math.ceil(p.until - G.time)}s left. Break it in Diplomacy if you mean to attack.`, army(t.owner).color);
+    sel.clear();
+    return;
+  }
   if (send(1, [...sel].filter(s => s !== t), t, sendPct)) {
     sfx.drum();
     if (!G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
