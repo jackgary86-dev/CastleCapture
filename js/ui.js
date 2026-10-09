@@ -311,7 +311,7 @@ function renderTreasury() {
   if (trEl.hidden) return;
   const coins = G.coins[1], income = incomeOf(1);
   document.getElementById('coinCount').textContent = Math.floor(coins);
-  document.getElementById('coinRate').textContent = `+${income}/min`;
+  document.getElementById('coinRate').textContent = coins >= coinCap() ? 'Treasury full' : `+${income}/min`;
   const owned = G.units.find(u => u.owner === 1);
   btnShop.hidden = !!owned || !!G.placing;
   if (owned) {
@@ -560,11 +560,11 @@ function startLevel(lv) {
 }
 // ---------- custom battle settings ----------
 const PRESETS = {
-  quick:    { castles: 12, map: 0.8,  start: 60, neutral: 0.5, speed: 1.25, recharge: 120 },
-  standard: { castles: 18, map: 1,    start: 40, neutral: 1,   speed: 1,    recharge: 300 },
-  long:     { castles: 26, map: 1.25, start: 30, neutral: 1.5, speed: 1,    recharge: 480 },
+  quick:    { castles: 12, map: 0.8,  start: 60, neutral: 0.5, speed: 1.25, recharge: 120, cap: 1 },
+  standard: { castles: 18, map: 1,    start: 40, neutral: 1,   speed: 1,    recharge: 300, cap: 1 },
+  long:     { castles: 26, map: 1.25, start: 30, neutral: 1.5, speed: 1,    recharge: 480, cap: 1 },
 };
-const SET_IDS = { castles: 'setCastles', map: 'setMap', start: 'setStart', neutral: 'setNeutral', speed: 'setSpeed', recharge: 'setRecharge' };
+const SET_IDS = { castles: 'setCastles', map: 'setMap', start: 'setStart', neutral: 'setNeutral', speed: 'setSpeed', recharge: 'setRecharge', cap: 'setCap' };
 function readCustom() {
   const c = {};
   // A blank or unknown value falls back to Standard rather than becoming zero.
@@ -617,7 +617,7 @@ function quickCfg() {
   const c = readCustom(), fixed = c.seed !== null;
   return {
     seed: fixed ? c.seed : Math.floor(Math.random() * 1e9), fixedSeed: fixed,
-    n: qAis === 4 ? Math.round(c.castles * 1.75) : c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge,
+    n: qAis === 4 ? Math.round(c.castles * 1.75) : c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge, capMul: c.cap,
     diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0], fog: fogOn,
   };
 }

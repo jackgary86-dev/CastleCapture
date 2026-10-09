@@ -392,7 +392,8 @@ const roadOf = o => atkOf(o) * army(o).stats.road;
 const bribes = (o, t) => t.owner === 0 && G.fac[o] === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
 const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1) * bribes(o, t);
 const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
-const capOf = p => GARRISON_CAP[tierOf(p)] + WALL_CAP * lvl(p, 'walls');
+// The Custom battle setting scales the cap (capMul); Walls add to it.
+const capOf = p => GARRISON_CAP[tierOf(p)] * (G.cfg.capMul ?? 1) + WALL_CAP * lvl(p, 'walls');
 const kindOf = p => p.kind ? CASTLE_KINDS[p.kind] : null;
 // Villages speed up their owner's other castles within reach: +25% for each, up to +50%.
 function villageBoost(p) {
@@ -405,6 +406,8 @@ function villageBoost(p) {
 const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o && dist(u, p) <= MAP_UNITS.ward.range);
 // Upkeep: a castle feeding a big garrison trains slower, which stops one castle hoarding an army forever.
 const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPKEEP_AT ? 0.5 : 1;
+// The treasury is capped in skirmishes and campaigns; the Grand Campaign has no cap.
+const coinCap = () => G.mode === 'grand' ? Infinity : (G.cfg.coinCap ?? COIN_CAP);
 // Harvest map event (#35): one kingdom trains faster for a while, shaped like a power.
 const harvestMul = o => G.ev && G.ev.harvest && G.ev.harvest.o === o && G.time < G.ev.harvest.until ? 1.5 : 1;
 const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() : 0;
@@ -1136,7 +1139,7 @@ function update(dt) {
       if (surplus >= 3) send(1, [p], p.rally, surplus / p.units);
     }
   }
-  for (const o of G.owners) G.coins[o] += incomeOf(o) / 60 * dt;
+  for (const o of G.owners) G.coins[o] = Math.min(coinCap(), G.coins[o] + incomeOf(o) / 60 * dt);
   mapUnits(dt);
   archersTick(dt);
 

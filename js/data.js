@@ -35,7 +35,7 @@ const KIND_SHARE = 0.25;
 // A castle at its cap stops training; troops marching in can still push it over.
 const GARRISON_CAP = [0, 60, 90, 120];
 const WALL_CAP = 15;
-const DESERT_RATE = 0.05;     // troops above the cap desert at this fraction of the excess per second
+const DESERT_RATE = 0.007;    // troops above the cap desert at this fraction of the excess per second (about a third a minute)
 // Weather that drifts across a homeland during a battle (THEMES[...].weather lists which kinds).
 // speed: marching speed; prod: training; sight: fog-of-war sight. The army whose homeland it is
 // (native) is used to it and ignores the effects.
@@ -72,6 +72,7 @@ const GRAND_MAPS = {
   realm: { name: 'The Five Realms', theme: 'vale', monster: null },
 };
 const MONSTERS = {};
+const COIN_CAP = 300;         // the treasury holds at most this many coins, except in the Grand Campaign
 const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
 const MAP_UNITS = {
   ballista: {
