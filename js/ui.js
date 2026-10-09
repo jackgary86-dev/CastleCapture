@@ -164,11 +164,15 @@ function hud() {
   if (G.cfg.demo) {
     statusEl.textContent = `${army(1).name} vs ${army(2).name}`;
   } else {
-    const rivals = G.owners.slice(1).map(o => `${lordOf(o).short} of ${army(o).name}`).join(' & ');
+    // On narrow screens rivals go by their army's name alone, so the line stays short (#56).
+    const narrow = matchMedia('(max-width: 560px)').matches;
+    const who = o => narrow ? army(o).name : lordOf(o).short;
+    const rivals = G.owners.slice(1).map(o => narrow ? army(o).name : `${lordOf(o).short} of ${army(o).name}`).join(' & ');
     const label = G.cfg.level ? `Battle ${G.cfg.level}: ${LEVELS[G.cfg.level - 1].name} vs ${rivals}` : `${DIFF_NAME[G.cfg.diff]} · vs ${rivals}`;
     const sky = [G.weather && G.weather.kind !== 'clear' ? WEATHER[G.weather.kind].name : '', nightAmt() > 0.5 ? 'Night' : ''].filter(Boolean).join(', ');
-    const truces = (G.pacts || []).filter(p => (p.a === 1 || p.b === 1) && G.time < p.until).map(p => `Truce with ${lordOf(p.a === 1 ? p.b : p.a).short} ${Math.ceil(p.until - G.time)}s`);
+    const truces = (G.pacts || []).filter(p => (p.a === 1 || p.b === 1) && G.time < p.until).map(p => `Truce with ${who(p.a === 1 ? p.b : p.a)} ${Math.ceil(p.until - G.time)}s`);
     statusEl.textContent = [`${label} · ${fmtTime(G.time)}`, sky, ...truces].filter(Boolean).join(' · ');
+    statusEl.title = statusEl.textContent;
     btnDiplo.hidden = !(G.owners.length >= 3 && !G.over);
   }
   updatePowerPanel();
