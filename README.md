@@ -70,3 +70,25 @@ Each homeland has its own synthesised theme (no audio files): a lute-like air in
 - **Campaign:** Eight battles across the rival homelands, from Thornbury to the High Throne. Each win unlocks the next.
 
 See the [issues](https://github.com/jackgary86-dev/CastleCapture/issues) for planned improvements.
+
+## Code layout
+
+The game has no build step. `index.html` holds the markup and CSS and loads five plain scripts that share the page's global scope, in this order:
+
+| File | What it holds |
+|---|---|
+| `js/data.js` | Constants, the five armies and their lords, homeland themes, campaign levels, utilities, and the event bus (`on` / `emit`) |
+| `js/sfx.js` | Synthesised sound effects and music |
+| `js/sim.js` | Map generation, battle state, army stats and powers, the AI lords, coins and map units, and the simulation step. No DOM access: it reports what happens through `emit()` |
+| `js/render.js` | Canvas drawing and the view state the input writes (`ptr`, `sel`) |
+| `js/ui.js` | HUD, power panel, treasury, input, menus, saving, the frame loop, and the listeners that turn simulation events into sound and banners |
+
+## Balance tests
+
+`tools/balance.js` runs the simulation headlessly in Node: every army fights every other with the AI on both sides, and the run fails if any army's win rate leaves the agreed band.
+
+```bash
+node tools/balance.js --games 8
+```
+
+Options: `--games N` per pairing, `--diff easy|medium|hard`, `--seconds` cap per battle, `--band 0.25,0.75`, `--json`. Runs are seeded, so the same arguments always give the same result. GitHub Actions runs it on every push and pull request (`.github/workflows/balance.yml`).
