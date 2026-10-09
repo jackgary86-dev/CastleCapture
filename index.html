@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Castle Siege</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,6 +31,7 @@
 }
 html { height: 100%; box-sizing: border-box; }
 *, *::before, *::after { box-sizing: inherit; }
+[hidden] { display: none !important; }
 body { height: 100%; margin: 0; background: var(--timber); color: var(--text); font-family: var(--ui); font-size: 15px; overflow: hidden; }
 #app { height: 100%; display: flex; flex-direction: column; gap: 10px; padding-inline: 16px; padding-block: 10px; }
 header { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
@@ -100,6 +105,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <button data-pct="1"><kbd>4</kbd>100%</button>
       </div>
       <button id="btnAll" title="Select all your castles (Space)" disabled>Select all</button>
+      <button id="btnSound" title="Sound (M)">Sound on</button>
       <button id="btnPause" title="Pause (P)" disabled>Pause</button>
     </div>
   </header>
@@ -135,7 +141,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Armies that meet on the road fight.</b> The larger column marches on with what's left, so you can intercept attacks.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Bigger castles</b> train troops faster. Grey, unclaimed keeps never grow.</li>
-            <li><b>Space</b> selects all your castles. <b>P</b> pauses.</li>
+            <li><b>Space</b> selects all your castles. <b>P</b> pauses. <b>M</b> mutes.</li>
           </ul>
         </div>
       </div>
@@ -206,6 +212,85 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
+
+  // ---------- sound (synthesised, no audio files) ----------
+  const sfx = (() => {
+    let ac = null, master = null, noise = null, lastClash = 0;
+    let muted = store.get('cs-muted', false);
+    function ensure() {
+      if (ac) return;
+      try {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        master = ac.createGain(); master.gain.value = 0.45; master.connect(ac.destination);
+        noise = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
+        const d = noise.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      } catch { ac = null; }
+    }
+    const ready = () => ac && !muted && ac.state === 'running';
+    function env(g, t0, vol, dur) {
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    }
+    function tone(freq, t0, dur, { type = 'sine', vol = 0.3, to = null, cutoff = null } = {}) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+      let node = o;
+      if (cutoff) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; o.connect(f); node = f; }
+      node.connect(g); g.connect(master); env(g, t0, vol, dur);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    }
+    function burst(t0, dur, { vol = 0.2, type = 'lowpass', freq = 1000, q = 1 } = {}) {
+      const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      s.buffer = noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
+      s.connect(f); f.connect(g); g.connect(master); env(g, t0, vol, dur);
+      s.start(t0, Math.random() * 0.3); s.stop(t0 + dur + 0.05);
+    }
+    return {
+      unlock() { ensure(); if (ac && ac.state === 'suspended') ac.resume(); },
+      get muted() { return muted; },
+      setMuted(v) { muted = v; store.set('cs-muted', v); },
+      drum() {
+        if (!ready()) return;
+        const t = ac.currentTime;
+        [0, 0.13, 0.26].forEach((d, i) => {
+          tone(i === 2 ? 95 : 120, t + d, 0.2, { vol: 0.55, to: 45 });
+          burst(t + d, 0.07, { vol: 0.18, freq: 900 });
+        });
+      },
+      clash() {
+        if (!ready()) return;
+        const t = ac.currentTime;
+        if (t - lastClash < 0.08) return;
+        lastClash = t;
+        burst(t, 0.11, { vol: 0.12, type: 'bandpass', freq: 2600 + Math.random() * 2400, q: 7 });
+        tone(1700 + Math.random() * 900, t, 0.14, { type: 'triangle', vol: 0.035 });
+      },
+      horn(won) {
+        if (!ready()) return;
+        const t = ac.currentTime, notes = won ? [196, 294] : [196, 147];
+        notes.forEach((f, i) => {
+          const d = i * 0.28, dur = i ? 0.55 : 0.3;
+          tone(f, t + d, dur, { type: 'sawtooth', vol: 0.16, cutoff: 1100 });
+          tone(f * 2, t + d, dur, { type: 'triangle', vol: 0.05 });
+        });
+      },
+      fanfare(won) {
+        if (!ready()) return;
+        const t = ac.currentTime;
+        const notes = won ? [[262, 0], [330, 0.16], [392, 0.32], [523, 0.5]] : [[220, 0], [196, 0.32], [175, 0.64], [131, 0.96]];
+        notes.forEach(([f, d], i) => {
+          const dur = i === notes.length - 1 ? 0.9 : 0.3;
+          tone(f, t + d, dur, { type: 'sawtooth', vol: 0.14, cutoff: won ? 1800 : 900 });
+          tone(f / 2, t + d, dur, { type: 'triangle', vol: 0.08 });
+        });
+      },
+    };
+  })();
+  addEventListener('pointerdown', () => sfx.unlock());
+  addEventListener('keydown', () => sfx.unlock());
 
   // ---------- map generation ----------
   function genMap(seed, n, players, portrait, aiBonus = 0) {
@@ -400,10 +485,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         else {
           t.units -= k.n;
           G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
+          if (!G.cfg.demo && (k.owner === 1 || t.owner === 1)) sfx.clash();
           if (t.units < 0) {
             const was = t.owner;
             t.owner = k.owner; t.units = -t.units;
             if (k.owner === 1) G.caps++;
+            if (!G.cfg.demo && (k.owner === 1 || was === 1)) sfx.horn(k.owner === 1);
             if (was === 1) sel.delete(t);
             G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: COL[k.owner], age: 0 });
           }
@@ -453,6 +540,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         a.n -= m; b.n -= m;
         fought = true;
         G.fx.push({ kind: 'clash', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, age: 0 });
+        if (!G.cfg.demo) sfx.clash();
       }
     }
     if (fought) G.packets = G.packets.filter(k => k.n > 0);
@@ -731,7 +819,10 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const playable = () => G && !G.cfg.demo && !G.over && !G.paused;
 
   function playerSend(t) {
-    if (send(1, [...sel].filter(s => s !== t), t, sendPct) && !G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
+    if (send(1, [...sel].filter(s => s !== t), t, sendPct)) {
+      sfx.drum();
+      if (!G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
+    }
     sel.clear();
   }
 
@@ -796,6 +887,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   addEventListener('keydown', e => {
     if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
     else if (e.key >= '1' && e.key <= '4') setSendPct(PCTS[+e.key - 1]);
+    else if (e.key === 'm' || e.key === 'M') toggleSound();
     else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
     else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }
   });
@@ -843,6 +935,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   function endGame(win) {
     G.over = true; sel.clear();
+    sfx.fanfare(win);
     btnPause.disabled = true; btnAll.disabled = true;
     const lv = G.cfg.level;
     if (win && lv) {
@@ -869,6 +962,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   $('btnNext').addEventListener('click', () => startLevel(lastCfg.level + 1));
   btnPause.addEventListener('click', () => setPaused(!G.paused));
   btnAll.addEventListener('click', selectAll);
+
+  const btnSound = $('btnSound');
+  function toggleSound() {
+    sfx.setMuted(!sfx.muted);
+    btnSound.textContent = sfx.muted ? 'Muted' : 'Sound on';
+    btnSound.setAttribute('aria-pressed', String(!sfx.muted));
+  }
+  btnSound.addEventListener('click', toggleSound);
+  btnSound.textContent = sfx.muted ? 'Muted' : 'Sound on';
 
   resize();
   toMenu();
