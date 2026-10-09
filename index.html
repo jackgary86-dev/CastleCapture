@@ -286,6 +286,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <li><b>Armies that meet on the road fight.</b> The stronger column marches on with what's left.</li>
             <li><b>Red banners</b> over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.</li>
             <li><b>Rivals surrender</b> when they're down to a tenth of the troops on the map and two castles or fewer. Against one rival, their castles open their gates to you.</li>
+            <li><b>Upkeep:</b> a castle trains at half speed once its garrison passes twice its size, and a quarter speed past four times. An hourglass on its plaque shows when. Spread big armies out or put them to work.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
             <li><b>Space</b> selects all your castles. <b>[</b> and <b>]</b> change the game speed (1×, 1.5× or 2×). <b>P</b> pauses. <b>M</b> mutes.</li>
           </ul>
@@ -339,6 +340,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const FIRST_CHARGE = 45;      // seconds before a special power is first ready
   const RECHARGE = 300;         // seconds a special power takes to recharge after use
   const COIN_PER_MIN = [0, 1, 2, 3]; // coins per minute from a small, medium and large castle
+  const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
   const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
   const MAP_UNITS = {
     ballista: {
@@ -788,7 +790,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1);
   const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
   const wardOver = (p, o) => G.units.some(u => u.type === 'ward' && u.owner === o && dist(u, p) <= MAP_UNITS.ward.range);
-  const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2.5 : 1) * (wardOver(p, p.owner) ? 2 : 1) : 0;
+  // Upkeep: a castle feeding a big garrison trains slower, which stops one castle hoarding an army forever.
+  const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPKEEP_AT ? 0.5 : 1;
+  const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2.5 : 1) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) : 0;
   // Wall strength of one castle: its owner's defence plus a Great Ward over it.
   const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1);
   // Enemy Great Wards halve marching speed inside them.
@@ -1605,6 +1609,15 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     ctx.fillStyle = p.owner ? army(p.owner).plaqueText : INK;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(label, p.x, py + th / 2 + 1);
+    // Hourglass beside the plaque when upkeep is slowing training: amber at half speed, red at a quarter.
+    const up = p.owner ? upkeepOf(p) : 1;
+    if (up < 1) {
+      const hx = p.x + tw / 2 + 5, hy = py + th / 2, hs = th * 0.38;
+      ctx.fillStyle = up < 0.5 ? WARN : '#e9b43b';
+      ctx.beginPath(); ctx.moveTo(hx - hs * 0.7, hy - hs); ctx.lineTo(hx + hs * 0.7, hy - hs); ctx.lineTo(hx, hy);
+      ctx.lineTo(hx + hs * 0.7, hy + hs); ctx.lineTo(hx - hs * 0.7, hy + hs); ctx.lineTo(hx, hy); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 0.8; ctx.stroke();
+    }
   }
 
   // Each army's soldier.
