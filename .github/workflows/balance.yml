@@ -1,0 +1,20 @@
+name: Balance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax-check every script
+        run: for f in js/*.js tools/*.js; do node --check "$f"; done
+      - name: AI-vs-AI balance test
+        # 8 games per pairing (32 per army) keeps the win rates stable; runs are seeded, so results are repeatable.
+        run: node tools/balance.js --games 8
