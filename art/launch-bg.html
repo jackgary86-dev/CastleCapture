@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Castle Siege launch background</title>
+<style>
+  html, body { height: 100%; margin: 0; background: #120f22; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+<canvas id="bg"></canvas>
+<script src="launch-bg.js"></script>
+<script>
+  // Fills the window at device resolution; add ?w=1920&h=1080 to render a fixed size.
+  const q = new URLSearchParams(location.search);
+  const cv = document.getElementById('bg'), ctx = cv.getContext('2d');
+  function render() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const W = +q.get('w') || Math.round(innerWidth * dpr), H = +q.get('h') || Math.round(innerHeight * dpr);
+    cv.width = W; cv.height = H;
+    paintLaunchBackground(ctx, W, H);
+  }
+  render();
+  addEventListener('resize', render);
+</script>
+</html>

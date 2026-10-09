@@ -106,3 +106,17 @@ node tools/balance.js --games 8
 ```
 
 Options: `--games N` per pairing, `--diff easy|medium|hard`, `--seconds` cap per battle, `--band 0.25,0.75`, `--json`. Runs are seeded, so the same arguments always give the same result. GitHub Actions runs it on every push and pull request (`.github/workflows/balance.yml`).
+
+## Smoke test
+
+The balance test only loads `js/data.js` and `js/sim.js`, so it can't see mistakes in the UI files. `tools/smoke.js` loads every script `index.html` loads, in the same order and sharing one global scope, with stand-in browser objects. It then plays two battles through the menu path, draws frames, saves, resumes and finishes a battle, and fails on any exception. That catches using a name before the file that defines it has run, two files declaring the same top-level name, and HUD or drawing code that throws.
+
+```bash
+node tools/smoke.js
+```
+
+CI runs it before the balance test. It still isn't a substitute for opening the game in a browser, since the stand-ins accept anything.
+
+## Art
+
+`art/launch-bg.js` paints the launch background procedurally (a dusk valley with the five homelands' castles), seeded so it renders identically everywhere. Open `art/launch-bg.html` to see it fill the window, or export PNGs with `node tools/render-art.js` after a one-off `npm install @napi-rs/canvas`. The exported `art/launch-bg.png` (1920×1080) and `art/launch-bg-3840x2160.png` are checked in.
