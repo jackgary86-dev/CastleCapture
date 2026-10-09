@@ -512,13 +512,14 @@ function drawWeather(now) {
   }
 }
 
-function drawThreats(now) {
-  const inc = incomingFor(1);
+// Red banners over kingdom `me`'s castles counting the enemy troops marching on them.
+function drawThreats(now, me = 1) {
+  const inc = incomingFor(me);
   for (const p of G.planets) {
-    if (p.owner !== 1) continue;
-    const threat = inc[p.id].reduce((a, v, o) => o > 1 ? a + v : a, 0);
+    if (p.owner !== me) continue;
+    const threat = inc[p.id].reduce((a, v, o) => o > 0 && o !== me ? a + v : a, 0);
     if (threat < 0.5) continue;
-    const falls = threat > (p.units + inc[p.id][1]) * defAt(p);
+    const falls = threat > (p.units + inc[p.id][me]) * defAt(p);
     if (falls) {
       const pulse = reduceMotion ? 0.6 : 0.45 + 0.4 * Math.sin(now / 160);
       ctx.save(); ctx.translate(p.x, p.y + p.r * 0.45); ctx.scale(1, 0.5);

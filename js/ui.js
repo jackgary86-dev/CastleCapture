@@ -27,7 +27,7 @@ function toast(title, detail, color) {
 
 // A lord speaks. Routine lines are rate-limited per lord and overall; key moments can force through.
 function taunt(o, kind, force = false) {
-  if (!G || G.cfg.demo || o === 1 || !tauntsOn) return;
+  if (!G || G.cfg.demo || o <= (G.cfg.humans || 1) || !tauntsOn) return;   // humans don't taunt
   const lines = lordOf(o).lines[kind];
   if (!lines) return;
   if (!force && (G.time - (G.tauntAt[o] ?? -99) < 12 || G.time - G.lastTaunt < 4)) return;
@@ -280,19 +280,23 @@ function planetAt(w) {
 }
 const playable = () => G && !G.cfg.demo && !G.over && !G.paused && !G.intro;
 
-function playerSend(t) {
+// A second human (two-player mode, #12) has its own selection and send amount in these tables.
+const sels = { 1: sel }, sendPcts = {};
+const pctOf = o => (o === 1 ? sendPct : (sendPcts[o] ?? 0.5));
+function playerSend(t, owner = 1) {
+  const s = sels[owner] || sel;
   // A truce holds: say so rather than silently doing nothing.
-  if (allied(1, t.owner)) {
-    const p = pactOf(1, t.owner);
+  if (allied(owner, t.owner)) {
+    const p = pactOf(owner, t.owner);
     toast(`Truce with ${lordOf(t.owner).short}`, `${Math.ceil(p.until - G.time)}s left. Break it in Diplomacy if you mean to attack.`, army(t.owner).color);
-    sel.clear();
+    s.clear();
     return;
   }
-  if (send(1, [...sel].filter(s => s !== t), t, sendPct)) {
+  if (send(owner, [...s].filter(x => x !== t), t, pctOf(owner))) {
     sfx.drum();
     if (!G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
   }
-  sel.clear();
+  s.clear();
 }
 function playerPower() { if (playable() && usePower(1)) hud(); }
 
@@ -461,7 +465,7 @@ function setPaused(v) {
 }
 addEventListener('keydown', e => {
   if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
-  else if (e.key >= '1' && e.key <= '4') setSendPct(PCTS[+e.key - 1]);
+  else if (e.key >= '1' && e.key <= '4' && !e.shiftKey) setSendPct(PCTS[+e.key - 1]);   // Shift+1-4 belong to player 2 (#12)
   else if (e.key === 'q' || e.key === 'Q') playerPower();
   else if (e.key === 'u' || e.key === 'U') playerUpgrade('walls');
   else if (e.key === 'i' || e.key === 'I') playerUpgrade('barracks');

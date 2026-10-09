@@ -148,13 +148,13 @@ setInterval(tutorialTick, 150);
 
 // Lessons that need to know how the player sent troops.
 const playerSendBase = playerSend;
-playerSend = function (t) {
+playerSend = function (t, ...rest) {
   if (tut && G && G.cfg.tutorial && tut.i >= 0) {
     const sources = [...sel].filter(s => s !== t && s.owner === 1);
     if (sources.length >= 2) tut.multi = true;
     if (t === tut.threat && sources.length) tut.reinforced = true;
   }
-  playerSendBase(t);
+  playerSendBase(t, ...rest);   // the owner argument (two-player mode) passes through
 };
 on('clash', ({ attacker, defender, road }) => { if (tut && road && (attacker === 1 || defender === 1)) tut.clashed = true; });
 on('power', ({ o }) => { if (tut && o === 1) tut.powered = true; });

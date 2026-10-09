@@ -351,7 +351,7 @@ function newGame(cfg, portrait = false) {
     if (cfg.playerKind) p.kind = cfg.playerKind;
   }
   const owners = Array.from({ length: players }, (_, i) => i + 1);
-  const aiIds = cfg.demo ? [1, 2] : owners.slice(1);
+  const aiIds = cfg.demo ? [1, 2] : owners.slice(cfg.humans || 1);   // cfg.humans: how many kingdoms people play (#12)
   G = {
     cfg, ...map, theme, packets: [], fx: [], time: 0, over: false, paused: false, owners,
     fac: Object.fromEntries(owners.map((o, i) => [o, cfg.armies[i]])),
@@ -1251,7 +1251,7 @@ const SURRENDER_SHARE = 0.10, SURRENDER_HOLD = 8;
 function checkSurrender() {
   if (G.time < 60) return;
   const sum = G.owners.reduce((a, o) => a + totalOf(o), 0) || 1;
-  for (const o of G.owners.slice(1)) {
+  for (const o of G.owners.slice(G.cfg.humans || 1)) {   // people never surrender for themselves
     if (G.surrendered.has(o)) continue;
     const castles = G.planets.filter(p => p.owner === o);
     if (!castles.length) continue;

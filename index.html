@@ -349,6 +349,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #objective { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100% - 28px); padding: 6px 14px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 1px solid #e9b43b; color: #f4ecd6; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; font-variant-numeric: tabular-nums; }
 #objective b { color: #e9b43b; font-family: var(--display); font-weight: 400; font-size: 16px; margin-right: 6px; }
 @media (max-width: 560px) { #objective { bottom: 64px; font-size: 13px; } }
+/* Two players on one screen (#12): player 2's keyboard status panel */
+#p2hud { position: absolute; right: 14px; bottom: 14px; padding: 6px 10px; border-radius: 4px; background: rgb(23 20 14 / 0.9); border: 2px solid var(--c, var(--edge)); color: #f4ecd6; font-size: 13px; line-height: 1.35; pointer-events: none; font-variant-numeric: tabular-nums; max-width: 240px; }
+#p2hud b { display: block; color: var(--c); font-family: var(--display); font-weight: 400; font-size: 16px; }
+#p2hud kbd { font: inherit; font-weight: 700; color: #e9b43b; }
+@media (max-width: 560px) { #p2hud { bottom: 64px; font-size: 12px; } }
 /* Achievements and records */
 .medal { flex: none; width: 26px; height: 26px; border-radius: 50%; background: #b7a985; box-shadow: inset 0 0 0 2px #8f8162; position: relative; }
 .medal::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.18); }
@@ -666,5 +671,6 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/grand-menu.js"></script>
 <script src="js/events.js"></script>
 <script src="js/story.js"></script>
+<script src="js/twoplayer.js"></script>
 <script src="js/codex.js"></script>
 <script src="js/tutorial.js"></script>
