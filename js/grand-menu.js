@@ -37,9 +37,16 @@
   const maps = () => {
     const src = grandMaps();
     const entries = src ? Object.entries(src).filter(([, m]) => m && typeof m === 'object' && m.name) : [];
-    return entries.length ? entries : Object.entries(FALLBACK_MAP);
+    // The plain realm is the stand-in until the monster maps exist; once they do, only they are offered.
+    const real = entries.filter(([, m]) => m.monster);
+    return real.length ? real : entries.length ? entries : Object.entries(FALLBACK_MAP);
   };
-  const monsterName = m => { const M = monsters(); return (m && m.monster && M && M[m.monster] && M[m.monster].name) || null; };
+  const monsterName = m => {
+    const M = monsters(), mon = m && m.monster && M && M[m.monster];
+    if (!mon) return null;
+    const n = String(mon.name || mon.short || m.monster).replace(/^the\s+/i, '');
+    return n.charAt(0).toUpperCase() + n.slice(1);
+  };
   const themeOf = m => (typeof THEMES === 'object' && THEMES[m.theme]) || THEMES.vale || {};
   const SLOT_KEY = i => `cs-grand-${i}`;
   const slot = i => { const d = store.get(SLOT_KEY(i), null); return d && typeof d === 'object' && d.map !== undefined ? d : null; };
@@ -77,10 +84,10 @@
       c.beginPath(); c.ellipse(rnd() * W, rnd() * H, 20 + rnd() * 50, 10 + rnd() * 26, rnd() * Math.PI, 0, Math.PI * 2); c.fill();
     }
     // Fog banks (misty themes) soften the far side.
-    const fog = hex(T.fog);
+    const fog = hex(T.fog) || (T.weather === 'fog' ? (hex(T.dust) || '#c8d2d4') : null);
     if (fog) { const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, alpha(fog, 0.45)); g.addColorStop(0.6, alpha(fog, 0)); c.fillStyle = g; c.fillRect(0, 0, W, H); }
     // A river, or a lava fissure that glows: a wandering ribbon across the map.
-    const lava = hex(T.lava), pool = hex(T.pool), water = hex(T.water) || pool;
+    const pool = hex(T.pool), lava = hex(T.lava) || (T.lava === true ? pool || '#ff6a1a' : null), water = hex(T.water) || pool;
     if (lava || (T.river && water) || (T.pools > 0 && pool)) {
       const col = lava || water;
       const pts = []; let x = -10, y = H * (0.3 + rnd() * 0.4);
@@ -116,11 +123,12 @@
       else if (tree === 'palm') { c.strokeStyle = leaf; c.lineWidth = 1; for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(k * 1.6) * 4, y - 2 + Math.sin(k * 1.6) * 2); c.stroke(); } }
       else { c.fillStyle = leaf; c.beginPath(); c.arc(x, y, 2 + rnd() * 1.5, 0, Math.PI * 2); c.fill(); }
     }
-    const rocks = (T.rocks || 0) + (T.boulders || 0) * 2;
+    const boulders = T.boulders || (T.rocks >= 40 ? Math.floor(T.rocks / 5) : 0);
+    const rocks = (T.rocks || 0) + boulders * 2;
     c.fillStyle = mixc(field, '#9a9a96', 0.55);
-    for (let i = 0; i < Math.min(60, rocks); i++) { const x = rnd() * W, y = rnd() * H, s = 1.5 + rnd() * (T.boulders ? 3 : 1.5); c.beginPath(); c.moveTo(x - s, y + s * 0.6); c.lineTo(x, y - s); c.lineTo(x + s, y + s * 0.6); c.closePath(); c.fill(); }
+    for (let i = 0; i < Math.min(60, rocks); i++) { const x = rnd() * W, y = rnd() * H, s = 1.5 + rnd() * (boulders ? 3 : 1.5); c.beginPath(); c.moveTo(x - s, y + s * 0.6); c.lineTo(x, y - s); c.lineTo(x + s, y + s * 0.6); c.closePath(); c.fill(); }
     // Embers drift over scorched ground.
-    if (lava) for (let i = 0; i < 24; i++) { c.fillStyle = `rgba(255,${150 + Math.floor(rnd() * 80)},60,${0.3 + rnd() * 0.5})`; c.fillRect(rnd() * W, rnd() * H, 1.2, 1.2); }
+    if (lava || T.weather === 'embers') for (let i = 0; i < 24; i++) { c.fillStyle = `rgba(255,${150 + Math.floor(rnd() * 80)},60,${0.3 + rnd() * 0.5})`; c.fillRect(rnd() * W, rnd() * H, 1.2, 1.2); }
     // Castles: one per realm in its army's colour (the colour-blind palette when it is on), and
     // the central keep, which is the monster's lair where the map has one.
     const castle = (x, y, s, col, roof) => {
@@ -139,7 +147,7 @@
     castle(cx, cy, 6, mixc(ring, bg, 0.3), mixc(ring, bg, 0.55));
     // Vignette so the card edges sit into the parchment.
     const v = c.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 2.2);
-    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.45)');
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, T.weather === 'gloom' ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.45)');
     c.fillStyle = v; c.fillRect(0, 0, W, H);
   }
 
