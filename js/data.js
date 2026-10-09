@@ -83,6 +83,17 @@ const GRAND = {
   waveCap: 400,                // headless runs stop here
 };
 // Grand Campaign maps and monsters (#48, #50) are defined after THEMES below.
+// King of the Hill (#64): a short mode where one crowned keep at the centre of the map scores for its holder.
+const HILL = {
+  goal: 300,                   // points to win; the holder scores 1 point a second
+  cap: 720,                    // seconds; then the most points wins
+  focusAt: 250,                // from here every lord turns on the leader
+  r: 36,                       // the hill keep's size (a large castle, so it trains fast and holds up to 120)
+  garrison: 50,                // unclaimed defenders at the start
+  def: 1.5,                    // its walls: defenders count this much more for whoever holds it; it can't be upgraded
+  rivalWorth: 0.35,            // how much a lord wants a rival's other (well-held) castles, next to a normal battle
+  castles: { 2: 15, 3: 16, 5: 21 },   // castles on the map by number of kingdoms
+};
 const COIN_CAP = 300;         // the treasury holds at most this many coins, except in the Grand Campaign
 const PLACE_REACH = 170;      // a map unit must be placed within this distance of one of your castles
 const MAP_UNITS = {
@@ -99,6 +110,7 @@ const MAP_UNITS = {
     desc: 'Your castles inside train twice as fast and their defenders count 1.5×. Enemy troops passing through march at half speed.',
   },
 };
+// ARMIES[id].ai.hill: how much a lord wants the crowned keep in King of the Hill (#64); their tactics for it live in js/hill.js.
 // The unit each lord saves up for.
 const AI_UNIT = { aldmere: 'ward', kharzul: 'trebuchet', frostmark: 'ballista', solmara: 'ward', nyx: 'trebuchet' };
 const NEUTRAL = '#8c8676', INK = '#2a2014', PARCH = '#dccba2', TIMBER = '#17140e', WARN = '#e0362f';
@@ -125,7 +137,7 @@ const ARMIES = {
     stats: { atk: 1, def: 1.45, speed: 1, prod: 1, road: 1, neutral: 1 },
     power: { id: 'stoneOath', name: 'Stone Oath', dur: 20, desc: 'For 20 seconds, every defender in your castles counts double.', call: 'swear the Stone Oath', they: 'swears the Stone Oath' },
     personality: 'Defensive. Holds the frontier, reinforces early, and marches only when it badly outnumbers you.',
-    ai: { sendFrac: 0.45, keep: 10, enemyBias: 0.9, neutralBias: 1, margin: 1.35, defendAt: 0.8, thinkMul: 1.1, front: true, opportunist: 1.2, boldAt: 1.6 },
+    ai: { sendFrac: 0.45, keep: 10, enemyBias: 0.9, neutralBias: 1, margin: 1.35, defendAt: 0.8, thinkMul: 1.1, front: true, opportunist: 1.2, boldAt: 1.6, hill: 2 },
   },
   kharzul: {
     name: 'Kharzul', full: 'The Kharzul Horde', emblem: 'moon',
@@ -137,7 +149,7 @@ const ARMIES = {
     stats: { forest: 0.45, atk: 1.12, def: 0.9, speed: 1.3, prod: 1, road: 0.9, neutral: 1 },
     power: { id: 'bloodMoon', name: 'Blood Moon Charge', dur: 15, desc: 'For 15 seconds, your riders move twice as fast and hit 1.5× harder.', call: 'charge under the Blood Moon', they: 'charges under the Blood Moon' },
     personality: 'Very aggressive. Attacks constantly with most of its army and rarely stops to defend.',
-    ai: { sendFrac: 0.75, keep: 4, enemyBias: 2.2, neutralBias: 0.9, margin: 1.0, defendAt: 1.4, thinkMul: 0.7, front: false, opportunist: 1.3, boldAt: 0.9 },
+    ai: { sendFrac: 0.75, keep: 4, enemyBias: 2.2, neutralBias: 0.9, margin: 1.0, defendAt: 1.4, thinkMul: 0.7, front: false, opportunist: 1.3, boldAt: 0.9, hill: 3.5 },
   },
   frostmark: {
     name: 'Frostmark', full: 'The Jarls of Frostmark', emblem: 'snow',
@@ -149,7 +161,7 @@ const ARMIES = {
     stats: { forest: 0.85, atk: 1, def: 1.4, speed: 0.95, prod: 1, road: 1.45, neutral: 1 },
     power: { id: 'wintersGrip', name: "Winter's Grip", dur: 12, desc: 'A blizzard sweeps the map. For 12 seconds, every enemy soldier in the field freezes in place.', call: "call down Winter's Grip", they: "calls down Winter's Grip" },
     personality: 'Very defensive. Builds up behind its walls, punishes weak attacks, and strikes only at castles left nearly empty.',
-    ai: { sendFrac: 0.45, keep: 10, enemyBias: 0.6, neutralBias: 1, margin: 1.35, defendAt: 0.6, thinkMul: 1.25, front: true, opportunist: 2.4, boldAt: 1.5 },
+    ai: { sendFrac: 0.45, keep: 10, enemyBias: 0.6, neutralBias: 1, margin: 1.35, defendAt: 0.6, thinkMul: 1.25, front: true, opportunist: 2.4, boldAt: 1.5, hill: 1.6 },
   },
   solmara: {
     name: 'Solmara', full: 'The Sun Dominion of Solmara', emblem: 'sun',
@@ -161,7 +173,7 @@ const ARMIES = {
     stats: { atk: 1.05, def: 1, speed: 1, prod: 1, road: 1, neutral: 1 },
     power: { id: 'goldenTithe', name: 'Golden Tithe', dur: 15, desc: 'Open the treasury. For 15 seconds, your castles train troops twice as fast.', call: 'open the Golden Tithe', they: 'opens the Golden Tithe' },
     personality: 'Balanced. Expands steadily, defends what it holds, and attacks when the odds are good.',
-    ai: { sendFrac: 0.5, keep: 8, enemyBias: 1.3, neutralBias: 1.1, margin: 1.05, defendAt: 0.9, thinkMul: 1, front: false, opportunist: 1.6, boldAt: 1.3 },
+    ai: { sendFrac: 0.5, keep: 8, enemyBias: 1.3, neutralBias: 1.1, margin: 1.05, defendAt: 0.9, thinkMul: 1, front: false, opportunist: 1.6, boldAt: 1.3, hill: 2 },
   },
   nyx: {
     name: 'Nyxhollow', full: 'The Nyxhollow Covenant', emblem: 'eye',
@@ -173,7 +185,7 @@ const ARMIES = {
     stats: { atk: 1.12, def: 1, speed: 1, prod: 1, road: 1, neutral: 1.25 },
     power: { id: 'crows', name: 'Plague of Crows', dur: 3, desc: 'Crows descend on the three largest enemy castles. Each loses 40% of its garrison at once.', call: 'loose the Plague of Crows', they: 'looses the Plague of Crows' },
     personality: 'Aggressive and cunning. Snaps up unclaimed keeps quickly and pounces on any castle you leave weak.',
-    ai: { sendFrac: 0.6, keep: 6, enemyBias: 1.8, neutralBias: 1.4, margin: 1.05, defendAt: 1.0, thinkMul: 0.85, front: false, opportunist: 1.8, boldAt: 1.1 },
+    ai: { sendFrac: 0.6, keep: 6, enemyBias: 1.8, neutralBias: 1.4, margin: 1.05, defendAt: 1.0, thinkMul: 0.85, front: false, opportunist: 1.8, boldAt: 1.1, hill: 1.4 },
   },
   // Not a kingdom: the raiding column of the bandit map event (#35). It owns no castles, no
   // lord commands it and it never appears in the army pickers (see ARMY_IDS).
@@ -188,7 +200,7 @@ const ARMIES = {
     stats: { atk: 1, def: 1, speed: 1.1, prod: 0, road: 1, neutral: 1, forest: 0.9 },
     power: { id: 'none', name: 'None', dur: 0, desc: '', call: '', they: '' },
     personality: '',
-    ai: { sendFrac: 0, keep: 0, enemyBias: 1, neutralBias: 1, margin: 1, defendAt: 1, thinkMul: 1, front: false, opportunist: 1, boldAt: 1 },
+    ai: { sendFrac: 0, keep: 0, enemyBias: 1, neutralBias: 1, margin: 1, defendAt: 1, thinkMul: 1, front: false, opportunist: 1, boldAt: 1, hill: 0 },
   },
 };
 // The five playable kingdoms, in picker order. Pseudo-armies (the bandits) are left out.
@@ -210,6 +222,7 @@ const LORDS = {
       capture: ['Another stone for my walls.', 'You built that badly. I will build it better.'],
       lose: ['A setback. Walls can be rebuilt.', 'Enjoy it while it lasts.'],
       power: ['By the Oath of Stone!'],
+      hill: ['The crown sits best on patient walls.', 'Hold it if you can. I will be waiting next door.'],
       nearDefeat: ['Even good walls fall. Remember that I built them.'],
       slay: ['A beast is only a wall that moves. It has stopped moving.'],
       victory: ['Patience wins every siege. You had none.'],
@@ -230,6 +243,7 @@ const LORDS = {
       capture: ['Burn it. We ride on.', 'Ha! Next!'],
       lose: ["Keep it. I'll take two of yours.", 'A pile of sticks. I have more.'],
       power: ['The moon is red! RIDE!'],
+      hill: ['The hill is MINE! Ride!', 'Whoever sits up there, knock him off!'],
       nearDefeat: ['A horse lord dies in the saddle, not on his knees!'],
       victory: ['The steppe wind blows over your ashes.'],
       defeat: ['You ride well, for a wall-builder.'],
@@ -247,6 +261,7 @@ const LORDS = {
       capture: ['You left it open to the cold.'],
       lose: ['Hm.'],
       power: ['Winter takes them.'],
+      hill: ['The hill freezes over.', 'Mine. Come and thaw it.'],
       counter: ['Now.'],
       nearDefeat: ['The ice breaks in spring. It always returns.'],
       victory: ['The north keeps its own.'],
@@ -266,6 +281,7 @@ const LORDS = {
       capture: ['Bought and paid for.', 'A bargain.'],
       lose: ['A small expense.', 'Put it on my account.'],
       power: ['Open the treasury!'],
+      hill: ['The best real estate in the realm.', 'The crown? A sound investment.'],
       nearDefeat: ['Surely we can come to an arrangement?'],
       victory: ['The sands are mine. Send me the bill.'],
       defeat: ['Well played. Name your price.'],
@@ -285,6 +301,7 @@ const LORDS = {
       capture: ['Empty halls echo so sweetly.', 'I saw that coming. Did you?'],
       lose: ['Take it. The mire will take it back.'],
       power: ['Fly, my darlings. Feast.'],
+      hill: ['You held it so bravely. Now it is mine.', 'The crown was always going to be mine, darling.'],
       nearDefeat: ['The mire keeps what it drowns. I will return.'],
       victory: ['Sleep now. The crows will keep watch.'],
       defeat: ['The crows did not see this. How interesting.'],

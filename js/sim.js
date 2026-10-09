@@ -249,7 +249,8 @@ function buildScenery(planets, T, theme, rnd, w, h, scaleCounts = false) {
 }
 
 // ---------- map generation ----------
-// opts: scale (map size multiplier), start (starting troops), neutral (unclaimed keep garrison multiplier).
+// opts: scale (map size multiplier), start (starting troops), neutral (unclaimed keep garrison multiplier),
+// hill (King of the Hill, #64: always a crowned keep at the centre, marked hill: true).
 function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
   const rnd = mulberry(seed);
   const S = opts.scale ?? 1, START = opts.start ?? 40, NM = opts.neutral ?? 1;
@@ -273,7 +274,8 @@ function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
   if (players === 2) {
     pts.push({ ...starts[0], r: 28, owner: 1, units: START });
     pts.push({ ...starts[1], r: 28, owner: 2, units: START + aiBonus });
-    if (n % 2 === 1 && !wet) pts.push({ x: cx, y: cy, r: 32, owner: 0, units: Math.round(45 * NM) });
+    if (opts.hill) pts.push({ x: cx, y: cy, r: HILL.r, owner: 0, units: HILL.garrison, hill: true });
+    else if (n % 2 === 1 && !wet) pts.push({ x: cx, y: cy, r: 32, owner: 0, units: Math.round(45 * NM) });
     let tries = 0;
     while (pts.length < n && tries++ < 4000) {
       const r = 13 + rnd() * 19, x = 60 + rnd() * (cx - 60), y = 50 + rnd() * (H - 100);
@@ -285,7 +287,8 @@ function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
     }
   } else {
     starts.forEach((s, k) => pts.push({ ...s, r: 26, owner: k + 1, units: k ? START + aiBonus : START }));
-    if (!wet) pts.push({ x: cx, y: cy, r: 33, owner: 0, units: Math.round(60 * NM) });
+    if (opts.hill) pts.push({ x: cx, y: cy, r: HILL.r, owner: 0, units: HILL.garrison, hill: true });
+    else if (!wet) pts.push({ x: cx, y: cy, r: 33, owner: 0, units: Math.round(60 * NM) });
     // Unclaimed castles are placed in matching sets, one per kingdom, rotated round the centre.
     const step = 2 * Math.PI / players;
     let tries = 0;
@@ -301,7 +304,7 @@ function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
   // Portrait screens: rotate the map so the player starts at the bottom.
   const rot = p => portrait ? { x: p.y, y: W - p.x } : { x: p.x, y: p.y };
   const rotV = (vx, vy) => portrait ? [vy, -vx] : [vx, vy];
-  const planets = pts.map((p, id) => ({ id, ...rot(p), r: p.r, owner: p.owner, units: p.units }));
+  const planets = pts.map((p, id) => ({ id, ...rot(p), r: p.r, owner: p.owner, units: p.units, ...(p.hill ? { hill: true } : {}) }));
   T.rivers = T.rivers.map(r => r.map(rot));
   if (T.lake) T.lake = { ...rot(T.lake), r: T.lake.r };
   T.bridges = T.bridges.map(b => { const [tx, ty] = rotV(b.tx, b.ty); return { ...rot(b), tx, ty, e1: rot(b.e1), e2: rot(b.e2) }; });
@@ -320,7 +323,7 @@ function assignKinds(planets, seed) {
   const rnd = mulberry((seed ^ 0x5bd1e995) >>> 0);
   const groups = new Map();
   for (const p of planets) {
-    if (p.owner) continue;
+    if (p.owner || p.hill) continue;   // the crowned keep of King of the Hill stays plain
     const key = `${p.r.toFixed(3)}|${p.units}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(p);
@@ -340,10 +343,12 @@ function assignKinds(planets, seed) {
 
 function newGame(cfg, portrait = false) {
   const players = cfg.armies.length;
-  const grand = cfg.mode === 'grand';
-  const theme = grand ? THEMES[(GRAND_MAPS[cfg.grandMap] || GRAND_MAPS.realm).theme] : THEMES[ARMIES[cfg.map].map];
+  const grand = cfg.mode === 'grand', hill = cfg.mode === 'hill';
+  const home = grand ? THEMES[(GRAND_MAPS[cfg.grandMap] || GRAND_MAPS.realm).theme] : THEMES[ARMIES[cfg.map].map];
+  // King of the Hill (#64) is fought on dry ground: the rivers' central lake would drown the crowned keep.
+  const theme = hill && home.river ? { ...home, river: false } : home;
   const map = grand ? genGrandMap(cfg.seed, cfg)
-    : genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral });
+    : genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral, hill });
   assignKinds(map.planets, cfg.seed);
   // Story campaign setups (#27): a chosen starting garrison and castle kind for the player.
   for (const p of map.planets) if (p.owner === 1) {
@@ -412,7 +417,7 @@ const coinCap = () => G.mode === 'grand' ? Infinity : (G.cfg.coinCap ?? COIN_CAP
 const harvestMul = o => G.ev && G.ev.harvest && G.ev.harvest.o === o && G.time < G.ev.harvest.until ? 1.5 : 1;
 const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() : 0;
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.
-const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1);
+const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1) * (p.hill ? HILL.def : 1);
 // Enemy Great Wards halve marching speed inside them.
 const slowedAt = k => G.units.some(u => u.type === 'ward' && u.owner !== k.owner && dist(u, k) <= MAP_UNITS.ward.range);
 const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] : 0), 0);
@@ -421,7 +426,8 @@ const frozen = o => G.owners.some(q => q !== o && powerOn(q, 'wintersGrip'));
 // ---------- castle upgrades and archers ----------
 const lvl = (p, kind) => (p.up && p.up[kind]) || 0;
 // Bigger castles train more, so their upgrades cost more: 0.8x for small, 1x medium, 1.2x large.
-const upgradeCost = (p, kind) => lvl(p, kind) < UPGRADE.max ? Math.round(UPGRADE.cost[lvl(p, kind)] * (0.6 + 0.2 * tierOf(p))) : null;
+// The crowned keep of King of the Hill can't be upgraded.
+const upgradeCost = (p, kind) => !p.hill && lvl(p, kind) < UPGRADE.max ? Math.round(UPGRADE.cost[lvl(p, kind)] * (0.6 + 0.2 * tierOf(p))) : null;
 const canUpgrade = (p, kind) => !!p.owner && upgradeCost(p, kind) !== null && p.units >= upgradeCost(p, kind) + 1;
 const wallsMul = p => 1 + UPGRADE.wallDef * lvl(p, 'walls');
 const barracksTrainMul = p => 1 + UPGRADE.barracksTrain * lvl(p, 'barracks');
@@ -844,6 +850,8 @@ function aiThink(ai) {
   // A Grand Campaign monster near death is worth a lord's turn (js/monsters.js).
   if (G.monster && typeof monsterAi === 'function' && monsterAi(ai)) return;
   const inc = incomingFor(me), pow = incomingPowerFor(me);
+  // King of the Hill (#64): each lord's own play for the crowned keep comes first (js/hill.js).
+  if (G.mode === 'hill' && typeof hillAi === 'function' && hillAi(ai, P, inc, pow)) return;
   const enemyCastles = P.filter(p => p.owner && p.owner !== me);
   // Marching distance to the nearest castle in a list: rivers and forests count, not just the crow's flight.
   const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => travel(p, q))) : Infinity;
@@ -995,6 +1003,8 @@ function aiThink(ai) {
     }
     if (t.owner && t.units < t.r * 0.6) worth *= pz.opportunist;
     if (G.monster && typeof monsterWorthMul === 'function') worth *= monsterWorthMul(t, me);
+    if (G.mode === 'hill' && typeof hillWorthMul === 'function') worth *= hillWorthMul(ai, t, P);
+    if (worth <= 0) continue;
     if (id === 'kharzul' && real(t) === ai.focus) worth *= 2.5;
     // Grand Campaign: lords turn on whichever rival has fallen well behind them, so a dying realm gets finished off.
     if (G.mode === 'grand' && t.owner && totalOf(t.owner) < myTotal * 0.5) worth *= GRAND.finishBias;
@@ -1136,6 +1146,7 @@ function mapUnits(dt) {
 function aiBuyUnit(ai, mine) {
   const me = ai.id;
   if (G.bought.has(me)) return;
+  if (G.mode === 'hill' && typeof hillBuyUnit === 'function' && hillBuyUnit(ai, mine)) return;
   const type = AI_UNIT[G.fac[me]], U = MAP_UNITS[type];
   if (G.coins[me] < U.price) return;
   if (ai.diff === 'easy' && Math.random() < 0.5) return;
@@ -1259,6 +1270,8 @@ function update(dt) {
     if (brink) { G.nearDefeat.add(o); lordSays(o, 'nearDefeat', true); }
   }
   checkSurrender();
+  // King of the Hill (#64): the crowned keep scores, and the race can end the battle (js/hill.js).
+  if (G.mode === 'hill' && typeof hillTick === 'function' && hillTick(dt)) return;
 
   if (G.cfg.demo) {
     if (!alive(1) || !alive(2) || G.time > 150) newGame(demoCfg(), G.portrait);
@@ -1291,7 +1304,8 @@ const SURRENDER_SHARE = 0.10, SURRENDER_HOLD = 8;
 const grandSurrenderShare = () =>
   Math.min(GRAND.wearyMax, GRAND.surrenderShare + Math.max(0, G.wave - GRAND.wearyFrom) * GRAND.wearyPerWave);
 function checkSurrender() {
-  if (G.time < 60) return;
+  // King of the Hill (#64) is a race against the clock: nobody gives up, and seats can't fall.
+  if (G.time < 60 || G.mode === 'hill') return;
   const sum = G.owners.reduce((a, o) => a + totalOf(o), 0) || 1;
   for (const o of G.owners.slice(G.cfg.humans || 1)) {   // people never surrender for themselves
     if (G.surrendered.has(o)) continue;
@@ -1342,6 +1356,8 @@ function arrive(k, t) {
   t.units -= k.n * A / D;
   G.fx.push({ kind: 'clash', x: k.x, y: k.y, age: 0 });
   emit('clash', { attacker: k.owner, defender: t.owner });
+  // King of the Hill (#64): a kingdom's seat (its starting castle) can be emptied but never taken.
+  if (t.units < 0 && t.seat && G.mode === 'hill') t.units = 0;
   if (t.units < 0) {
     const was = t.owner;
     t.owner = k.owner; t.units = -t.units * D / A;

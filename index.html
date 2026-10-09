@@ -32,6 +32,18 @@ header { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
 h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: 0.04em; white-space: nowrap; line-height: 1; }
 #strength { flex: 1 1 140px; min-width: 120px; height: 10px; display: flex; gap: 2px; border-radius: 2px; overflow: hidden; background: var(--line); border: 1px solid var(--edge); }
 #strength span { height: 100%; transition: width 0.4s ease; }
+/* King of the Hill (#64): every realm's points towards the crown, beside the strength bar */
+#hillBar { flex: 2 1 260px; display: flex; gap: 6px 10px; flex-wrap: wrap; align-items: center; min-width: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+#hillBar .hb { display: inline-flex; align-items: center; gap: 5px; flex: 1 1 110px; min-width: 0; }
+#hillBar .hb-name { display: inline-flex; align-items: center; gap: 2px; color: var(--text); white-space: nowrap; font-weight: 700; }
+#hillBar .hb-name svg { width: 13px; height: 13px; color: #f3c64a; }
+#hillBar .hb-track { flex: 1; min-width: 36px; height: 8px; border-radius: 2px; background: var(--line); border: 1px solid var(--edge); overflow: hidden; }
+#hillBar .hb-track span { display: block; height: 100%; background: var(--c); transition: width 0.4s ease; }
+#hillBar .hb-pts { min-width: 2.2em; text-align: right; color: var(--muted); }
+#hillBar .holds .hb-track { border-color: #f3c64a; box-shadow: 0 0 0 1px rgb(243 198 74 / 0.5); }
+#hillBar .hunted .hb-pts { color: var(--warn, #e0362f); font-weight: 800; }
+.group.hill .mode-name { font-family: var(--display); font-weight: 400; font-size: 19px; color: var(--ink); }
+.group.hill .hill-best { font-size: 13px; font-style: italic; margin: 0; }
 #status { color: var(--muted); font-size: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 /* On phones the status line wraps rather than widening the page (#56). */
 @media (max-width: 560px) { #status { white-space: normal; } }
@@ -638,6 +650,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
             <li><b>Map events</b> (optional, under Lord taunts): every minute or two something happens, announced with a banner. <b>Mercenaries</b> fill an unclaimed keep with 30 troops who join whoever takes it (gold ring). <b>Plague</b> takes 30% from a random held castle. <b>Bandits</b> send a grey raiding column at the weakest castle; a castle they overrun is left unclaimed. A <b>harvest</b> makes one kingdom's castles train half again as fast for 30 seconds. In the Grand Campaign one opens every fourth march.</li>
             <li><b>Two players</b> on one screen (the toggle under Fog of war): a second person takes the rival army at the keyboard with <b>W A S D</b>, <b>E</b> (select or send), <b>F</b> (select all), <b>R</b> (power), <b>Shift+1–4</b> (send amount), <b>T</b> (offer or break a truce) and <b>Y</b> / <b>N</b> (answer one). No lord plays that kingdom, fog is off, and the end screen names the winner.</li>
             <li><b>Grand Campaign:</b> all five armies on one great map, played in <b>waves</b>. In the plan phase nothing moves: drag orders as usual, change or remove them in the orders panel, then press <b>March!</b> (or Enter) and every army's orders play out for 20 seconds before the next plan. Pan with <b>WASD</b> or by dragging empty ground, zoom with the wheel or a pinch, and watch the minimap. Pause to <b>save to one of five slots</b> or export a save file; the campaign is also autosaved every wave and can be continued, loaded or deleted from the menu. Each map has a monster of its own.</li>
+            <li><b>King of the Hill</b> (under Modes): a crowned keep stands at the centre of the map. It is big, its walls count 1.5×, and it can't be upgraded. Whoever holds it scores a point a second, shown on the score bar in the header; the first to 300 wins, and after 12 minutes the most points wins. Each kingdom's starting castle (gold pennant) can be emptied but never taken. A banner calls out the leader, and at 250 points every lord turns on them. The lords know the rule: Torvek rushes the hill, Isolde takes the keeps beside it and strikes the moment someone else has paid to take it, Amaru builds a Ballista Tower next to it, Veyra waits for the holder to bleed, and Sigrun freezes the holder's columns with Winter's Grip. Your best time to 300 is kept for each army.</li>
             <li><b>Story campaigns:</b> each army's five chapters set their own objective, shown on a badge at the bottom of the map: take every enemy castle, <b>hold out</b> until the timer runs down, or <b>take the castle ringed in gold</b>. Some chapters start you outnumbered or in a single fortress. Progress is kept per army.</li>
             <li><b>Map monsters</b> roam the Grand Campaign maps and bite any column that strays within reach. Drag troops onto one to fight it: whoever lands the <b>final blow</b> takes the whole coin bounty, and its health bar shows every army's share of the damage. The lords ignore a healthy monster and swarm it once it is nearly dead.</li>
             <li><b>Bigger castles</b> train troops faster. Unclaimed keeps never grow. A captured castle is rebuilt in its new owner's style.</li>
@@ -712,6 +725,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/sfx.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/grand.js"></script>
+<script src="js/hill.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/grand-ui.js"></script>
@@ -723,6 +737,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="art/gallery.js"></script>
 <script src="js/menu-art.js"></script>
 <script src="js/grand-menu.js"></script>
+<script src="js/hill-ui.js"></script>
 <script src="js/events.js"></script>
 <script src="js/story.js"></script>
 <script src="js/twoplayer.js"></script>

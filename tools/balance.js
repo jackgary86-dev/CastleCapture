@@ -8,8 +8,9 @@
 //   node tools/balance.js --fps 30        # coarser, faster simulation step (default 60, as in the game)
 //   node tools/balance.js --mode grand --games 4   # Grand Campaign: five AI lords play waves to the end
 //   node tools/balance.js --mode grand --map scorched   # ...on one map (realm, scorched, fells, blackwood); 'all' cycles them
+//   node tools/balance.js --mode hill --games 16   # King of the Hill (#64): every pairing races for the crowned keep
 //
-// Only js/data.js, js/sim.js, js/grand.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
+// Only js/data.js, js/sim.js, js/grand.js, js/hill.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
 // dependencies. Math.random is seeded per game, so the same arguments always give the same result.
 
 const fs = require('fs');
@@ -35,13 +36,13 @@ const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
-const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/monsters.js']
+const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/monsters.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8'))
   .join('\n;\n');
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, newGame, update, totalOf, march, on,
+  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, HILL, newGame, update, totalOf, march, on, hillCfg,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
@@ -56,6 +57,7 @@ for (const pair of (opt('set', '') || '').split(',').filter(Boolean)) {
   obj[last] = isNaN(+raw) ? raw : +raw;
 }
 if (MODE === 'grand') { runGrand(); process.exit(0); }
+if (MODE === 'hill') process.exit(runHill() ? 1 : 0);
 
 const stat = Object.fromEntries(ids.map(id => [id, { games: 0, decided: 0, wins: 0, powers: 0, units: 0, surrenders: 0 }]));
 const lengths = [];
@@ -189,4 +191,69 @@ function runGrand() {
     console.log(`seed ${r.seed} (${r.map}): ${r.waves} waves, winner ${r.winner || 'none (cap)'}; out: ${order || '-'}${mon}`);
   }
   console.log(`\nmedian ${median} waves = about ${minutes(median)} min of play (${GR.waveSeconds}s march + ~${GR.planSecondsEstimate}s planning per wave); target 120–180 waves, about an hour`);
+}
+
+// ---------- King of the Hill (#64) ----------
+// Every pairing races for the crowned keep, alternating whose homeland it is fought on, with the AI
+// playing both seats. A game is decided by the goal, a knockout, or the time cap (most points), so every
+// game counts towards the band. Two three-way races follow for crash coverage. Returns true on failure.
+function runHill() {
+  const H = api.HILL, st = Object.fromEntries(ids.map(id => [id, { games: 0, wins: 0, held: 0, goal: 0 }]));
+  const how = { goal: 0, knockout: 0, cap: 0 }, lens = [];
+  let fails = 0;
+  const play = (armies, mapOf, seed, label) => {
+    api.seedRandom(seed);
+    const cfg = api.hillCfg(armies[0], armies.slice(1), DIFF, seed);
+    cfg.map = mapOf;
+    api.newGame(cfg);
+    const G = api.G;
+    G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+    try {
+      // The player's seat falling ends a real game; here the race plays on to its own end.
+      while (G.hill.winner == null && G.time < H.cap + 1) { G.over = false; api.update(DT); }
+    } catch (e) {
+      fails++;
+      console.error(`crash in ${label}: ${e.stack}`);
+      return null;
+    }
+    const w = G.hill.winner;
+    if (w == null) { console.error(`${label}: the race never ended`); fails++; return null; }
+    lens.push(G.time);
+    how[G.hill.reachedAt != null ? 'goal' : G.time >= H.cap ? 'cap' : 'knockout']++;
+    return { G, w };
+  };
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      for (let g = 0; g < GAMES; g++) {
+        const a = ids[i], b = ids[j];
+        const r = play([a, b], g % 2 ? a : b, 3000 + i * 100 + j * 10 + g, `${a} vs ${b} #${g}`);
+        if (!r) continue;
+        for (const o of r.G.owners) {
+          const s = st[r.G.fac[o]];
+          s.games++;
+          s.held += r.G.hill.score[o];
+          if (o === r.w) { s.wins++; if (r.G.hill.reachedAt != null) s.goal++; }
+        }
+      }
+    }
+  }
+  play(['kharzul', 'frostmark', 'nyx'], 'solmara', 5, 'three-way A');
+  play(['aldmere', 'solmara', 'kharzul', 'frostmark', 'nyx'], 'nyx', 9, 'five-way');
+  lens.sort((x, y) => x - y);
+  const rows = ids.map(id => {
+    const s = st[id], rate = s.games ? s.wins / s.games : null;
+    return { army: id, lord: api.LORDS[id].short, games: s.games, wins: s.wins, winRate: rate, byGoal: s.goal, avgPoints: s.games ? Math.round(s.held / s.games) : 0,
+      outside: rate !== null && s.games >= MIN_DECIDED && (rate < BAND_LO || rate > BAND_HI) };
+  });
+  const median = lens.length ? Math.round(lens[lens.length >> 1]) : null;
+  if (JSON_OUT) console.log(JSON.stringify({ mode: 'hill', diff: DIFF, gamesPerPairing: GAMES, band: [BAND_LO, BAND_HI], medianLength: median, ended: how, crashes: fails, rows }, null, 2));
+  else {
+    console.log(`Castle Siege King of the Hill: ${DIFF}, ${GAMES} games per pairing, goal ${H.goal}, cap ${H.cap}s, band ${Math.round(BAND_LO * 100)}–${Math.round(BAND_HI * 100)}%`);
+    console.log(`median race ${median}s (${(median / 60).toFixed(1)} min); ended by goal ${how.goal}, knockout ${how.knockout}, time cap ${how.cap}; ${fails} crashes\n`);
+    console.log('army        lord     games  wins  rate  by goal  avg points');
+    for (const r of rows) console.log(`${r.army.padEnd(11)} ${r.lord.padEnd(8)} ${String(r.games).padStart(5)} ${String(r.wins).padStart(5)}  ${r.winRate === null ? '   -' : (Math.round(r.winRate * 100) + '%').padStart(4)}  ${String(r.byGoal).padStart(7)}  ${String(r.avgPoints).padStart(10)}${r.outside ? '   <-- outside band' : ''}`);
+  }
+  const failed = fails > 0 || rows.some(r => r.outside);
+  if (failed && !JSON_OUT) console.log('\nFAILED: ' + (fails ? `${fails} crash(es)` : 'an army is outside the win band'));
+  return failed;
 }

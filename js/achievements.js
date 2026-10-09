@@ -28,6 +28,10 @@ const ACHIEVEMENTS = [
   { id: 'grandMaps', name: 'Lord of Every Land', desc: 'Win a Grand Campaign on every map.', get goal() { return grandMapCount(); }, progress: r => r.grandMapsWon.length },
   { id: 'slayer', name: 'Monster Slayer', desc: 'Land the killing blow on a Grand Campaign monster.', goal: 1, progress: r => r.slain },
   { id: 'hunter', name: 'Beast Hunter', desc: 'Slay 10 Grand Campaign monsters.', goal: 10, progress: r => r.slain },
+  // King of the Hill (#64): like the Grand Campaign, its games count here and not towards battles won and lost.
+  { id: 'hillWin', name: 'King of the Hill', desc: 'Win a King of the Hill race.' },
+  { id: 'hillFast', name: 'Unshaken', desc: `Reach ${HILL.goal} points in King of the Hill within ${Math.round(HILL.goal * 1.4 / 60)} minutes.` },
+  { id: 'hillAll', name: 'Every Crown', desc: 'Win King of the Hill with every army.', goal: 5, progress: r => r.hillArmiesWon.length },
 ];
 function grandMapCount() { return typeof GRAND_MAPS === 'object' ? Object.keys(GRAND_MAPS).length : 1; }
 
@@ -35,6 +39,7 @@ const blankRecords = () => ({
   battles: 0, wins: 0, losses: 0, castles: 0, ambushed: 0,
   byArmy: {}, byLord: {}, best: {}, armiesWon: [], lordsBeatenHard: [],
   grandPlayed: 0, grandWon: 0, grandMapsWon: [], slain: 0,
+  hillPlayed: 0, hillWon: 0, hillArmiesWon: [], hillBest: {},   // hillBest: fastest time to the goal, by army
 });
 function loadAchievements() {
   const d = store.get(ACH_KEY, null);
@@ -101,6 +106,25 @@ function grandEnded(win) {
   showUnlocks(unlockEarned(earned));
 }
 
+// King of the Hill: its own wins, a best time to the goal per army, and the career totals.
+function hillEnded(win) {
+  const r = ach.rec, me = G.fac[1], H = G.hill;
+  r.hillPlayed++;
+  r.castles += G.caps;
+  r.ambushed += ambushedThisBattle();
+  const earned = new Set();
+  if (win) {
+    r.hillWon++;
+    if (!r.hillArmiesWon.includes(me)) r.hillArmiesWon.push(me);
+    earned.add('hillWin');
+    if (H && H.reachedAt != null) {
+      if (!(r.hillBest[me] <= H.reachedAt)) r.hillBest[me] = H.reachedAt;
+      if (H.reachedAt <= HILL.goal * 1.4) earned.add('hillFast');
+    }
+  }
+  showUnlocks(unlockEarned(earned));
+}
+
 // Slaying a map monster unlocks on the spot, with a banner, since a campaign can run for an hour.
 on('monster', e => {
   if (e.kind !== 'slain' || e.o !== 1 || !G || G.cfg.demo) return;
@@ -120,6 +144,7 @@ on('monster', e => {
 on('end', ({ win }) => {
   if (!G || G.cfg.demo || G.cfg.tutorial) return;
   if (G.mode === 'grand') { grandEnded(win); return; }
+  if (G.mode === 'hill') { hillEnded(win); return; }
   if ((G.cfg.humans || 1) > 1) return;   // beating a friend at the other keyboard isn't beating a lord
   const r = ach.rec, me = G.fac[1], rivals = G.owners.slice(1).map(o => G.fac[o]), diff = G.cfg.diff;
   r.battles++;
@@ -183,6 +208,7 @@ achOv.innerHTML = `<div class="sheet ach-sheet">
   <div class="rec-tables">
     <table class="rec-table"><caption>Playing as</caption><thead><tr><th>Army</th><th>Won</th><th>Lost</th></tr></thead><tbody id="achByArmy"></tbody></table>
     <table class="rec-table"><caption>Against each lord</caption><thead><tr><th>Lord</th><th>Won</th><th>Lost</th></tr></thead><tbody id="achByLord"></tbody></table>
+    <table class="rec-table"><caption>King of the Hill</caption><thead><tr><th>Army</th><th>Best to ${HILL.goal}</th></tr></thead><tbody id="achHill"></tbody></table>
   </div>
   <div class="row">
     <button class="primary" id="achClose">Back to the menu</button>
@@ -235,6 +261,7 @@ function renderAchievements() {
     ['Castles captured', r.castles], ['Enemy troops destroyed on the road', Math.floor(r.ambushed)],
     ['Fastest win, Squire', best('easy')], ['Fastest win, Knight', best('medium')], ['Fastest win, Warlord', best('hard')],
     ['Grand Campaigns', r.grandPlayed], ['Grand Campaigns won', r.grandWon], ['Map monsters slain', r.slain],
+    ['King of the Hill races', r.hillPlayed], ['King of the Hill won', r.hillWon],
   ];
   const dl = document.getElementById('achRecords');
   dl.innerHTML = '';
@@ -259,6 +286,15 @@ function renderAchievements() {
   };
   fill('achByArmy', key => ARMIES[key].name);
   fill('achByLord', key => `${LORDS[key].short} of ${ARMIES[key].name}`);
+  const hill = document.getElementById('achHill');
+  hill.innerHTML = '';
+  for (const key of ARMY_IDS) {
+    const tr = document.createElement('tr'), name = cell(ARMIES[key].name), best = r.hillBest[key];
+    name.style.setProperty('--c', ARMIES[key].color);
+    name.className = 'rec-name';
+    tr.append(name, cell(best != null ? fmtTime(best) : '—'));
+    hill.append(tr);
+  }
 }
 
 let resetArmed = 0;

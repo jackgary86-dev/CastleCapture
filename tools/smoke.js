@@ -158,6 +158,57 @@ run('end screen', `
   update(1 / 30); hud(); draw(${clock});
   if (!G.over) throw new Error('battle did not end after the player took every castle');
 `);
+// ---------- 3b. King of the Hill (#64): a short race, saved and resumed, then won and lost by points ----------
+const hasHill = run('king of the hill check', `typeof startHill === 'function'`);
+if (hasHill) {
+  run('king of the hill race', `{
+    Math.random = mulberry(${(+process.env.SMOKE_SEED || 1) * 7 + 3});
+    startHill('aldmere', 2, 'hard');
+    if (typeof startBattle === 'function') startBattle();
+    if (G.mode !== 'hill' || !G.hill) throw new Error('King of the Hill did not start in its own mode');
+    const keep = G.planets[G.hill.id];
+    if (!keep || !keep.hill || keep.owner !== 0) throw new Error('no unclaimed crowned keep on the map');
+    if (Math.hypot(keep.x - G.w / 2, keep.y - G.h / 2) > 1) throw new Error('the crowned keep is not at the centre of the map');
+    if (upgradeCost(keep, 'walls') !== null) throw new Error('the crowned keep can be upgraded');
+    if (G.planets.filter(p => p.seat).length !== G.owners.length) throw new Error('every kingdom should have one seat');
+    G.ais.unshift({ id: 1, diff: 'hard', timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
+    for (let s = 0; s < 4; s++) { for (let i = 0; i < 30 * 25 && !G.over; i++) update(1 / 30); hud(); draw(${clock}); }
+    if (G.over) throw new Error('the race ended within its first 100 seconds');
+    if (G.owners.some(o => !G.planets.some(p => p.seat && p.owner === o))) throw new Error('a seat was taken');
+    const scored = G.owners.reduce((a, o) => a + G.hill.score[o], 0);
+    if (scored > G.time + 1e-6) throw new Error('more points were scored than seconds have passed');
+    // Save and resume keep the race.
+    const before = JSON.stringify(G.hill);
+    saveBattle(); resumeBattle(); setPaused(false);
+    if (G.mode !== 'hill' || JSON.stringify(G.hill) !== before) throw new Error('the race did not survive a save and resume');
+    if (!G.planets[G.hill.id].hill || !G.planets.some(p => p.seat)) throw new Error('the keep or the seats were lost on resume');
+    // A rival on the hill one breath from the goal wins it, and the player loses.
+    const rival = G.owners[1], k2 = G.planets[G.hill.id];
+    k2.owner = rival; k2.units = 200; G.hill.score[rival] = HILL.goal - 0.5;
+    for (let i = 0; i < 60 && !G.over; i++) update(1 / 30);
+    if (!G.over || G.hill.winner !== rival || G.won !== false) throw new Error('a rival reaching the goal did not end the race with a defeat');
+    if (G.hill.reachedAt == null) throw new Error('the goal time was not recorded');
+    hud(); draw(${clock});
+  }`);
+  run('king of the hill win and time cap', `{
+    startHill('kharzul', 1, 'medium');
+    if (typeof startBattle === 'function') startBattle();
+    const keep = G.planets[G.hill.id];
+    keep.owner = 1; keep.units = 200; G.hill.score[1] = HILL.goal - 0.2;
+    for (let i = 0; i < 30 && !G.over; i++) update(1 / 30);
+    if (!G.over || G.hill.winner !== 1 || G.won !== true) throw new Error('reaching the goal did not win the race');
+    if (!(ach.rec.hillBest.kharzul > 0)) throw new Error('no best time to the goal recorded for the army');
+    hud(); draw(${clock});
+    // Nobody at the goal when the clock runs out: the most points wins.
+    startHill('nyx', 2, 'easy');
+    if (typeof startBattle === 'function') startBattle();
+    G.hill.score[1] = 40; G.hill.score[2] = 120; G.hill.score[3] = 80;
+    G.time = HILL.cap - 0.05;
+    for (let i = 0; i < 10 && !G.over; i++) update(1 / 30);
+    if (!G.over || G.hill.winner !== 2 || G.won !== false) throw new Error('the time cap did not hand the race to the most points');
+    hud(); draw(${clock});
+  }`);
+}
 // ---------- 4. a few waves of a Grand Campaign, if the mode is in the build ----------
 // Grand Campaigns start on a random seed and the AI lords roll dice, so seed Math.random first (as
 // tools/balance.js does) to make every run play the same campaign. SMOKE_SEED picks another one.
@@ -258,4 +309,4 @@ if (hasGrand) {
 }
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasGrand ? ', and four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', and four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}.`);

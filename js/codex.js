@@ -22,7 +22,7 @@
     <div class="codex" id="codexArmies"></div>
     <div class="codex codex-3" id="codexMonsters"></div>
     <span class="sublabel">The realm</span>
-    <div class="codex codex-4" id="codexRealm"></div>`;
+    <div class="codex" id="codexRealm"></div>`;
   const rules = [...sheet.querySelectorAll('.label')].find(l => l.textContent.trim() === 'Rules of war');
   if (rules && rules.parentElement && rules.parentElement !== sheet) rules.parentElement.before(group); else sheet.append(group);
 
@@ -59,7 +59,7 @@
   const para = t => `<p>${esc(t)}</p>`;
   const list = items => `<ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
   const stat = (label, v) => `<div><span>${esc(label)}</span><strong>${esc(v)}</strong></div>`;
-  const lineKinds = { capture: 'Taking one of your castles', lose: 'Losing a castle', power: 'Using their power', counter: 'Striking back', nearDefeat: 'Near defeat', surrender: 'Surrendering', victory: 'Victory', defeat: 'Defeat' };
+  const lineKinds = { capture: 'Taking one of your castles', lose: 'Losing a castle', power: 'Using their power', counter: 'Striking back', nearDefeat: 'Near defeat', hill: 'Taking the hill', surrender: 'Surrendering', victory: 'Victory', defeat: 'Defeat' };
 
   function armyEntry(id) {
     const g = game.armies && game.armies[id], L = game.lords && game.lords[id], a = info.ARMIES[id], T = info.THEMES[a.theme];
@@ -104,6 +104,7 @@
     { id: 'kinds', name: 'Castle kinds', sub: 'Fortress, war camp, village' },
     { id: 'units', name: 'Map units', sub: 'Ballista, trebuchet, ward' },
     { id: 'powers', name: 'Special powers', sub: 'One per army' },
+    { id: 'hill', name: 'King of the Hill', sub: 'A mode: race for the crown' },
   ];
   const GOLD = '#e9b43b', PALE = '#ece2c6';
   // An army's emblem as plain strokes, the same shapes access.js draws on plaques.
@@ -180,6 +181,23 @@
       x = W * 0.8; stroke(5); c.beginPath(); c.arc(x, y - s * 0.8, s * 1.1, 0, Math.PI * 2); c.stroke();
       stroke(3); c.setLineDash([5 * u, 5 * u]); c.beginPath(); c.arc(x, y - s * 0.8, s * 1.5, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
       stroke(5, PALE); c.beginPath(); c.moveTo(x, y - s * 1.5); c.lineTo(x, y - s * 0.1); c.moveTo(x - s * 0.6, y - s * 1.2); c.lineTo(x + s * 0.6, y - s * 0.4); c.moveTo(x + s * 0.6, y - s * 1.2); c.lineTo(x - s * 0.6, y - s * 0.4); c.stroke();
+    } else if (id === 'hill') {
+      // A big keep on a mound with the crown above it, and the five banners climbing towards it.
+      const x = W / 2, y = H * 0.72, s = 46 * u;
+      c.fillStyle = 'rgba(236,226,198,0.12)'; c.beginPath(); c.ellipse(x, y + s * 0.2, s * 3.2, s * 0.9, 0, Math.PI, 0); c.fill();
+      c.fillStyle = PALE; c.fillRect(x - s, y - s * 1.3, s * 2, s * 1.3);
+      for (let i = 0; i < 4; i++) c.fillRect(x - s + i * s * 0.6, y - s * 1.6, s * 0.3, s * 0.3);
+      c.fillStyle = '#17140e'; c.beginPath(); c.arc(x, y - s * 0.3, s * 0.3, Math.PI, 0); c.fill(); c.fillRect(x - s * 0.3, y - s * 0.3, s * 0.6, s * 0.3);
+      const cy = y - s * 2.5;
+      c.fillStyle = GOLD; c.beginPath(); c.moveTo(x - s * 0.8, cy + s * 0.45); c.lineTo(x - s * 0.8, cy - s * 0.3); c.lineTo(x - s * 0.4, cy + s * 0.05);
+      c.lineTo(x, cy - s * 0.6); c.lineTo(x + s * 0.4, cy + s * 0.05); c.lineTo(x + s * 0.8, cy - s * 0.3); c.lineTo(x + s * 0.8, cy + s * 0.45); c.closePath(); c.fill();
+      const ids = typeof ARMY_IDS !== 'undefined' ? ARMY_IDS : Object.keys(info.ARMIES);
+      ids.forEach((aid, i) => {
+        const A = game.armies && game.armies[aid], fx = W * (0.1 + i * 0.2) + (i >= 2 ? W * 0.02 : -W * 0.02), fy = y + s * 0.15 - (i === 0 || i === 4 ? 0 : s * 0.25);
+        if (i === 2) return;   // the middle of the hill is the keep
+        stroke(3, PALE); c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx, fy - s * 0.9); c.stroke();
+        c.fillStyle = A ? A.color : GOLD; c.beginPath(); c.moveTo(fx, fy - s * 0.9); c.lineTo(fx + s * 0.5, fy - s * 0.72); c.lineTo(fx, fy - s * 0.54); c.closePath(); c.fill();
+      });
     } else if (id === 'powers') {
       const ids = typeof ARMY_IDS !== 'undefined' ? ARMY_IDS : Object.keys(info.ARMIES);
       ids.forEach((aid, i) => {
@@ -225,6 +243,12 @@
       const ids = typeof ARMY_IDS !== 'undefined' ? ARMY_IDS : Object.keys(game.armies);
       html += section('Timing', para(`Press Q, or click the power panel in the top left of the map. A power is first ready ${typeof FIRST_CHARGE !== 'undefined' ? FIRST_CHARGE : 45} seconds into a battle and then every ${typeof RECHARGE !== 'undefined' ? Math.round(RECHARGE / 60) : 5} minutes (the Power recharge setting changes this). Player 2 uses R. In the Grand Campaign a power is queued as an order and fires when the wave marches.`));
       html += table(['Army', 'Power', 'Lasts', 'Effect'], ids.map(aid => { const A = game.armies[aid]; return [A.name, A.power.name, `${A.power.dur}s`, A.power.desc]; }));
+    } else if (id === 'hill' && typeof HILL !== 'undefined') {
+      html += section('The race', para(`A short mode of five to ten minutes, found under Modes on the menu. A crowned keep stands at the centre of the map. Whoever holds it scores a point a second; the first to ${HILL.goal} wins, and after ${HILL.cap / 60} minutes the most points wins. The score bar in the header shows every realm's points.`));
+      html += section('The hill keep', list([`It is a large keep with strong walls: defenders count ${HILL.def}× for whoever holds it, and it can't be upgraded.`, `It starts with ${HILL.garrison} unclaimed defenders and trains fast once taken, up to 120.`, "Each kingdom's starting castle flies a gold pennant: it can be emptied but never taken, so nobody is knocked out of the race.", `A banner calls out the leader. At ${HILL.focusAt} points every lord turns on them.`]));
+      const lords = game.lords ? [['kharzul', 'rushes the hill, harder than anyone.'], ['aldmere', 'takes the keeps beside it and strikes the moment someone else has paid to take it.'], ['solmara', 'builds a Ballista Tower next to it.'], ['nyx', 'waits for the holder to bleed, then pounces.'], ['frostmark', "freezes the holder's columns with Winter's Grip while hers close in."]].filter(([aid]) => game.lords[aid]).map(([aid, t]) => `${game.lords[aid].short} ${t}`) : [];
+      if (lords.length) html += section('How the lords play it', list(lords));
+      html += section('Records', para(`Your best time to ${HILL.goal} is kept for each army under Achievements and records.`));
     } else {
       html += para('Nothing to show.');
     }

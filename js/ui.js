@@ -210,8 +210,8 @@ function updateCastlePanel() {
   for (const kind of ['walls', 'barracks']) {
     const btn = kind === 'walls' ? document.getElementById('btnWalls') : document.getElementById('btnBarracks');
     const T = UPG_TEXT[kind], L = lvl(p, kind), cost = upgradeCost(p, kind), ok = canUpgrade(p, kind);
-    const title = cost === null ? `${T.name} ${ROMAN[L]} · max` : `${T.name} ${L ? ROMAN[L] + ' → ' : ''}${ROMAN[L + 1]}`;
-    const costText = cost === null ? 'Fully upgraded' : ok ? `Costs ${cost} troops` : `Costs ${cost} troops · need ${cost + 1 - units} more`;
+    const title = p.hill ? T.name : cost === null ? `${T.name} ${ROMAN[L]} · max` : `${T.name} ${L ? ROMAN[L] + ' → ' : ''}${ROMAN[L + 1]}`;
+    const costText = p.hill ? 'The hill keep cannot be upgraded' : cost === null ? 'Fully upgraded' : ok ? `Costs ${cost} troops` : `Costs ${cost} troops · need ${cost + 1 - units} more`;
     btn.innerHTML = `<span class="u-top"><span class="u-name"></span><span class="u-key">${T.key}</span></span><span class="u-desc">${T.desc}</span><span class="u-cost"></span>`;
     btn.querySelector('.u-name').textContent = title;
     btn.querySelector('.u-cost').textContent = costText;
@@ -793,6 +793,9 @@ let chartBase = null, chartGeom = null;
 function renderSummary() {
   const cvs = $('endChart'), tip = $('chartTip');
   const W = cvs.clientWidth, H = 180, d = Math.min(window.devicePixelRatio || 1, 2);
+  // While the end screen is still hidden the canvas has no width (getImageData would throw); the
+  // ResizeObserver below draws the chart as soon as the screen opens.
+  if (!W) return;
   cvs.width = Math.round(W * d); cvs.height = Math.round(H * d);
   const c = cvs.getContext('2d');
   c.setTransform(d, 0, 0, d, 0, 0);
