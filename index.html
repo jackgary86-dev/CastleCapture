@@ -170,6 +170,19 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 .row button { flex: 1; }
 .rules { margin: 0; padding-left: 18px; color: var(--ink-soft); line-height: 1.55; font-size: 14px; }
 .rules b { color: var(--ink); }
+.custom summary { cursor: pointer; font-size: 14px; font-weight: 700; color: var(--ink); }
+.custom[open] { display: grid; gap: 10px; }
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 14px; }
+.settings label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--ink); min-width: 0; }
+.settings label.wide { grid-column: 1 / -1; }
+.settings small { font-weight: 400; color: var(--ink-soft); }
+.settings output { font-weight: 800; font-variant-numeric: tabular-nums; }
+.settings select, .settings input:not([type=range]) { font: inherit; font-weight: 500; color: var(--ink); background: rgb(255 250 235 / 0.5); border: 1px solid #9c8656; border-radius: 4px; padding: 5px 8px; width: 100%; }
+.settings input[type=range] { width: 100%; accent-color: #2f5ea8; }
+.settings select:focus-visible, .settings input:focus-visible { outline: 2px solid #2f5ea8; outline-offset: 1px; }
+.seedline { font-size: 14px; }
+.seedline code { font-family: ui-monospace, Consolas, monospace; font-weight: 700; color: var(--ink); }
+.seedline button { padding: 1px 8px; font-size: 13px; }
 .result-win { color: #2f5ea8; }
 .result-lose { color: #9e2a25; }
 .stats { display: flex; gap: 22px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
@@ -279,6 +292,30 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
             <button data-field="theirs" aria-pressed="true">Invade their homeland</button>
             <button data-field="mine">Defend your homeland</button>
           </div>
+          <details class="custom" id="customBox">
+            <summary>Custom battle settings</summary>
+            <div class="seg" id="presetSeg">
+              <button data-preset="quick">Quick brawl</button>
+              <button data-preset="standard">Standard</button>
+              <button data-preset="long">Long war</button>
+            </div>
+            <div class="settings">
+              <label for="setCastles">Castles <output id="outCastles" for="setCastles">18</output>
+                <input type="range" id="setCastles" min="10" max="28" step="1" value="18"></label>
+              <label for="setMap">Map size
+                <select id="setMap"><option value="0.8">Small</option><option value="1">Normal</option><option value="1.25">Large</option></select></label>
+              <label for="setStart">Starting troops
+                <select id="setStart"><option value="20">20</option><option value="30">30</option><option value="40">40</option><option value="60">60</option><option value="80">80</option></select></label>
+              <label for="setNeutral">Unclaimed keeps
+                <select id="setNeutral"><option value="0.5">Weak</option><option value="1">Normal</option><option value="1.5">Strong</option><option value="2">Fortified</option></select></label>
+              <label for="setSpeed">Troop speed
+                <select id="setSpeed"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label>
+              <label for="setRecharge">Power recharge
+                <select id="setRecharge"><option value="120">2 minutes</option><option value="300">5 minutes</option><option value="480">8 minutes</option></select></label>
+              <label for="setSeed" class="wide">Map seed <small>Leave blank for a new map each time</small>
+                <input id="setSeed" inputmode="numeric" autocomplete="off" placeholder="Random"></label>
+            </div>
+          </details>
           <span class="sublabel">Lord taunts</span>
           <div class="seg" id="tauntSeg">
             <button data-taunts="on" aria-pressed="true">On</button>
@@ -334,6 +371,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <h2 id="endTitle">Victory</h2>
         <p id="endText"></p>
         <div class="endquote" id="endQuote"></div>
+        <p class="seedline" id="seedLine" hidden>Map seed <code id="seedVal"></code> <button id="btnCopySeed" type="button">Copy</button><br><small>Enter it under Custom battle settings to replay this map.</small></p>
         <figure class="summary">
           <figcaption>Army strength over the battle</figcaption>
           <div class="chartwrap"><canvas id="endChart" aria-describedby="endTableWrap"></canvas><div id="chartTip" hidden></div></div>
@@ -697,18 +735,20 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   addEventListener('keydown', () => sfx.unlock());
 
   // ---------- map generation ----------
-  function genMap(seed, n, players, portrait, theme, aiBonus = 0) {
+  // opts: scale (map size multiplier), start (starting troops), neutral (unclaimed keep garrison multiplier).
+  function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
     const rnd = mulberry(seed);
-    const W = 1000, H = 640, cx = W / 2, cy = H / 2;
+    const S = opts.scale ?? 1, START = opts.start ?? 40, NM = opts.neutral ?? 1;
+    const W = Math.round(1000 * S), H = Math.round(640 * S), cx = W / 2, cy = H / 2;
     const pts = [];
     const fits = (x, y, r) => x - r > 40 && x + r < W - 40 && y - r * 1.3 > 30 && y + r * 1.3 < H - 30 &&
       pts.every(p => Math.hypot(p.x - x, p.y - y) > p.r + r + 34);
-    const garrison = r => Math.round(r * 0.45 + rnd() * r * 0.7);
+    const garrison = r => Math.round((r * 0.45 + rnd() * r * 0.7) * NM);
 
     if (players === 2) {
-      pts.push({ x: 130, y: cy, r: 28, owner: 1, units: 40 });
-      pts.push({ x: W - 130, y: cy, r: 28, owner: 2, units: 40 + aiBonus });
-      if (n % 2 === 1) pts.push({ x: cx, y: cy, r: 32, owner: 0, units: 45 });
+      pts.push({ x: 130, y: cy, r: 28, owner: 1, units: START });
+      pts.push({ x: W - 130, y: cy, r: 28, owner: 2, units: START + aiBonus });
+      if (n % 2 === 1) pts.push({ x: cx, y: cy, r: 32, owner: 0, units: Math.round(45 * NM) });
       let tries = 0;
       while (pts.length < n && tries++ < 4000) {
         const r = 13 + rnd() * 19, x = 60 + rnd() * (cx - 60), y = 50 + rnd() * (H - 100);
@@ -719,12 +759,12 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         pts.push({ x, y, r, owner: 0, units: u }, { x: mx, y: my, r, owner: 0, units: u });
       }
     } else {
-      const ax = 430, ay = 260;
+      const ax = 430 * S, ay = 260 * S;
       for (let k = 0; k < 3; k++) {
         const a = Math.PI + k * 2 * Math.PI / 3;
-        pts.push({ x: cx + Math.cos(a) * ax * 0.92, y: cy + Math.sin(a) * ay * 0.92, r: 26, owner: k + 1, units: k ? 40 + aiBonus : 40 });
+        pts.push({ x: cx + Math.cos(a) * ax * 0.92, y: cy + Math.sin(a) * ay * 0.92, r: 26, owner: k + 1, units: k ? START + aiBonus : START });
       }
-      pts.push({ x: cx, y: cy, r: 33, owner: 0, units: 60 });
+      pts.push({ x: cx, y: cy, r: 33, owner: 0, units: Math.round(60 * NM) });
       let tries = 0;
       while (pts.length < n && tries++ < 4000) {
         const r = 13 + rnd() * 17, a0 = rnd() * 2 * Math.PI / 3, rr = 0.28 + rnd() * 0.7;
@@ -790,7 +830,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const portrait = board.clientHeight > board.clientWidth * 1.1;
     const players = cfg.armies.length;
     const theme = THEMES[ARMIES[cfg.map].map];
-    const map = genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0);
+    const map = genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral });
     const owners = players === 2 ? [1, 2] : [1, 2, 3];
     const aiIds = cfg.demo ? [1, 2] : owners.slice(1);
     G = {
@@ -814,7 +854,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const powerOn = (o, id) => o && army(o).power.id === id && G.time < G.pw[o].until;
   const atkOf = o => army(o).stats.atk * (powerOn(o, 'bloodMoon') ? 1.5 : 1);
   const defOf = o => o ? army(o).stats.def * (powerOn(o, 'stoneOath') ? 2 : 1) : 1;
-  const speedOf = o => SPEED * army(o).stats.speed * (powerOn(o, 'bloodMoon') ? 2 : 1);
+  const speedOf = o => SPEED * (G.cfg.speedMul ?? 1) * army(o).stats.speed * (powerOn(o, 'bloodMoon') ? 2 : 1);
+  const rechargeTime = () => G.cfg.recharge ?? RECHARGE;
   const roadOf = o => atkOf(o) * army(o).stats.road;
   // Amaru, as an AI rival, bribes the garrisons of unclaimed keeps in his first minute: they count 1.6×.
   const bribes = (o, t) => t.owner === 0 && G.fac[o] === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
@@ -834,7 +875,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   function usePower(o) {
     const pw = G.pw[o], A = army(o);
     if (pw.ready > 0 || G.over) return false;
-    pw.ready = RECHARGE;
+    pw.ready = rechargeTime();
     pw.until = G.time + A.power.dur;
     if (A.power.id === 'crows') {
       const targets = G.planets.filter(p => p.owner && p.owner !== o).sort((a, b) => b.units - a.units).slice(0, 3);
@@ -2091,7 +2132,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       fill = left / A.power.dur;
       state = `Active · ${Math.ceil(left)}s left`;
     } else if (!ready) {
-      fill = 1 - pw.ready / (pw.until > 0 ? RECHARGE : FIRST_CHARGE);
+      fill = 1 - pw.ready / (pw.until > 0 ? rechargeTime() : FIRST_CHARGE);
       state = `Ready in ${fmtTime(Math.ceil(pw.ready))}`;
     } else {
       fill = 1;
@@ -2403,11 +2444,68 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     const rivals = levelRivals(lv);
     play({ ...LEVELS[lv - 1], level: lv, armies: [myArmy, ...rivals], map: rivals[0] });
   }
+  // ---------- custom battle settings ----------
+  const PRESETS = {
+    quick:    { castles: 12, map: 0.8,  start: 60, neutral: 0.5, speed: 1.25, recharge: 120 },
+    standard: { castles: 18, map: 1,    start: 40, neutral: 1,   speed: 1,    recharge: 300 },
+    long:     { castles: 26, map: 1.25, start: 30, neutral: 1.5, speed: 1,    recharge: 480 },
+  };
+  const SET_IDS = { castles: 'setCastles', map: 'setMap', start: 'setStart', neutral: 'setNeutral', speed: 'setSpeed', recharge: 'setRecharge' };
+  function readCustom() {
+    const c = {};
+    // A blank or unknown value falls back to Standard rather than becoming zero.
+    for (const [k, id] of Object.entries(SET_IDS)) { const v = +$(id).value; c[k] = v > 0 ? v : PRESETS.standard[k]; }
+    const raw = $('setSeed').value.trim();
+    c.seed = /^\d{1,10}$/.test(raw) ? +raw : null;
+    return c;
+  }
+  function showCustom(c) {
+    for (const [k, id] of Object.entries(SET_IDS)) $(id).value = String(c[k]);
+    $('outCastles').textContent = $('setCastles').value;
+    const now = readCustom();
+    const match = Object.keys(PRESETS).find(name => Object.keys(SET_IDS).every(k => PRESETS[name][k] === now[k]));
+    $('presetSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === match)));
+  }
+  function saveCustom() {
+    const c = readCustom();
+    store.set('cs-custom', { ...c, seed: $('setSeed').value.trim() });
+    showCustom(c);
+  }
+  $('presetSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    showCustom(PRESETS[b.dataset.preset]); saveCustom();
+  });
+  $('customBox').addEventListener('input', saveCustom);
+  {
+    // Restore saved settings; anything missing or no longer offered falls back to Standard.
+    const saved = store.get('cs-custom', null) || {};
+    showCustom({ ...PRESETS.standard });
+    for (const [k, id] of Object.entries(SET_IDS)) {
+      if (saved[k] == null) continue;
+      const el = $(id), before = el.value;
+      el.value = String(saved[k]);
+      if (el.value !== String(saved[k])) el.value = before;
+    }
+    if (typeof saved.seed === 'string') $('setSeed').value = saved.seed;
+    showCustom(readCustom());
+  }
+  $('btnCopySeed').addEventListener('click', () => {
+    const seed = $('seedVal').textContent;
+    const done = () => { $('btnCopySeed').textContent = 'Copied'; setTimeout(() => { $('btnCopySeed').textContent = 'Copy'; }, 1500); };
+    const fallback = () => getSelection().selectAllChildren($('seedVal'));
+    try { navigator.clipboard.writeText(seed).then(done, fallback); } catch { fallback(); }
+  });
+
   function quickCfg() {
     let rivals = shuffle(others());
     if (qRival !== 'random') rivals = [qRival, ...rivals.filter(id => id !== qRival)];
     rivals = rivals.slice(0, qAis);
-    return { seed: Math.floor(Math.random() * 1e9), n: qAis === 1 ? 18 : 19, diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0] };
+    const c = readCustom(), fixed = c.seed !== null;
+    return {
+      seed: fixed ? c.seed : Math.floor(Math.random() * 1e9), fixedSeed: fixed,
+      n: c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge,
+      diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0],
+    };
   }
   function play(cfg) {
     lastCfg = cfg;
@@ -2593,6 +2691,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     $('endQuote').innerHTML = `${portraitHtml(G.fac[lordO])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
     $('endQuote').querySelector('q').textContent = pick(L.lines[!win ? 'victory' : G.surrendered.has(lordO) ? 'surrender' : 'defeat']);
     tauntEl.hidden = true;
+    $('seedLine').hidden = !!lv;
+    $('seedVal').textContent = G.cfg.seed;
     $('endTime').textContent = fmtTime(G.time);
     $('endCaps').textContent = G.caps;
     $('endPeak').textContent = Math.floor(G.peak);
@@ -2613,7 +2713,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   $('btnResume').addEventListener('click', () => setPaused(false));
   $('btnQuit').addEventListener('click', toMenu);
   $('btnMenu').addEventListener('click', toMenu);
-  $('btnRetry').addEventListener('click', () => play(lastCfg.level ? lastCfg : { ...lastCfg, seed: Math.floor(Math.random() * 1e9) }));
+  $('btnRetry').addEventListener('click', () => play(lastCfg.level || lastCfg.fixedSeed ? lastCfg : { ...lastCfg, seed: Math.floor(Math.random() * 1e9) }));
   $('btnNext').addEventListener('click', () => startLevel(lastCfg.level + 1));
   btnPause.addEventListener('click', () => setPaused(!G.paused));
   btnAll.addEventListener('click', selectAll);

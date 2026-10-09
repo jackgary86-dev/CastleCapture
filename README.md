@@ -61,6 +61,7 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 ## Modes
 
 - **Skirmish:** Pick your rival (or a random one), 1 or 2 rivals, and whether to invade their homeland or defend yours. Difficulty is Squire, Knight or Warlord.
+  - **Custom battle settings** (in the Skirmish menu): number of castles, map size, starting troops, how strong unclaimed keeps are, troop speed and power recharge time, with **Quick brawl**, **Standard** and **Long war** presets. The end screen shows the map seed; type it into the settings to replay the same map.
 - **Campaign:** Eight battles across the rival homelands, from Thornbury to the High Throne. Each win unlocks the next.
 
 See the [issues](https://github.com/jackgary86-dev/CastleCapture/issues) for planned improvements.
