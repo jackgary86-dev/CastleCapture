@@ -92,7 +92,14 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     <div id="strength" aria-label="Army strength by kingdom"></div>
     <span id="status">Demo</span>
     <div class="tools">
-      <button id="btnAll" title="Select all your castles (Space)" disabled>All</button>
+      <div class="sendctl" id="sendCtl" role="group" aria-label="Troops to send">
+        <span>Send</span>
+        <button data-pct="0.25"><kbd>1</kbd>25%</button>
+        <button data-pct="0.5" aria-pressed="true"><kbd>2</kbd>50%</button>
+        <button data-pct="0.75"><kbd>3</kbd>75%</button>
+        <button data-pct="1"><kbd>4</kbd>100%</button>
+      </div>
+      <button id="btnAll" title="Select all your castles (Space)" disabled>Select all</button>
       <button id="btnPause" title="Pause (P)" disabled>Pause</button>
     </div>
   </header>
@@ -102,7 +109,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
     <div class="overlay" id="menu">
       <div class="sheet">
         <h2>Castle Siege</h2>
-        <p>Take every enemy castle. Drag from a castle flying your blue banner to march half its garrison anywhere on the map.</p>
+        <p>Take every enemy castle. Drag from a castle flying your blue banner to march its garrison anywhere on the map.</p>
         <div class="group">
           <span class="label">Skirmish</span>
           <div class="seg" id="diffSeg">
@@ -123,7 +130,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
         <div class="group">
           <span class="label">Rules of war</span>
           <ul class="rules">
-            <li><b>Drag</b> from your castle to any castle to send half its troops.</li>
+            <li><b>Drag</b> from your castle to any castle to send troops. Keys <b>1–4</b> or the <b>scroll wheel</b> choose how many: 25%, 50%, 75% or all.</li>
             <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
             <li><b>Bigger castles</b> train troops faster. Grey, unclaimed keeps never grow.</li>
             <li><b>Space</b> selects all your castles. <b>P</b> pauses.</li>
@@ -288,11 +295,11 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
   const rate = p => p.owner ? p.r * PROD : 0;
 
-  function send(owner, sources, target) {
+  function send(owner, sources, target, frac = 0.5) {
     let launched = false;
     for (const s of sources) {
       if (s === target || s.owner !== owner) continue;
-      const n = Math.floor(s.units / 2);
+      const n = Math.floor(s.units * frac);
       if (n < 1) continue;
       s.units -= n;
       launched = true;
@@ -570,6 +577,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
       const tx = ptr.hover ? ptr.hover.x : ptr.wx, ty = ptr.hover ? ptr.hover.y : ptr.wy;
       for (const s of sel) { if (s === ptr.hover) continue; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke(); }
       ctx.setLineDash([]);
+      // How many troops this order sends.
+      let troops = 0;
+      for (const s of sel) if (s !== ptr.hover) troops += Math.floor(s.units * sendPct);
+      const msg = `${Math.round(sendPct * 100)}% · ${troops}`;
+      const fs = 13 / sc;
+      ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
+      const lw = ctx.measureText(msg).width + fs, lx = ptr.wx + 14 / sc, ly = ptr.wy - 26 / sc;
+      ctx.fillStyle = alpha(C.timber, 0.85); ctx.beginPath(); ctx.roundRect(lx, ly, lw, fs * 1.6, 3 / sc); ctx.fill();
+      ctx.fillStyle = C.parchment; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(msg, lx + fs / 2, ly + fs * 0.85);
     }
 
     // Selection and target rings sit on the ground under the castles.
@@ -659,9 +676,27 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   const playable = () => G && !G.cfg.demo && !G.over && !G.paused;
 
   function playerSend(t) {
-    if (send(1, [...sel].filter(s => s !== t), t) && !G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
+    if (send(1, [...sel].filter(s => s !== t), t, sendPct) && !G.hintDone) { G.hintDone = true; store.set('cs-hint', true); }
     sel.clear();
   }
+
+  // ---------- send amount ----------
+  const PCTS = [0.25, 0.5, 0.75, 1];
+  let sendPct = PCTS.includes(store.get('cs-send', 0.5)) ? store.get('cs-send', 0.5) : 0.5;
+  const sendCtl = document.getElementById('sendCtl');
+  function setSendPct(v) {
+    sendPct = v;
+    store.set('cs-send', v);
+    sendCtl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.pct === v)));
+  }
+  sendCtl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSendPct(+b.dataset.pct); });
+  cv.addEventListener('wheel', e => {
+    if (!playable()) return;
+    e.preventDefault();
+    const i = PCTS.indexOf(sendPct) + (e.deltaY < 0 ? 1 : -1);
+    setSendPct(PCTS[Math.max(0, Math.min(PCTS.length - 1, i))]);
+  }, { passive: false });
+  setSendPct(sendPct);
 
   cv.addEventListener('pointerdown', e => {
     if (!playable()) return;
@@ -705,6 +740,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   }
   addEventListener('keydown', e => {
     if (e.code === 'Space' && playable()) { e.preventDefault(); selectAll(); }
+    else if (e.key >= '1' && e.key <= '4') setSendPct(PCTS[+e.key - 1]);
     else if (e.key === 'p' || e.key === 'P') setPaused(!(G && G.paused));
     else if (e.key === 'Escape') { if (sel.size) sel.clear(); else if (G && !G.cfg.demo && !G.over) setPaused(!G.paused); }
   });
