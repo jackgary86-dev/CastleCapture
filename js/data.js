@@ -67,15 +67,18 @@ const SIEGE_ESCORT = 0.4;       // share of an AI catapult force sent as foot ma
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
 // Grand Campaign (#46): a wave-based mode with all five armies on one large map.
 const GRAND = {
-  castles: 71,                 // 5 starting castles, a central keep, and 13 neutral keeps per realm
+  castles: 51,                 // 5 starting castles, a central keep, and 13 neutral keeps per realm
   radius: 1000,                // realm radius in world units (the regular battle map is 1000 x 640)
   start: 40,                   // starting troops
   waveSeconds: 20,             // length of each march window, in game seconds
   planSecondsEstimate: 10,     // typical time a player spends planning a wave, for length estimates
   actionsPerWave: { easy: 1, medium: 2, hard: 3 },  // decisions each AI lord makes per wave
   siegeSources: { easy: 3, medium: 5, hard: 8 },    // castles an AI lord may combine into one attack
-  surrenderShare: 0.2,         // a rival realm surrenders below this fraction of the strongest realm's troops
+  surrenderShare: 0.35,        // a rival realm surrenders below this fraction of the strongest realm's troops
   surrenderFromWave: 20,       // ...but never before this wave
+  // War-weariness: from wearyFrom, the surrender share rises by wearyPerWave each wave, up to wearyMax,
+  // so a long three-way standoff ends with the trailing realm giving up instead of running for hours.
+  wearyFrom: 120, wearyPerWave: 0.01, wearyMax: 0.9,
   finishBias: 1.5,             // how much more a lord wants castles of a rival at under half its strength
   waveCap: 400,                // headless runs stop here
 };

@@ -1286,6 +1286,8 @@ function endBattle(win) { G.over = true; G.won = win; emit('end', { win }); }
 
 // A rival far behind with no realistic comeback gives up instead of making you hunt down its last castle.
 const SURRENDER_SHARE = 0.10, SURRENDER_HOLD = 8;
+const grandSurrenderShare = () =>
+  Math.min(GRAND.wearyMax, GRAND.surrenderShare + Math.max(0, G.wave - GRAND.wearyFrom) * GRAND.wearyPerWave);
 function checkSurrender() {
   if (G.time < 60) return;
   const sum = G.owners.reduce((a, o) => a + totalOf(o), 0) || 1;
@@ -1298,7 +1300,7 @@ function checkSurrender() {
     // troops doesn't work with five realms: everyone starts at about a fifth.)
     const leader = Math.max(...G.owners.filter(q => q !== o).map(totalOf));
     const weak = G.mode === 'grand'
-      ? G.wave >= GRAND.surrenderFromWave && totalOf(o) < leader * GRAND.surrenderShare
+      ? G.wave >= GRAND.surrenderFromWave && totalOf(o) < leader * grandSurrenderShare()
       : totalOf(o) / sum < SURRENDER_SHARE && castles.length <= 2;
     if (!weak) { delete G.weakSince[o]; continue; }
     G.weakSince[o] ??= G.time;

@@ -28,6 +28,7 @@ const SECONDS = +opt('seconds', 600);
 const [BAND_LO, BAND_HI] = opt('band', '0.33,0.67').split(',').map(Number);
 const JSON_OUT = process.argv.includes('--json');
 const MODE = opt('mode', 'battle');
+const SEED0 = +opt('seed', 7000);  // Grand Campaign seeds run from here
 // Simulate at the game's own step (the browser runs 1/60 s substeps); coarser steps let fast columns skip
 // past each other on the road and skew the results.
 const DT = 1 / +opt('fps', 60);
@@ -46,6 +47,14 @@ vm.runInContext(code + `
 };`, ctx, { filename: 'castle-siege-sim.js' });
 const api = ctx.__api;
 const ids = api.ARMY_IDS;
+// --set overrides GRAND settings for a run without editing data.js, e.g.
+//   --set surrenderShare=0.3,siegeSources.hard=10
+for (const pair of (opt('set', '') || '').split(',').filter(Boolean)) {
+  const [keyPath, raw] = pair.split('='), keys = keyPath.split('.'), last = keys.pop();
+  const obj = keys.reduce((o, k) => o[k], api.GRAND);
+  if (!obj || !(last in obj)) { console.error(`--set: no GRAND setting ${keyPath}`); process.exit(1); }
+  obj[last] = isNaN(+raw) ? raw : +raw;
+}
 if (MODE === 'grand') { runGrand(); process.exit(0); }
 
 const stat = Object.fromEntries(ids.map(id => [id, { games: 0, decided: 0, wins: 0, powers: 0, units: 0, surrenders: 0 }]));
@@ -135,7 +144,7 @@ function runGrand() {
   const monsterLog = [];
   api.on('monster', e => monsterLog.push(e));
   for (let g = 0; g < GAMES; g++) {
-    const seed = 7000 + g, grandMap = MAP === 'all' ? mapIds[g % mapIds.length] : MAP;
+    const seed = SEED0 + g, grandMap = MAP === 'all' ? mapIds[g % mapIds.length] : MAP;
     api.seedRandom(seed);
     monsterLog.length = 0;
     // Rotate who sits in each realm so every army plays every start.
