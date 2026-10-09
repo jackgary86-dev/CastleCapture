@@ -345,6 +345,11 @@ function newGame(cfg, portrait = false) {
   const map = grand ? genGrandMap(cfg.seed, cfg)
     : genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral });
   assignKinds(map.planets, cfg.seed);
+  // Story campaign setups (#27): a chosen starting garrison and castle kind for the player.
+  for (const p of map.planets) if (p.owner === 1) {
+    if (cfg.playerUnits != null) p.units = cfg.playerUnits;
+    if (cfg.playerKind) p.kind = cfg.playerKind;
+  }
   const owners = Array.from({ length: players }, (_, i) => i + 1);
   const aiIds = cfg.demo ? [1, 2] : owners.slice(1);
   G = {
@@ -360,6 +365,8 @@ function newGame(cfg, portrait = false) {
     seen: Object.fromEntries(owners.map(o => [o, map.planets.map(p => ({ owner: p.owner, units: p.units }))])),
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
   };
+  // Story objective (#27): the one enemy castle whose capture wins the chapter.
+  G.mustTake = cfg.mustTake ? mustTakeCastle(cfg.mustTake) : null;
   emit('newGame', G);
 }
 
@@ -1055,7 +1062,22 @@ function update(dt) {
     return;
   }
   if (!alive(1)) endBattle(false);
+  // Story chapters (#27) can be won by surviving for holdFor seconds, or by taking one castle.
+  else if (G.cfg.holdFor && G.time >= G.cfg.holdFor) endBattle(true);
+  else if (G.mustTake != null && G.planets[G.mustTake] && G.planets[G.mustTake].owner === 1) endBattle(true);
   else if (G.owners.slice(1).every(o => !alive(o))) endBattle(true);
+}
+
+// 'largest': the biggest enemy castle (most troops breaks ties); 'nearest': the enemy castle
+// closest to the player's start.
+function mustTakeCastle(rule) {
+  const enemy = G.planets.filter(p => p.owner > 1);
+  if (!enemy.length) return null;
+  const home = G.planets.find(p => p.owner === 1);
+  const pick = rule === 'nearest' && home
+    ? enemy.sort((a, b) => dist(a, home) - dist(b, home))[0]
+    : enemy.sort((a, b) => (b.r - a.r) || (b.units - a.units))[0];
+  return pick.id;
 }
 
 // The battle is decided. The UI listens for 'end' to show the result screen.
