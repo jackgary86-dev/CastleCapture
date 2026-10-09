@@ -245,6 +245,29 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   .armies b { font-size: 12px; }
   .armies small { font-size: 10px; }
 }
+/* Grand Campaign section (#51): map cards with painted previews, the Continue row and the saved-games sheet */
+.grand-maps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.grand-maps.single { grid-template-columns: minmax(0, 300px); }
+.grand-map { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 6px 6px 8px; min-width: 0; text-align: left; line-height: 1.2; }
+.grand-map canvas { position: static; inset: auto; touch-action: auto; display: block; width: 100%; height: auto; aspect-ratio: 240 / 130; border-radius: 3px; border: 1px solid rgb(42 32 20 / 0.35); }
+.grand-map b { font-family: var(--display); font-weight: 400; font-size: 17px; }
+.grand-map .grand-monster { font-size: 12px; font-weight: 700; color: var(--ink); }
+.grand-map small { font-size: 12px; color: var(--ink-soft); white-space: normal; }
+.grand-map[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--parchment); }
+.grand-map[aria-pressed="true"] .grand-monster { color: var(--parchment); }
+.grand-map[aria-pressed="true"] small { color: #cbbb92; }
+.grand-note { font-size: 13px; font-style: italic; }
+.grand-continue { border-left-color: #9e2a25; }
+.grand-slots { max-width: 560px; }
+.slots { display: grid; gap: 6px; }
+.slot { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid #b39d6c; background: rgb(255 250 235 / 0.4); }
+.slot > div { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.slot b { font-family: var(--display); font-weight: 400; font-size: 18px; }
+.slot span { font-size: 13px; color: var(--ink-soft); }
+.slot.empty { color: var(--ink-soft); justify-content: space-between; }
+.slot.empty b { color: var(--ink-soft); }
+.slot button.danger { background: #9e2a25; border-color: #7a1f1b; color: #f4ecd6; }
+@media (max-width: 560px) { .grand-maps { grid-template-columns: 1fr; } .grand-map { flex-direction: row; flex-wrap: wrap; align-items: center; } .grand-map canvas { width: 96px; height: 52px; flex: none; } .grand-map b { flex: 1; } .grand-map .grand-monster, .grand-map small { flex-basis: 100%; } }
 /* Achievements and records */
 .medal { flex: none; width: 26px; height: 26px; border-radius: 50%; background: #b7a985; box-shadow: inset 0 0 0 2px #8f8162; position: relative; }
 .medal::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.18); }
@@ -525,4 +548,5 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/touch.js"></script>
 <script src="art/launch-bg.js"></script>
 <script src="js/menu-art.js"></script>
+<script src="js/grand-menu.js"></script>
 <script src="js/tutorial.js"></script>
