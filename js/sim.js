@@ -740,27 +740,60 @@ function incomingTable() {
   for (const k of G.packets) inc[k.to.id][k.owner] += k.n;
   return inc;
 }
+// A marching column's punch against its target: its troops times its army's strike and its Barracks strength.
+const packetPower = k => k.n * strikeOf(k.owner, k.to) * (k.str || 1);
+// Like incomingFor, but counting each column's punch rather than its head count.
+function incomingPowerFor(o) {
+  const inc = G.planets.map(() => new Array(G.owners.length + 2).fill(0));
+  for (const k of G.packets) {
+    if (G.planets[k.to.id] !== k.to) continue;
+    if (k.owner === o || !G.cfg.fog || seesAt(o, k.x, k.y)) inc[k.to.id][k.owner] += packetPower(k);
+  }
+  return inc;
+}
 
 // ---------- AI: each army's personality shapes how it plays ----------
 // Troops `me` must send to take `t`, after travel time, reinforcements and army strengths.
-function needAt(t, far, inc, me) {
+function needAt(t, far, inc, me, src) {
+  const route = src ? routeHazard(src, t, me) : { slow: 0, loss: 0 };
   let def = t.units;
-  if (t.owner !== 0) def += rate(t) * (far / speedOf(me)) + inc[t.id][t.owner];
-  def = def * defAt(t) / strikeOf(me, t) + archerLoss(t, me);
+  if (t.owner !== 0) def += rate(t) * ((far + route.slow) / speedOf(me)) + inc[t.id][t.owner];
+  def = def * defAt(t) / strikeOf(me, t) + archerLoss(t, me) + route.loss;
   def -= inc[t.id][me];
   return Math.ceil(def + 2);
+}
+
+// What lies on the road from src to t for kingdom me: extra distance from enemy Great Wards (half speed inside)
+// and troops expected to fall to enemy Ballista Towers along the way.
+function routeHazard(src, t, me) {
+  const out = { slow: 0, loss: 0 };
+  const foes = G.units.filter(u => u.owner !== me && (u.type === 'ward' || u.type === 'ballista'));
+  if (!foes.length) return out;
+  const pts = [src, ...pathOf(src, t).pts], STEP = 10;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1], n = Math.max(1, Math.ceil(dist(a, b) / STEP)), len = dist(a, b) / n;
+    for (let j = 0; j < n; j++) {
+      const x = a.x + (b.x - a.x) * (j + 0.5) / n, y = a.y + (b.y - a.y) * (j + 0.5) / n;
+      for (const u of foes) {
+        const d = Math.hypot(u.x - x, u.y - y);
+        if (u.type === 'ward' && d <= MAP_UNITS.ward.range) out.slow += len;
+        if (u.type === 'ballista' && d <= MAP_UNITS.ballista.range) out.loss += len / speedOf(me) * 3;
+      }
+    }
+  }
+  return out;
 }
 
 const threatOn = (p, me, inc) => inc[p.id].reduce((a, v, o) => o !== me ? a + v : a, 0);
 
 // When each AI fires its power. Named lords override their army's default timing.
 function aiPower(ai, inc, mine) {
-  const me = ai.id, id = G.fac[me];
+  const me = ai.id, id = G.fac[me], pow = incomingPowerFor(me);
   if (G.pw[me].ready > 0) return;
   if (ai.readyAt == null) ai.readyAt = G.time;
   const waited = G.time - ai.readyAt;
   if (ai.diff === 'easy' && Math.random() < 0.6) return;
-  const falling = mine.filter(p => threatOn(p, me, inc) >= 8 && threatOn(p, me, inc) > (p.units + inc[p.id][me]) * defAt(p));
+  const falling = mine.filter(p => threatOn(p, me, pow) >= p.r * 0.4 && threatOn(p, me, pow) > (p.units + inc[p.id][me]) * defAt(p));
   const incoming = mine.reduce((a, p) => a + threatOn(p, me, inc), 0);
   let use = false;
   switch (id) {
@@ -784,7 +817,7 @@ function aiPower(ai, inc, mine) {
       break;
     case 'nyx':
       // Veyra looses the crows just before her main attack (see aiThink); this is a fallback.
-      use = waited > 60 && G.planets.some(p => { const k = knownOf(me, p); return k.owner && k.owner !== me && k.units >= 30; });
+      use = waited > 60 && G.planets.some(p => { const k = knownOf(me, p); return k.owner && k.owner !== me && k.units >= k.r * 1.5; });
       break;
   }
   if (use) usePower(me);
@@ -804,7 +837,7 @@ function aiThink(ai) {
   const pz = { ...army(me).ai };
   const mine = P.filter(p => p.owner === me);
   if (!mine.length) return;
-  const inc = incomingFor(me);
+  const inc = incomingFor(me), pow = incomingPowerFor(me);
   const enemyCastles = P.filter(p => p.owner && p.owner !== me);
   // Marching distance to the nearest castle in a list: rivers and forests count, not just the crow's flight.
   const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => travel(p, q))) : Infinity;
@@ -817,7 +850,7 @@ function aiThink(ai) {
     ai.counter = null;
     if (targets.length) {
       const t = targets[0];
-      const srcs = mine.filter(s => s.units > 8).sort((a, b) => travel(a, t) - travel(b, t)).slice(0, 4);
+      const srcs = mine.filter(s => s.units > s.r * 0.4).sort((a, b) => travel(a, t) - travel(b, t)).slice(0, 4);
       if (send(me, srcs, real(t), 0.6)) { lordSays(me, 'counter', true); return; }
     }
   }
@@ -843,14 +876,16 @@ function aiThink(ai) {
   // Defend castles about to fall. Defensive armies react earlier; Torvek never does.
   if (id !== 'kharzul') {
     for (const p of mine) {
-      const threat = threatOn(p, me, inc);
+      const threat = threatOn(p, me, pow);
       const hold = (p.units + inc[p.id][me]) * defAt(p) + rate(p) * 1.5;
       if (threat > 0 && threat > hold * pz.defendAt) {
-        const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => travel(a, p) - travel(b, p));
-        if (helpers.length) {
-          send(me, d === 'hard' ? helpers.slice(0, 2) : [helpers[0]], p, 0.5);
-          if (d === 'medium') return;
-        }
+        // The first enemy column to arrive sets the deadline; help that would come later only goes if it outnumbers them.
+        const eta = Math.min(...G.packets.filter(k => k.to === real(p) && k.owner !== me && (!G.cfg.fog || seesAt(me, k.x, k.y)))
+          .map(k => Math.hypot(k.x - p.x, k.y - p.y) / speedOf(k.owner)), Infinity);
+        const helpers = mine.filter(q => q !== p && q.units > q.r * 0.4).sort((a, b) => travel(a, p) - travel(b, p));
+        const inTime = helpers.filter(q => travel(q, p) / speedOf(me) <= eta);
+        const pool = inTime.length ? inTime : helpers.filter(q => q.units * 0.5 * defAt(p) > threat);
+        if (pool.length) send(me, d === 'hard' ? pool.slice(0, 2) : [pool[0]], real(p), 0.5);
       }
     }
   }
@@ -859,8 +894,8 @@ function aiThink(ai) {
   if (id === 'aldmere' && enemyCastles.length && mine.length > 1 && Math.random() < 0.5) {
     const byDanger = [...mine].sort((a, b) => nearestOf(a, enemyCastles) - nearestOf(b, enemyCastles));
     const frontLine = byDanger.filter(p => nearestOf(p, enemyCastles) < nearestOf(byDanger[0], enemyCastles) * 1.3);
-    const weak = frontLine.find(p => p.units < 18);
-    const rear = byDanger.slice().reverse().find(p => !frontLine.includes(p) && p.units > 25);
+    const weak = frontLine.find(p => p.units < p.r * 1.2);
+    const rear = byDanger.slice().reverse().find(p => !frontLine.includes(p) && p.units > p.r * 1.4);
     if (weak && rear) { send(me, [rear], weak, 0.5); return; }
   }
 
@@ -870,7 +905,7 @@ function aiThink(ai) {
       const enemyIn = G.packets.filter(k => k.to === real(nt) && k.owner !== me && seesAt(me, k.x, k.y));
       if (!enemyIn.length || inc[nt.id][me] > 0) continue;
       const strength = enemyIn.reduce((a, k) => a + k.n * roadOf(k.owner), 0);
-      const h = mine.filter(s => s.units > 10).sort((a, b) => travel(a, nt) - travel(b, nt))[0];
+      const h = mine.filter(s => s.units > s.r * 0.5).sort((a, b) => travel(a, nt) - travel(b, nt))[0];
       if (h && Math.floor(h.units * 0.5) * roadOf(me) > strength) { send(me, [h], real(nt), 0.5); return; }
     }
   }
@@ -882,46 +917,58 @@ function aiThink(ai) {
   const bold = myTotal > enemyTotal * pz.boldAt ? 2 : 1;
 
   // Torvek fixes on the strongest rival's biggest castle and keeps hammering it.
-  if (id === 'kharzul' && (!ai.focus || knownOf(me, ai.focus).owner === me || knownOf(me, ai.focus).owner === 0)) {
+  const stale = id === 'kharzul' && ai.focus && G.time - (ai.focusSince ?? G.time) > 60;
+  if (id === 'kharzul' && (!ai.focus || stale || knownOf(me, ai.focus).owner === me || knownOf(me, ai.focus).owner === 0)) {
     // Strongest rival first; on a tie (as at the start), the nearest one, rather than always the player.
     const near = o => Math.min(...P.filter(p => p.owner === o).map(p => nearestOf(p, mine)), Infinity);
     const rivals = G.owners.filter(o => o !== me && P.some(p => p.owner === o)).sort((a, b) => (theirTotal(b) - theirTotal(a)) || (near(a) - near(b)));
-    const f = P.filter(p => p.owner === rivals[0]).sort((a, b) => b.units - a.units)[0];
+    const prev = stale ? ai.focus : null;
+    const f = P.filter(p => p.owner === rivals[0] && real(p) !== prev).sort((a, b) => b.units - a.units)[0];
     ai.focus = f ? real(f) : null;
+    ai.focusSince = G.time;
   }
 
-  if (aiUpgrade(ai, mine, enemyCastles, inc, pz)) return;
+  // An upgrade no longer costs the lord his attack this think.
+  aiUpgrade(ai, mine, enemyCastles, pow, pz);
 
   let candidates = P.filter(t => t.owner !== me && (t.owner === 0 || !mustering()) && !allied(me, t.owner));
   // Sigrun holds her army home early, taking only neutrals and near-empty castles.
-  if (id === 'frostmark' && G.time < 100 && bold === 1) candidates = candidates.filter(t => t.owner === 0 || t.units < 5);
+  if (id === 'frostmark' && G.time < 100 && bold === 1) candidates = candidates.filter(t => t.owner === 0 || t.units < t.r * 0.3);
   // Amaru's first minute: claim every keep on his side of the map, and nothing that brings him close to a rival.
-  if (amaruRush) candidates = candidates.filter(t => (t.owner === 0 && nearestOf(t, mine) <= nearestOf(t, enemyCastles)) || (t.owner && t.units < 5));
+  if (amaruRush) candidates = candidates.filter(t => (t.owner === 0 && nearestOf(t, mine) <= nearestOf(t, enemyCastles)) || (t.owner && t.units < t.r * 0.3));
   // Isolde advances one castle at a time once she outnumbers you two to one.
   if (id === 'aldmere' && myTotal > enemyTotal * 2) candidates = candidates.sort((a, b) => nearestOf(a, mine) - nearestOf(b, mine)).slice(0, 3);
 
   let best = null;
   // In the Grand Campaign, lords mass sieges from more castles, since walled castles at their cap are hard to crack.
-  const maxSrc = G.mode === 'grand' ? GRAND.siegeSources[d] || 4 : d === 'hard' ? 4 : amaruRush ? 2 : 1;
-  // A castle at its cap trains nothing more, so the AI is happy to send most of it.
-  const fracOf = s => s.units >= capOf(s) - 1 ? Math.max(pz.sendFrac, 0.8) : pz.sendFrac;
-  // While rushing, Amaru's castles within reach of a rival keep at least 10 troops home.
+  const maxSrc = G.mode === 'grand' ? GRAND.siegeSources[d] || 4 : d === 'hard' ? 4 : 3;
+  // A castle at its cap trains nothing more, and a bold lord commits; either way the AI sends most of it.
+  const fracOf = s => s.units >= capOf(s) - 1 || bold > 1 ? Math.max(pz.sendFrac, 0.8) : pz.sendFrac;
+  // While rushing, Amaru's castles within reach of a rival keep 40% of their size home.
   const exposed = s => amaruRush && nearestOf(s, enemyCastles) < 300;
+  // Stalemate breaker: while no castle has changed hands for 90 seconds, caution drains away towards an even fight.
+  const ease = Math.min(1, Math.max(0, (G.time - (G.lastCapAt ?? 0) - 90) / 90));
   for (const t of candidates) {
-    const srcs = mine.filter(s => s.units >= pz.keep && (!exposed(s) || s.units * (1 - pz.sendFrac) >= 10)).sort((a, b) => travel(a, t) - travel(b, t));
+    const srcs = mine.filter(s => s.units >= pz.keep / 20 * s.r && (!exposed(s) || s.units * (1 - pz.sendFrac) >= s.r * 0.4)).sort((a, b) => travel(a, t) - travel(b, t));
     const chosen = [];
-    let sum = 0, far = 0, need = Infinity;
+    let sum = 0, sumAll = 0, far = 0, need = Infinity;
     // Amaru avoids even fights against other kingdoms.
-    const margin = pz.margin * (id === 'solmara' && t.owner && bold === 1 ? 1.15 : 1);
+    const margin0 = pz.margin * (id === 'solmara' && t.owner && bold === 1 ? 1.15 : 1);
+    const margin = margin0 - Math.max(0, margin0 - 1) * ease;
     for (const s of srcs) {
       if (chosen.length >= maxSrc) break;
       chosen.push(s);
-      sum += Math.floor(s.units * fracOf(s));
+      // Barracks make each soldier count for more, so fewer need to go.
+      sum += Math.floor(s.units * fracOf(s)) * soldierStr(s);
+      sumAll += Math.floor(s.units * 0.8) * soldierStr(s);
       far = Math.max(far, travel(s, t));
-      need = needAt(t, far, inc, me) * margin;
+      need = needAt(t, far, inc, me, s) * margin;
       if (sum >= need) break;
     }
-    if (!chosen.length || need <= 2 || sum < need) continue;
+    if (!chosen.length || need <= 2) continue;
+    // Within 20% of affordable: commit 80% of each chosen garrison rather than give up.
+    let frac = null;
+    if (sum < need) { if (sum >= need * 0.8 && sumAll >= need) frac = 0.8; else continue; }
     let worth = (t.r * PROD + 0.4) * (t.owner === 0 ? pz.neutralBias : pz.enemyBias * bold);
     // Special kinds: war camps and villages are prizes; a village is worth more the more of our castles it would speed up.
     if (t.kind) {
@@ -935,19 +982,19 @@ function aiThink(ai) {
     if (id === 'nyx') {
       // Veyra pounces on castles that were just emptied, and boxes rivals in with nearby keeps.
       const prev = ai.snap.get(t.id);
-      if (t.owner && prev >= 10 && t.units < prev * 0.55) worth *= 4;
+      if (t.owner && prev >= t.r * 0.5 && t.units < prev * 0.55) worth *= 4;
       if (!t.owner && nearestOf(t, enemyCastles) < 200) worth *= 1.6;
     }
     const score = worth / (need + far * 0.06);
-    if (!best || score > best.score) best = { score, chosen, t, sum };
+    if (!best || score > best.score) best = { score, chosen, t, sum, frac };
   }
   if (id === 'nyx') ai.snap = new Map(P.map(p => [p.id, p.units]));
 
   if (best) {
-    const big = best.t.owner && (best.sum >= 20 || (id === 'kharzul' && best.sum >= 10));
+    const big = best.t.owner && (best.sum >= best.t.r || (id === 'kharzul' && best.sum >= best.t.r * 0.5));
     // Veyra drops the crows before her main attack lands; Torvek charges alongside his.
     if (id === 'nyx' && big && G.pw[me].ready === 0) usePower(me);
-    for (const s of best.chosen) send(me, [s], real(best.t), fracOf(s));
+    for (const s of best.chosen) send(me, [s], real(best.t), best.frac ?? fracOf(s));
     if (id === 'kharzul' && big && G.pw[me].ready === 0) usePower(me);
     return;
   }
@@ -956,7 +1003,7 @@ function aiThink(ai) {
   if (pz.front && Math.random() < 0.5 && mine.length > 1 && enemyCastles.length) {
     const byDanger = [...mine].sort((a, b) => nearestOf(a, enemyCastles) - nearestOf(b, enemyCastles));
     const front = byDanger[0], rear = byDanger[byDanger.length - 1];
-    if (rear !== front && rear.units > 20 && front.units < capOf(front) * 0.8) send(me, [rear], front, 0.5);
+    if (rear !== front && rear.units > rear.r * 1.2 && front.units < capOf(front) * 0.8) send(me, [rear], front, 0.5);
   }
 }
 
@@ -1257,7 +1304,7 @@ function arrive(k, t) {
     else if (k.owner === 1 && was) lordSays(was, 'lose');
     emit('capture', { o: k.owner, was, castle: t });
     G.fx.push({ kind: 'capture', x: t.x, y: t.y, r: t.r, col: col(k.owner), age: 0 });
-    t.capturedAt = G.time; t.prevOwner = was;
+    t.capturedAt = G.time; t.prevOwner = was; G.lastCapAt = G.time;
     // A captured castle loses one level of each upgrade.
     if (t.up) t.up = { walls: Math.max(0, lvl(t, 'walls') - 1), barracks: Math.max(0, lvl(t, 'barracks') - 1) };
     if (was === 1) { G.stats.castlesLost++; G.events.push({ t: G.time, kind: 'lost', owner: k.owner }); }

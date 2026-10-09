@@ -147,7 +147,7 @@ const ARMIES = {
     castle: 'domes', flag: 'pennant', soldier: 'turban',
     story: "Solmara's wealth flows from the oases and caravan roads of the great desert. Its sultans pay their soldiers in gold, and gold raises soldiers faster than any blade can cut them down.",
     strength: 'Rich treasury. Soldiers fight at 0.9, but the Golden Tithe can double the training of every castle at once.',
-    stats: { atk: 0.9, def: 0.95, speed: 1, prod: 1, road: 1, neutral: 1 },
+    stats: { atk: 0.95, def: 1, speed: 1, prod: 1, road: 1, neutral: 1 },
     power: { id: 'goldenTithe', name: 'Golden Tithe', dur: 15, desc: 'Open the treasury. For 15 seconds, your castles train troops twice as fast.', call: 'open the Golden Tithe', they: 'opens the Golden Tithe' },
     personality: 'Balanced. Expands steadily, defends what it holds, and attacks when the odds are good.',
     ai: { sendFrac: 0.5, keep: 8, enemyBias: 1.3, neutralBias: 1.1, margin: 1.15, defendAt: 0.9, thinkMul: 1, front: false, opportunist: 1.4, boldAt: 1.3 },
