@@ -66,15 +66,18 @@ on('newGame', g => {
 // Each AI lord makes a few decisions per wave with its usual logic. Its orders are queued like the
 // player's, and troops set aside by earlier orders aren't available to later ones, so a lord can't
 // commit the same garrison twice.
+// A lord's tempo carries over from battles: a quick thinker (thinkMul below 1, like Torvek) makes more
+// decisions per wave, a slow one fewer, with the fraction settled by a dice roll so it averages out.
 function planWave(ai) {
-  const actions = GRAND.actionsPerWave[ai.diff] || 2;
+  const n = (GRAND.actionsPerWave[ai.diff] || 2) / army(ai.id).ai.thinkMul;
+  const actions = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
   for (let i = 0; i < actions; i++) aiThink(ai);
 }
 
 // Submit the wave: AI lords plan, every queued order launches, and the march window starts.
 function march() {
   if (!planning() || G.over) return false;
-  for (const ai of G.ais) planWave(ai);
+  for (const ai of shuffle(G.ais)) planWave(ai);   // a new order each wave, so no lord always plans last
   const orders = G.orders;
   G.orders = [];
   G.phase = 'march';

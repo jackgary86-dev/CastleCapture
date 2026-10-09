@@ -368,7 +368,7 @@ function newGame(cfg, portrait = false) {
     coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
     roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0, sight: {}, sightClock: 0,
     weather: { kind: 'clear', prev: 'clear', since: -WEATHER_FADE, until: WEATHER_FIRST },
-    pacts: [], pactCool: {}, lastOffer: {}, offer: null, diploClock: 0,
+    pacts: [], pactCool: {}, lastOffer: {}, betrayers: {}, offer: null, diploClock: 0,
     seen: Object.fromEntries(owners.map(o => [o, map.planets.map(p => ({ owner: p.owner, units: p.units }))])),
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
   };
@@ -396,7 +396,10 @@ const rechargeTime = () => G.cfg.recharge ?? RECHARGE;
 const roadOf = o => atkOf(o) * army(o).stats.road;
 // Amaru, as an AI rival, bribes the garrisons of unclaimed keeps in his first minute: they count 1.6×.
 const bribes = (o, t) => t.owner === 0 && G.fac[o] === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
-const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? army(o).stats.neutral : 1) * bribes(o, t);
+// Against unclaimed keeps an army's neutral bonus applies; the Grand Campaign's map is mostly unclaimed keeps,
+// so there only part of it counts (GRAND.neutralBonus), or Veyra's +25% snowballed every campaign.
+const neutralMul = o => G.mode === 'grand' ? 1 + (army(o).stats.neutral - 1) * GRAND.neutralBonus : army(o).stats.neutral;
+const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? neutralMul(o) : 1) * bribes(o, t);
 const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
 // The Custom battle setting scales the cap (capMul); Walls add to it.
 const capOf = p => GARRISON_CAP[tierOf(p)] * (G.cfg.capMul ?? 1) + WALL_CAP * lvl(p, 'walls');
@@ -511,7 +514,7 @@ function usePower(o) {
   pw.until = G.time + A.power.dur;
   if (A.power.id === 'crows') {
     const targets = G.planets.filter(p => p.owner && p.owner !== o && !allied(o, p.owner)).sort((a, b) => b.units - a.units).slice(0, 3);
-    for (const t of targets) { t.units *= 0.6; G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
+    for (const t of targets) { t.units -= Math.min(t.units * 0.4, G.mode === 'grand' ? 25 : Infinity); G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
   }
   emit('power', { o, army: A });
   const ai = G.ais.find(a => a.id === o);
@@ -576,7 +579,7 @@ function endPact(p, by) {
 // Does lord o take a truce offered by `from`?
 function lordAccepts(o, from) {
   switch (G.fac[o]) {
-    case 'kharzul': return false;                                   // Torvek never stops
+    case 'kharzul': return G.mode === 'grand' && aliveOwners().every(q => q === o || totalOf(q) > totalOf(o));   // Torvek never stops, unless the realm is closing on him
     case 'nyx': return true;                                        // Veyra always says yes
     case 'aldmere': return leaderOf() !== o;                        // Isolde only when she isn't winning
     case 'frostmark': return totalOf(from) > totalOf(o);            // Sigrun only with someone stronger
@@ -622,6 +625,7 @@ function diplomacyTick() {
     if (G.time >= p.until) continue;
     if (p.betrayAt && G.time >= p.betrayAt) {
       endPact(p, p.betrayer);
+      (G.betrayers ??= {})[p.betrayer] = true;   // once bitten: no lord offers Veyra another truce this game
       if (p.a === 1 || p.b === 1) lordSays(p.betrayer, 'betray', true);
     } else if (![p.a, p.b].every(o => aliveOwners().includes(o))) endPact(p, null);
   }
@@ -635,7 +639,7 @@ function diplomacyTick() {
   const second = ranked[1];
   if (!G.ais.some(ai => ai.id === second) || !['aldmere', 'solmara'].includes(G.fac[second])) return;
   if (G.time - (G.lastOffer[second] ?? -99) < 45) return;
-  const partner = ranked.find(o => o !== second && o !== ranked[0] && canPact(second, o));
+  const partner = ranked.find(o => o !== second && o !== ranked[0] && !(G.betrayers || {})[o] && canPact(second, o));
   if (!partner) return;
   G.lastOffer[second] = G.time;
   proposeTruce(second, partner);
@@ -843,9 +847,21 @@ function aiThink(ai) {
   const me = ai.id, id = G.fac[me], d = ai.diff;
   // Under fog of war, castles out of sight are stand-ins carrying this lord's memory of them;
   // orders always go to the real castle (t.ghostOf).
-  const P = G.cfg.fog ? G.planets.map(p => knownOf(me, p)) : G.planets;
+  let P = G.cfg.fog ? G.planets.map(p => knownOf(me, p)) : G.planets;
+  // Grand Campaign: a queued order sets its troops aside at once, but they don't leave until the march. Rivals
+  // planning later in the same wave see those castles as they really stand, not the plan behind them.
+  if (G.mode === 'grand' && G.orders && G.orders.length) {
+    const queued = new Map();
+    for (const o of G.orders) if (o.kind === 'send' && o.owner !== me) queued.set(o.from.id, (queued.get(o.from.id) || 0) + o.n);
+    if (queued.size) P = P.map(p => queued.has(p.id) ? { ...p, units: p.units + queued.get(p.id), ghostOf: p.ghostOf || p } : p);
+  }
   const real = t => t.ghostOf || t;
   const pz = { ...army(me).ai };
+  // A realm on the Grand Campaign's big map can't be held on skeleton garrisons: everyone keeps a few more home.
+  if (G.mode === 'grand') { pz.keep = Math.max(pz.keep, GRAND.keepFloor); pz.sendFrac = Math.min(pz.sendFrac, GRAND.sendFracMax); }
+  // The Grand Campaign's opening: every lord fills out its own realm's unclaimed keeps before marching on a
+  // neighbour, so an aggressive lord isn't bled white fighting walls in the first waves.
+  if (G.mode === 'grand' && (G.wave || 1) <= GRAND.openingWaves) { pz.enemyBias = Math.min(pz.enemyBias, 1); pz.neutralBias = Math.max(pz.neutralBias, 1.3); }
   const mine = P.filter(p => p.owner === me);
   if (!mine.length) return;
   // A Grand Campaign monster near death is worth a lord's turn (js/monsters.js).

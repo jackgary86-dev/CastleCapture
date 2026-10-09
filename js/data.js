@@ -79,6 +79,10 @@ const GRAND = {
   // War-weariness: from wearyFrom, the surrender share rises by wearyPerWave each wave, up to wearyMax,
   // so a long three-way standoff ends with the trailing realm giving up instead of running for hours.
   wearyFrom: 120, wearyPerWave: 0.01, wearyMax: 0.9,
+  openingWaves: 16,            // waves in which every lord favours unclaimed keeps over its neighbours' castles
+  sendFracMax: 0.6,            // the most of a castle's garrison a lord sends in one attack (Torvek sends 0.75 in battles)
+  keepFloor: 8,
+  neutralBonus: 0.4,           // share of an army's bonus against unclaimed keeps that counts in the Grand Campaign                // troops every lord leaves in a castle at least (Torvek's 4 hollowed out his realm)
   finishBias: 1.5,             // how much more a lord wants castles of a rival at under half its strength
   waveCap: 400,                // headless runs stop here
 };
