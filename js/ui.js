@@ -585,15 +585,17 @@ function dec(v) {
 const savable = () => G && !G.cfg.demo && !G.cfg.tutorial && !G.over && !G.intro;
 function saveBattle() {
   if (!savable()) return;
+  // A Grand Campaign keeps its own autosave (cs-grand-0, grand-ui.js) so it never replaces a battle's.
+  if (G.mode === 'grand') { if (typeof saveGrandSlot === 'function') saveGrandSlot(0); return; }
   const state = Object.fromEntries(Object.entries(G).filter(([k]) => !SAVE_SKIP.has(k)).map(([k, v]) => [k, enc(v)]));
   const planets = G.planets.map(p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, k === 'id' ? v : enc(v)])));
   store.set(SAVE_KEY, { v: SAVE_VERSION, savedAt: Date.now(), cfg: G.cfg, portrait: G.h > G.w, state, planets });
 }
 const clearSave = () => { try { localStorage.removeItem(SAVE_KEY); } catch {} };
 const loadSave = () => { const d = store.get(SAVE_KEY, null); return d && d.v === SAVE_VERSION && d.cfg && d.state ? d : null; };
-function resumeBattle() {
-  const d = loadSave();
-  if (!d) { renderResume(); return; }
+// Also restores Grand Campaign slots (loadGrandSlot passes its own save and failure handler).
+function resumeBattle(d = loadSave(), onFail = clearSave) {
+  if (!d) { renderResume(); return false; }
   try {
     lastCfg = d.cfg;
     shopOpen = false; btnShop.setAttribute('aria-expanded', 'false');
@@ -601,15 +603,18 @@ function resumeBattle() {
     btnPause.disabled = false; btnAll.disabled = false;
     setArmyColors(d.cfg.armies[0]);
     newGame(d.cfg, d.portrait);
-    for (const [k, v] of Object.entries(d.state)) G[k] = dec(v);
+    for (const [k, v] of Object.entries(d.state)) if (k !== '__proto__') G[k] = dec(v);
     for (const sp of d.planets) Object.assign(G.planets[sp.id], dec(sp));
     G.intro = false; G.over = false; G.paused = false;
     setPaused(true);
-    toast('Battle resumed', 'Press Resume the siege when you are ready.', army(1).color);
+    if (G.mode === 'grand') toast('Campaign resumed', `Wave ${G.wave}. Press Resume the siege when you are ready.`, army(1).color);
+    else toast('Battle resumed', 'Press Resume the siege when you are ready.', army(1).color);
+    return true;
   } catch (err) {
     // A save from an older version of the game can't always be restored; drop it rather than crash.
-    clearSave();
+    onFail();
     toMenu();
+    return false;
   }
 }
 function renderResume() {
@@ -830,7 +835,7 @@ function endGame(win) {
 $('btnQuick').addEventListener('click', () => play(quickCfg()));
 $('btnResume').addEventListener('click', () => setPaused(false));
 $('btnQuit').addEventListener('click', () => { clearSave(); toMenu(); });
-$('btnResumeSave').addEventListener('click', resumeBattle);
+$('btnResumeSave').addEventListener('click', () => resumeBattle());
 $('btnDiscard').addEventListener('click', () => { clearSave(); renderResume(); });
 $('btnMenu').addEventListener('click', toMenu);
 $('btnRetry').addEventListener('click', () => play(lastCfg.level || lastCfg.fixedSeed ? lastCfg : { ...lastCfg, seed: Math.floor(Math.random() * 1e9) }));

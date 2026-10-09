@@ -188,7 +188,29 @@ if (hasGrand) {
       if (G.phase !== 'plan') throw new Error('the march window did not end in a new plan phase');
     }
   `);
+  run('grand campaign save slots', `
+    if (!G.over) {
+      if (!localStorage.getItem('cs-grand-0')) throw new Error('no Continue autosave after a wave');
+      const mine = G.planets.find(p => p.owner === 1), target = G.planets.find(p => p.owner !== 1);
+      send(1, [mine], target, 0.5);
+      const wave = G.wave, left = mine.units, n = G.orders.length;
+      if (!saveGrandSlot(3)) throw new Error('saving to slot 3 failed');
+      march();
+      for (let i = 0; i < 90; i++) update(1 / 30);
+      if (!loadGrandSlot(3)) throw new Error('loading slot 3 failed');
+      if (G.mode !== 'grand' || G.phase !== 'plan' || G.wave !== wave) throw new Error('slot 3 did not restore the wave and phase');
+      if (G.orders.length !== n || G.orders[n - 1].from !== G.planets[mine.id]) throw new Error('queued orders did not survive a save and load');
+      if (Math.abs(G.planets[mine.id].units - left) > 1e-9) throw new Error('garrisons did not survive a save and load');
+      const text = localStorage.getItem('cs-grand-3');
+      if (importGrandSave(text) !== '') throw new Error('importing an exported save failed');
+      if (importGrandSave('{"v":1}') === '') throw new Error('a bad file was imported');
+      deleteGrandSlot(3);
+      if (localStorage.getItem('cs-grand-3')) throw new Error('deleting slot 3 left it behind');
+      setPaused(false);
+      hud(); draw(${clock + 500});
+    }
+  `);
 }
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasGrand ? ', and four Grand Campaign waves planned and marched' : ''}.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasGrand ? ', and four Grand Campaign waves planned, marched, saved and loaded' : ''}.`);

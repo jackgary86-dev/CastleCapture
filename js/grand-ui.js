@@ -80,10 +80,10 @@ btnMarch.addEventListener('click', () => { if (playable()) { march(); renderOrde
 const hudBase = hud;
 hud = function () {
   hudBase();
+  renderOrders();
   if (!isGrand() || G.cfg.demo) return;
   const left = G.owners.filter(o => G.planets.some(p => p.owner === o) && !G.surrendered.has(o)).length;
   statusEl.textContent = `Wave ${G.wave} · ${G.phase === 'plan' ? 'Plan' : `March ${Math.max(0, Math.ceil(G.marchLeft))}s`} · ${left} realms left`;
-  renderOrders();
 };
 
 // ---------- input: plan freely, then hands off while the armies march ----------
@@ -175,4 +175,170 @@ draw = function (now) {
     ctx.fillStyle = army(1).plaqueText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(label, t.x, y + fs * 0.78);
   }
+};
+
+// ---------- save slots ----------
+// Slot 0 is the Continue autosave, written at the start of every plan phase and whenever the tab is
+// hidden; slots 1-5 are the player's own. Each is a battle save (enc/dec from ui.js) plus the fields
+// the campaign menu lists: label, wave, map and armies left.
+const GRAND_SLOTS = 5;
+const grandSlotKey = i => `cs-grand-${i}`;
+const armiesLeft = () => G.owners.filter(o => G.planets.some(p => p.owner === o) && !G.surrendered.has(o)).length;
+function grandSnapshot() {
+  const state = Object.fromEntries(Object.entries(G).filter(([k]) => !SAVE_SKIP.has(k)).map(([k, v]) => [k, enc(v)]));
+  const planets = G.planets.map(p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, k === 'id' ? v : enc(v)])));
+  return {
+    v: SAVE_VERSION, savedAt: Date.now(), label: `${army(1).name}, wave ${G.wave}`, wave: G.wave,
+    map: G.cfg.grandMap || 'realm', armiesLeft: armiesLeft(), cfg: G.cfg, portrait: G.h > G.w, state, planets,
+  };
+}
+function saveGrandSlot(i) {
+  if (!isGrand() || !savable()) return false;
+  store.set(grandSlotKey(i), grandSnapshot());
+  return true;
+}
+const readGrandSlot = i => {
+  const d = store.get(grandSlotKey(i), null);
+  return d && d.v === SAVE_VERSION && d.cfg && d.cfg.mode === 'grand' && d.state && Array.isArray(d.planets) ? d : null;
+};
+// Restores slot i (0 is Continue) and leaves the menu, paused. False if the slot is empty or stale.
+function loadGrandSlot(i) {
+  const d = readGrandSlot(i);
+  if (!d) return false;
+  const ok = resumeBattle(d, () => {});
+  if (ok) { mmLast = -1e9; hud(); }
+  return ok;
+}
+function deleteGrandSlot(i) { try { localStorage.removeItem(grandSlotKey(i)); } catch {} }
+
+on('wave', ({ phase }) => { if (phase === 'plan' && isGrand() && !G.cfg.demo) saveGrandSlot(0); });
+// A finished campaign has nothing to continue.
+on('end', () => { if (isGrand() && !G.cfg.demo) deleteGrandSlot(0); });
+
+// ---------- export and import ----------
+function exportGrandSave() {
+  if (!isGrand() || !savable()) return false;
+  const blob = new Blob([JSON.stringify(grandSnapshot())], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `castle-siege-campaign-wave-${G.wave}.json`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  return true;
+}
+// Checks a file's text is a campaign save from this version, stores it as the Continue save and
+// loads it. Returns an error message, or '' once the campaign is restored.
+function importGrandSave(text) {
+  let d;
+  try { d = JSON.parse(text); } catch { return 'That file is not a saved campaign.'; }
+  const hasProto = v => !!v && typeof v === 'object' && (Object.prototype.hasOwnProperty.call(v, '__proto__') || Object.values(v).some(hasProto));
+  if (!d || typeof d !== 'object' || !d.cfg || d.cfg.mode !== 'grand' || !d.state || !Array.isArray(d.planets) || hasProto(d)) return 'That file is not a saved campaign.';
+  if (d.v !== SAVE_VERSION) return 'That campaign was saved by another version of the game.';
+  store.set(grandSlotKey(0), d);
+  return loadGrandSlot(0) ? '' : 'That campaign could not be restored.';
+}
+
+// ---------- the save box on the pause sheet ----------
+const grandSaveBox = document.getElementById('grandSaveBox');
+const grandSaveSlots = document.getElementById('grandSaveSlots');
+const grandSaveNote = document.getElementById('grandSaveNote');
+const grandImportFile = document.getElementById('grandImportFile');
+let slotConfirm = 0;
+const slotAgo = t => {
+  const mins = Math.round((Date.now() - (t || 0)) / 60000);
+  return mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} days ago`;
+};
+function renderSaveBox() {
+  const show = isGrand() && savable();
+  grandSaveBox.hidden = !show;
+  if (!show) return;
+  grandSaveSlots.innerHTML = '';
+  for (let i = 1; i <= GRAND_SLOTS; i++) {
+    const d = store.get(grandSlotKey(i), null), used = !!(d && typeof d === 'object' && d.cfg);
+    const li = document.createElement('li'), b = document.createElement('button');
+    const name = document.createElement('span'), info = document.createElement('small');
+    b.type = 'button';
+    name.textContent = slotConfirm === i ? `Overwrite slot ${i}?` : `Slot ${i}`;
+    info.textContent = used ? `${d.label || `Wave ${d.wave}`} · ${slotAgo(d.savedAt)}` : 'Empty';
+    if (slotConfirm === i) b.className = 'confirm';
+    b.append(name, info);
+    b.addEventListener('click', () => {
+      // A used slot asks once before it is overwritten.
+      if (used && slotConfirm !== i) { slotConfirm = i; renderSaveBox(); grandSaveSlots.children[i - 1].firstChild.focus(); return; }
+      slotConfirm = 0;
+      grandSaveNote.textContent = saveGrandSlot(i) ? `Saved to slot ${i}.` : 'This campaign cannot be saved right now.';
+      renderSaveBox();
+      grandSaveSlots.children[i - 1].firstChild.focus();
+    });
+    li.append(b);
+    grandSaveSlots.append(li);
+  }
+}
+const setPausedGrand = setPaused;
+setPaused = function (v) {
+  setPausedGrand(v);
+  slotConfirm = 0; grandSaveNote.textContent = '';
+  renderSaveBox();
+};
+document.getElementById('btnGrandExport').addEventListener('click', () => {
+  grandSaveNote.textContent = exportGrandSave() ? 'Campaign exported.' : 'This campaign cannot be exported right now.';
+});
+document.getElementById('btnGrandImport').addEventListener('click', () => grandImportFile.click());
+grandImportFile.addEventListener('change', () => {
+  const f = grandImportFile.files && grandImportFile.files[0];
+  grandImportFile.value = '';
+  if (!f) return;
+  f.text().then(t => { const err = importGrandSave(t); grandSaveNote.textContent = err; if (!err) renderSaveBox(); });
+});
+
+// ---------- minimap ----------
+// The whole realm in the corner: castles in their owners' colours (as the player knows them under
+// fog of war) and a frame round the part on screen. Click or drag on it to look somewhere else.
+const minimap = document.getElementById('minimap');
+const mm = minimap.getContext('2d');
+let mmLast = 0;
+const mmFrame = () => {
+  const W = minimap.width, H = minimap.height, k = Math.min(W / G.w, H / G.h);
+  return { W, H, k, x0: (W - G.w * k) / 2, y0: (H - G.h * k) / 2 };
+};
+function drawMinimap(now) {
+  const show = isGrand() && !G.cfg.demo && !G.over;
+  minimap.hidden = !show;
+  if (!show || (now - mmLast < 120 && now >= mmLast)) return;
+  mmLast = now;
+  const { W, H, k, x0, y0 } = mmFrame();
+  mm.setTransform(1, 0, 0, 1, 0, 0);
+  mm.clearRect(0, 0, W, H);
+  mm.fillStyle = G.theme.bg || '#263220';
+  mm.beginPath(); mm.arc(W / 2, H / 2, Math.min(W, H) / 2 - 3, 0, Math.PI * 2); mm.fill();
+  for (const p of G.planets) {
+    const q = typeof knownOf === 'function' ? knownOf(1, p) : p;
+    mm.fillStyle = q.owner ? col(q.owner) : NEUTRAL;
+    mm.beginPath(); mm.arc(x0 + p.x * k, y0 + p.y * k, Math.max(2, p.r * k * 1.3), 0, Math.PI * 2); mm.fill();
+    if (q.owner === 1) { mm.strokeStyle = PARCH; mm.lineWidth = 1; mm.stroke(); }
+  }
+  // The part of the realm on screen.
+  const vx = Math.max(0, -ox / sc), vy = Math.max(0, -oy / sc);
+  const vw = Math.min(G.w - vx, cw / sc), vh = Math.min(G.h - vy, ch / sc);
+  mm.strokeStyle = PARCH; mm.lineWidth = 1.5;
+  mm.strokeRect(x0 + vx * k, y0 + vy * k, vw * k, vh * k);
+}
+function minimapLook(e) {
+  if (!isGrand() || typeof cam === 'undefined') return;
+  const r = minimap.getBoundingClientRect(), { W, H, k, x0, y0 } = mmFrame();
+  const mx = (e.clientX - r.left) * (W / r.width), my = (e.clientY - r.top) * (H / r.height);
+  if (cam.z <= 1.001) cam.z = GRAND_START_ZOOM;
+  cam.cx = (mx - x0) / k; cam.cy = (my - y0) / k;
+  applyCamera();
+  mmLast = -1e9;
+}
+let mmDrag = false;
+minimap.addEventListener('pointerdown', e => { mmDrag = true; minimap.setPointerCapture?.(e.pointerId); minimapLook(e); e.preventDefault(); });
+minimap.addEventListener('pointermove', e => { if (mmDrag) minimapLook(e); });
+minimap.addEventListener('pointerup', () => { mmDrag = false; });
+minimap.addEventListener('pointercancel', () => { mmDrag = false; });
+const drawMinimapBase = draw;
+draw = function (now) {
+  drawMinimapBase(now);
+  drawMinimap(now);
 };
