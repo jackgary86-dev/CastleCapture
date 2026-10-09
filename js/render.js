@@ -411,7 +411,7 @@ function drawThreats(now) {
   const inc = incomingTable();
   for (const p of G.planets) {
     if (p.owner !== 1) continue;
-    const threat = inc[p.id][2] + inc[p.id][3];
+    const threat = inc[p.id].reduce((a, v, o) => o > 1 ? a + v : a, 0);
     if (threat < 0.5) continue;
     const falls = threat > (p.units + inc[p.id][1]) * defAt(p);
     if (falls) {
@@ -575,22 +575,47 @@ function drawRallies(now) {
   }
 }
 
+// A plank bridge laid across the river.
+function drawBridge(b) {
+  const len = RIVER_W + 16, wid = 12, ang = Math.atan2(b.tx, -b.ty);
+  ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(ang);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(-len / 2 + 1.5, -wid / 2 + 2, len, wid);
+  ctx.fillStyle = '#8a6239'; ctx.fillRect(-len / 2, -wid / 2, len, wid);
+  ctx.strokeStyle = '#5e3f22'; ctx.lineWidth = 1;
+  for (let x = -len / 2 + 3; x < len / 2; x += 4) { ctx.beginPath(); ctx.moveTo(x, -wid / 2); ctx.lineTo(x, wid / 2); ctx.stroke(); }
+  ctx.strokeStyle = '#4a3019'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(-len / 2, -wid / 2); ctx.lineTo(len / 2, -wid / 2); ctx.moveTo(-len / 2, wid / 2); ctx.lineTo(len / 2, wid / 2); ctx.stroke();
+  ctx.restore();
+}
+
 function drawScenery(now) {
   const T = G.theme;
   ctx.fillStyle = T.field; ctx.fillRect(0, 0, G.w, G.h);
   ctx.fillStyle = T.lit;
   for (const m of G.meadows) { ctx.beginPath(); ctx.ellipse(m.x, m.y, m.rx, m.ry, 0, 0, Math.PI * 2); ctx.fill(); }
+  const TR = G.terrain;
+  for (const f of TR.forests) {
+    ctx.fillStyle = alpha(T.wood, 0.45); ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
+  }
   for (const o of G.pools) {
     ctx.fillStyle = T.pool; ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx, o.ry, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.ellipse(o.x, o.y, o.rx * 0.95, o.ry * 0.9, 0, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
   }
-  ctx.lineCap = 'round';
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const [w, c] of [[RIVER_W + 7, T.bank], [RIVER_W, T.water]]) {
+    ctx.strokeStyle = c; ctx.lineWidth = w;
+    for (const r of TR.rivers) { ctx.beginPath(); r.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); }
+    if (TR.lake) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(TR.lake.x, TR.lake.y, TR.lake.r + (w - RIVER_W) / 2, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1.5;
+  for (const r of TR.rivers) { ctx.beginPath(); r.forEach((q, i) => i ? ctx.lineTo(q.x + 2, q.y - 2) : ctx.moveTo(q.x + 2, q.y - 2)); ctx.stroke(); }
   for (const [w, a] of [[9, 0.25], [5, 0.55]]) {
     ctx.strokeStyle = alpha(T.road, a); ctx.lineWidth = w;
-    for (const r of G.roads) { ctx.beginPath(); ctx.moveTo(r.a.x, r.a.y + r.a.r * 0.5); ctx.quadraticCurveTo(r.mx, r.my, r.b.x, r.b.y + r.b.r * 0.5); ctx.stroke(); }
+    for (const r of G.roads) { ctx.beginPath(); r.pts.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke(); }
   }
-  ctx.lineCap = 'butt';
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+  for (const b of TR.bridges) drawBridge(b);
   for (const r of G.rocks) {
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x + 1, r.y + r.s * 0.4, r.s, r.s * 0.45, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#8b8577'; ctx.beginPath(); ctx.ellipse(r.x, r.y, r.s, r.s * 0.7, 0, 0, Math.PI * 2); ctx.fill();
@@ -636,7 +661,14 @@ function draw(now) {
   if (ptr.down && ptr.moved && sel.size) {
     ctx.strokeStyle = alpha(ring, 0.8); ctx.lineWidth = 2 / sc; ctx.setLineDash([7 / sc, 6 / sc]);
     const tx = ptr.hover ? ptr.hover.x : ptr.wx, ty = ptr.hover ? ptr.hover.y : ptr.wy;
-    for (const s of sel) { if (s === ptr.hover) continue; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke(); }
+    // Aiming at a castle shows the route each column will actually march.
+    for (const s of sel) {
+      if (s === ptr.hover) continue;
+      ctx.beginPath(); ctx.moveTo(s.x, s.y);
+      if (ptr.hover) for (const q of pathOf(s, ptr.hover).pts) ctx.lineTo(q.x, q.y);
+      else ctx.lineTo(tx, ty);
+      ctx.stroke();
+    }
     ctx.setLineDash([]);
     let troops = 0;
     for (const s of sel) if (s !== ptr.hover) troops += Math.floor(s.units * sendPct);

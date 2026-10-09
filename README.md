@@ -12,10 +12,10 @@ Each army has its own castles, banners, soldiers, homeland map, strengths, speci
 
 | Army | Role | Strength | Special power | Homeland | As a rival |
 |---|---|---|---|---|---|
-| **The Azure Crown of Aldmere** (blue) | Defense | Defenders count as 1.35 soldiers | **Stone Oath:** defenders count double for 20s | The Vale of Aldmere | Defensive |
-| **The Kharzul Horde** (red) | Attack | Riders 30% faster, strike 1.12×; palisades defend at 0.9 | **Blood Moon Charge:** troops move 2× and hit 1.5× for 15s | The Red Steppe | Very aggressive |
-| **The Jarls of Frostmark** (teal) | Defense | 1.45× in road battles, castles defend at 1.3; 5% slower | **Winter's Grip:** every enemy soldier in the field freezes for 12s | The Frostmark Fjords | Very defensive |
-| **The Sun Dominion of Solmara** (gold) | Balanced | Castles train 5% faster; soldiers fight at 0.9 | **Golden Tithe:** castles train twice as fast for 15s | The Sunscorched Sands | Balanced |
+| **The Azure Crown of Aldmere** (blue) | Defense | Defenders count as 1.45 soldiers | **Stone Oath:** defenders count double for 20s | The Vale of Aldmere | Defensive |
+| **The Kharzul Horde** (red) | Attack | Riders 30% faster, strike 1.12×; 0.9 in road battles, palisades defend at 0.9, slowed badly by forests | **Blood Moon Charge:** troops move 2× and hit 1.5× for 15s | The Red Steppe | Very aggressive |
+| **The Jarls of Frostmark** (teal) | Defense | 1.45× in road battles, castles defend at 1.4; 5% slower, barely slowed by forests | **Winter's Grip:** every enemy soldier in the field freezes for 12s | The Frostmark Fjords | Very defensive |
+| **The Sun Dominion of Solmara** (gold) | Balanced | Soldiers fight at 0.9; relies on the Golden Tithe | **Golden Tithe:** castles train twice as fast for 15s | The Sunscorched Sands | Balanced |
 | **The Nyxhollow Covenant** (violet) | Attack | Attacks on unclaimed keeps count 1.35×; strike 1.12× | **Plague of Crows:** the 3 largest enemy castles lose 40% of their garrison | Nyxhollow Mire | Aggressive and cunning |
 
 Special powers are ready 45 seconds into a battle, then recharge for 5 minutes. The timings live in `FIRST_CHARGE` and `RECHARGE` at the top of the script.
@@ -53,6 +53,7 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 - **Upgrades:** select one of your castles to spend its troops on **Walls** (each level: defenders count 15% more, and the castle's archers shoot faster, farther and harder) or **Barracks** (each level: 8% faster training, and the soldiers it sends hit 12% harder, shown by a gold crest). Three levels each, costing 15 / 25 / 40 troops for a medium castle (0.8× small, 1.2× large). **U** and **I** upgrade every selected castle. A captured castle loses one level of each. Pips under the garrison count show a castle's levels.
 - **Archers:** every castle a kingdom holds shoots at enemy columns marching past, so a small raid on a fortified castle can lose a third of its troops before it arrives.
 - **Special castles:** about a quarter of the unclaimed keeps are special, marked by a badge beside the troop count and a detail on the map. A **fortress** (shield, outer rampart) counts every defender double. A **war camp** (crossed swords, tents) trains 60% faster, but its defenders count only 0.7. A **village** (cottage, houses) trains nothing, but its owner's castles within its dashed circle train 25% faster each (up to 50%). Captured castles keep their kind, and mirrored copies on the map always share a kind.
+- **Rivers** can only be crossed at bridges, so troops march the long way round and bridges become chokepoints. **Forests** slow marching troops (Kharzul horses most, Frostmark woodsmen least). Routes follow the roads automatically, and while aiming you can see the exact route each column will take. The desert has neither.
 - **Armies that meet on the road fight.** The stronger column marches on with what's left.
 - **Red banners** over your castles count the enemy troops marching on them. A pulsing ring means the castle will fall unless you reinforce it.
 - **Rivals surrender** when they hold under 10% of all troops and two castles or fewer for 8 seconds (after the first minute). Against one rival their castles open their gates to you; with two rivals they fall back to neutral.

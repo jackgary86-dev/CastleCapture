@@ -4,21 +4,212 @@
 // load order: data.js, sfx.js, sim.js, render.js, ui.js. There is no build step.
 // Map generation, battle state, army stats and powers, the AI lords, coins and map units, and the simulation step. No DOM access: it reports through emit() and the headless balance runner loads it.
 
+// ---------- terrain: rivers, bridges and forests ----------
+const RIVER_W = 16;                        // river width, world units
+const FOREST_SLOW = 0.6;                   // marching speed inside a forest
+const FOREST_COST = 1 / FOREST_SLOW - 1;   // extra path cost per unit of forest crossed
+const cross3 = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+const segsCross = (a, b, c, d) =>
+  (cross3(c, d, a) > 0) !== (cross3(c, d, b) > 0) && (cross3(a, b, c) > 0) !== (cross3(a, b, d) > 0);
+function segDist(a, b, p) {
+  const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / L2));
+  return Math.hypot(a.x + vx * t - p.x, a.y + vy * t - p.y);
+}
+function polyDist(pts, p) {
+  let m = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) m = Math.min(m, segDist(pts[i], pts[i + 1], p));
+  return m;
+}
+// Distance from a point to the nearest water (rivers or the central lake).
+const waterDist = (T, p) => Math.min(...T.rivers.map(r => polyDist(r, p)), T.lake ? Math.hypot(p.x - T.lake.x, p.y - T.lake.y) - T.lake.r : Infinity);
+const inForest = (T, p) => T.forests.some(f => Math.hypot(p.x - f.x, p.y - f.y) < f.r);
+// Closest approach between two segments.
+const segSegDist = (a, b, c, d) => segsCross(a, b, c, d) ? 0 : Math.min(segDist(a, b, c), segDist(a, b, d), segDist(c, d, a), segDist(c, d, b));
+// True if a straight march would cross or wade along the water, rather than keep to the bank.
+const BANK = RIVER_W / 2 + 4;
+// River segments with their bounding boxes (grown by a bank's width), built once per map.
+function riverSegs(T) {
+  if (!T.segs) {
+    T.segs = [];
+    for (const r of T.rivers) for (let i = 0; i < r.length - 1; i++) {
+      const a = r[i], b = r[i + 1];
+      T.segs.push({ a, b, x0: Math.min(a.x, b.x) - BANK, x1: Math.max(a.x, b.x) + BANK, y0: Math.min(a.y, b.y) - BANK, y1: Math.max(a.y, b.y) + BANK });
+    }
+  }
+  return T.segs;
+}
+function crossesWater(T, a, b) {
+  const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+  for (const g of riverSegs(T)) {
+    // Skip river segments nowhere near this leg before doing the exact distance test.
+    if (g.x1 < x0 || g.x0 > x1 || g.y1 < y0 || g.y0 > y1) continue;
+    if (segSegDist(a, b, g.a, g.b) < BANK) return true;
+  }
+  return !!T.lake && segDist(a, b, T.lake) < T.lake.r + 6;
+}
+// Cost of marching one straight leg: its length, plus extra for the stretch through forest.
+function legCost(T, a, b) {
+  const len = dist(a, b);
+  // Only forests the leg actually passes through matter.
+  const near = T.forests.filter(f => segDist(a, b, f) < f.r);
+  if (!near.length) return len;
+  const n = Math.max(1, Math.ceil(len / 8));
+  let wood = 0;
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+    if (near.some(f => Math.hypot(x - f.x, y - f.y) < f.r)) wood++;
+  }
+  return len + FOREST_COST * len * wood / n;
+}
+
+// Rivers run from a central lake out to the map edge between every pair of neighbouring kingdoms,
+// each crossed by two bridges. Forests sit in matching spots for every kingdom, so maps stay fair.
+function makeTerrain(rnd, theme, W, H, RX, RY, playerAngles, starts) {
+  const T = { rivers: [], lake: null, bridges: [], forests: [] };
+  const cx = W / 2, cy = H / 2;
+  if (theme.river) {
+    T.lake = { x: cx, y: cy, r: 40 };
+    const phase = rnd() * Math.PI * 2, amp = 12 + rnd() * 10;
+    const sorted = [...playerAngles].sort((a, b) => a - b);
+    const arms = sorted.map((a, i) => (a + (i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + Math.PI * 2)) / 2);
+    for (const a of arms) {
+      let dx = Math.cos(a) * RX, dy = Math.sin(a) * RY;
+      const dl = Math.hypot(dx, dy); dx /= dl; dy /= dl;
+      const px = -dy, py = dx;
+      const at = s => {
+        const w = amp * Math.sin(phase + s / 34) * Math.min(1, Math.max(0, (s - T.lake.r) / 70));
+        return { x: cx + dx * s + px * w, y: cy + dy * s + py * w };
+      };
+      let edge = T.lake.r;
+      while (cx + dx * edge > 0 && cx + dx * edge < W && cy + dy * edge > 0 && cy + dy * edge < H) edge += 4;
+      const river = [];
+      for (let s = T.lake.r * 0.6; s < edge + 40; s += 12) river.push(at(s));
+      T.rivers.push(river);
+      // Bridges sit at the same distances from the centre on every river, however long it runs to the map edge.
+      const reach = Math.min(edge, Math.hypot(dx * RX, dy * RY));
+      for (const f of [0.38, 0.76]) {
+        const s = T.lake.r + (reach - T.lake.r) * f, c = at(s), a1 = at(s - 3), a2 = at(s + 3);
+        let tx = a2.x - a1.x, ty = a2.y - a1.y;
+        const tl = Math.hypot(tx, ty); tx /= tl; ty /= tl;
+        const half = RIVER_W / 2 + 7;
+        T.bridges.push({ x: c.x, y: c.y, tx, ty, e1: { x: c.x - ty * half, y: c.y + tx * half }, e2: { x: c.x + ty * half, y: c.y - tx * half } });
+      }
+    }
+  }
+  if (theme.forest) {
+    // Rotate a point around the map centre in the same squashed space the castles are laid out in.
+    const rotE = (p, ang) => {
+      const u = (p.x - cx) / RX, v = (p.y - cy) / RY, c = Math.cos(ang), s = Math.sin(ang);
+      return { x: cx + (u * c - v * s) * RX, y: cy + (u * s + v * c) * RY };
+    };
+    const groups = playerAngles.length === 2 ? 3 : 2;
+    for (let g = 0, tries = 0; g < groups && tries < 500; tries++) {
+      const r = 38 + rnd() * 20, a = rnd() * Math.PI * 2, rr = 0.3 + rnd() * 0.62;
+      const base = { x: cx + Math.cos(a) * RX * rr, y: cy + Math.sin(a) * RY * rr };
+      const group = playerAngles.length === 2
+        ? [base, { x: W - base.x, y: H - base.y }]
+        : playerAngles.map((_, k) => rotE(base, k * 2 * Math.PI / playerAngles.length));
+      const ok = group.every((p, i) =>
+        p.x > r * 0.6 && p.x < W - r * 0.6 && p.y > r * 0.6 && p.y < H - r * 0.6 &&
+        waterDist(T, p) > 12 &&
+        starts.every(s => Math.hypot(s.x - p.x, s.y - p.y) > r + 70) &&
+        T.forests.every(f => Math.hypot(f.x - p.x, f.y - p.y) > f.r + r + 20) &&
+        group.every((q, j) => i === j || Math.hypot(q.x - p.x, q.y - p.y) > 2 * r + 20));
+      if (!ok) continue;
+      group.forEach(p => T.forests.push({ x: p.x, y: p.y, r }));
+      g++;
+    }
+  }
+  return T;
+}
+
+// Shortest march between every pair of castles: straight where possible, otherwise over bridges,
+// and around forests when going round is quicker than pushing through.
+function buildPaths(T, planets) {
+  // Route nodes: both ends of every bridge, a step back from each end (so marches can leave the bank
+  // where the river bends), and a ring around the lake. Only a bridge's own two ends may cross water.
+  const ends = [];
+  T.bridges.forEach((b, bi) => ends.push({ x: b.e1.x, y: b.e1.y, bi }, { x: b.e2.x, y: b.e2.y, bi }));
+  const extra = [];
+  for (const e of ends.slice()) {
+    const b = T.bridges[e.bi], ux = (e.x - b.x) / dist(e, b), uy = (e.y - b.y) / dist(e, b);
+    for (const out of [30, 60]) extra.push({ x: e.x + ux * out, y: e.y + uy * out });
+  }
+  if (T.lake) for (let k = 0; k < 12; k++) {
+    const a = k * Math.PI / 6;
+    extra.push({ x: T.lake.x + Math.cos(a) * (T.lake.r + 26), y: T.lake.y + Math.sin(a) * (T.lake.r + 26) });
+  }
+  extra.forEach((q, k) => { if (waterDist(T, q) > BANK + 2) ends.push({ x: q.x, y: q.y, bi: -1 - k }); });
+  const E = ends.length, N = planets.length;
+  const ee = ends.map(() => new Array(E).fill(0));
+  for (let i = 0; i < E; i++) for (let j = i + 1; j < E; j++) {
+    const a = ends[i], b = ends[j];
+    ee[i][j] = ee[j][i] = a.bi === b.bi ? dist(a, b) : crossesWater(T, a, b) ? Infinity : legCost(T, a, b);
+  }
+  const ce = planets.map(p => ends.map(e => crossesWater(T, p, e) ? Infinity : legCost(T, p, e)));
+  const paths = new Array(N * N);
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+    const S = planets[i], D = planets[j];
+    const direct = crossesWater(T, S, D) ? Infinity : legCost(T, S, D);
+    // Nodes: 0 = start, 1 = destination, 2.. = bridge ends.
+    const cost = (u, v) => {
+      if (u === 0) return v === 1 ? direct : ce[i][v - 2];
+      if (v === 1) return ce[j][u - 2];
+      return ee[u - 2][v - 2];
+    };
+    const V = E + 2, best = new Array(V).fill(Infinity), prev = new Array(V).fill(-1), done = new Array(V).fill(false);
+    best[0] = 0;
+    for (;;) {
+      let u = -1;
+      for (let k = 0; k < V; k++) if (!done[k] && best[k] < Infinity && (u < 0 || best[k] < best[u])) u = k;
+      if (u < 0 || u === 1) break;
+      done[u] = true;
+      for (let v = 1; v < V; v++) {
+        if (done[v]) continue;
+        const c = best[u] + cost(u, v);
+        if (c < best[v]) { best[v] = c; prev[v] = u; }
+      }
+    }
+    let pts, len;
+    if (best[1] === Infinity) { pts = [{ x: D.x, y: D.y }]; len = dist(S, D); }
+    else {
+      pts = [];
+      for (let v = 1; v > 0; v = prev[v]) pts.unshift(v === 1 ? { x: D.x, y: D.y } : { x: ends[v - 2].x, y: ends[v - 2].y });
+      len = best[1];
+    }
+    paths[i * N + j] = { pts, len };
+    paths[j * N + i] = { pts: [...pts.slice(0, -1).reverse(), { x: S.x, y: S.y }], len };
+  }
+  return paths;
+}
+
 // ---------- map generation ----------
 // opts: scale (map size multiplier), start (starting troops), neutral (unclaimed keep garrison multiplier).
 function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
   const rnd = mulberry(seed);
   const S = opts.scale ?? 1, START = opts.start ?? 40, NM = opts.neutral ?? 1;
-  const W = Math.round(1000 * S), H = Math.round(640 * S), cx = W / 2, cy = H / 2;
+  const [W, H] = (players >= 5 ? [1240, 900] : [1000, 640]).map(v => Math.round(v * S)), cx = W / 2, cy = H / 2;
+  // Three or more kingdoms sit round a true circle: rotating around a squashed oval would leave one
+  // kingdom further from everything.
+  const [RX, RY] = (players === 2 ? [460, 320] : players >= 5 ? [400, 400] : [290, 290]).map(v => v * S);
+  const playerAngles = players === 2 ? [Math.PI, 0] : Array.from({ length: players }, (_, k) => Math.PI + k * 2 * Math.PI / players);
+  const starts = players === 2
+    ? [{ x: 130, y: cy }, { x: W - 130, y: cy }]
+    : playerAngles.map(a => ({ x: cx + Math.cos(a) * RX * 0.92, y: cy + Math.sin(a) * RY * 0.92 }));
+  const T = makeTerrain(rnd, theme, W, H, RX, RY, playerAngles, starts);
   const pts = [];
   const fits = (x, y, r) => x - r > 40 && x + r < W - 40 && y - r * 1.3 > 30 && y + r * 1.3 < H - 30 &&
-    pts.every(p => Math.hypot(p.x - x, p.y - y) > p.r + r + 34);
+    pts.every(p => Math.hypot(p.x - x, p.y - y) > p.r + r + 34) &&
+    waterDist(T, { x, y }) > r + 22 &&
+    T.forests.every(f => Math.hypot(f.x - x, f.y - y) > f.r * 0.55 + r);
   const garrison = r => Math.round((r * 0.45 + rnd() * r * 0.7) * NM);
+  const wet = T.rivers.length > 0;
 
   if (players === 2) {
-    pts.push({ x: 130, y: cy, r: 28, owner: 1, units: START });
-    pts.push({ x: W - 130, y: cy, r: 28, owner: 2, units: START + aiBonus });
-    if (n % 2 === 1) pts.push({ x: cx, y: cy, r: 32, owner: 0, units: Math.round(45 * NM) });
+    pts.push({ ...starts[0], r: 28, owner: 1, units: START });
+    pts.push({ ...starts[1], r: 28, owner: 2, units: START + aiBonus });
+    if (n % 2 === 1 && !wet) pts.push({ x: cx, y: cy, r: 32, owner: 0, units: Math.round(45 * NM) });
     let tries = 0;
     while (pts.length < n && tries++ < 4000) {
       const r = 13 + rnd() * 19, x = 60 + rnd() * (cx - 60), y = 50 + rnd() * (H - 100);
@@ -29,67 +220,85 @@ function genMap(seed, n, players, portrait, theme, aiBonus = 0, opts = {}) {
       pts.push({ x, y, r, owner: 0, units: u }, { x: mx, y: my, r, owner: 0, units: u });
     }
   } else {
-    const ax = 430 * S, ay = 260 * S;
-    for (let k = 0; k < 3; k++) {
-      const a = Math.PI + k * 2 * Math.PI / 3;
-      pts.push({ x: cx + Math.cos(a) * ax * 0.92, y: cy + Math.sin(a) * ay * 0.92, r: 26, owner: k + 1, units: k ? START + aiBonus : START });
-    }
-    pts.push({ x: cx, y: cy, r: 33, owner: 0, units: Math.round(60 * NM) });
+    starts.forEach((s, k) => pts.push({ ...s, r: 26, owner: k + 1, units: k ? START + aiBonus : START }));
+    if (!wet) pts.push({ x: cx, y: cy, r: 33, owner: 0, units: Math.round(60 * NM) });
+    // Unclaimed castles are placed in matching sets, one per kingdom, rotated round the centre.
+    const step = 2 * Math.PI / players;
     let tries = 0;
-    while (pts.length < n && tries++ < 4000) {
-      const r = 13 + rnd() * 17, a0 = rnd() * 2 * Math.PI / 3, rr = 0.28 + rnd() * 0.7;
-      const trio = [0, 1, 2].map(k => { const a = a0 + k * 2 * Math.PI / 3; return { x: cx + Math.cos(a) * ax * rr, y: cy + Math.sin(a) * ay * rr }; });
-      const ok = trio.every((p, i) => fits(p.x, p.y, r) && trio.every((q, j) => i === j || Math.hypot(p.x - q.x, p.y - q.y) > 2 * r + 34));
+    while (pts.length < n && tries++ < 6000) {
+      const r = 13 + rnd() * 17, a0 = rnd() * step, rr = 0.28 + rnd() * 0.7;
+      const set = playerAngles.map((_, k) => { const a = a0 + k * step; return { x: cx + Math.cos(a) * RX * rr, y: cy + Math.sin(a) * RY * rr }; });
+      const ok = set.every((p, i) => fits(p.x, p.y, r) && set.every((q, j) => i === j || Math.hypot(p.x - q.x, p.y - q.y) > 2 * r + 34));
       if (!ok) continue;
       const u = garrison(r);
-      trio.forEach(p => pts.push({ ...p, r, owner: 0, units: u }));
+      set.forEach(p => pts.push({ ...p, r, owner: 0, units: u }));
     }
   }
   // Portrait screens: rotate the map so the player starts at the bottom.
   const rot = p => portrait ? { x: p.y, y: W - p.x } : { x: p.x, y: p.y };
+  const rotV = (vx, vy) => portrait ? [vy, -vx] : [vx, vy];
   const planets = pts.map((p, id) => ({ id, ...rot(p), r: p.r, owner: p.owner, units: p.units }));
+  T.rivers = T.rivers.map(r => r.map(rot));
+  if (T.lake) T.lake = { ...rot(T.lake), r: T.lake.r };
+  T.bridges = T.bridges.map(b => { const [tx, ty] = rotV(b.tx, b.ty); return { ...rot(b), tx, ty, e1: rot(b.e1), e2: rot(b.e2) }; });
+  T.forests = T.forests.map(f => ({ ...rot(f), r: f.r }));
   const w = portrait ? H : W, h = portrait ? W : H;
   const clear = (x, y, pad) => planets.every(p => Math.hypot(p.x - x, p.y - y) > p.r + pad);
+  const paths = buildPaths(T, planets);
+  const N = planets.length;
 
-  // Scenery: roads between neighbouring castles, then the homeland's own features.
+  // Roads follow the marching routes between neighbouring castles, so they cross rivers at the bridges.
   const roads = [], seen = new Set();
   for (const a of planets) {
-    planets.filter(b => b !== a).sort((b, c) => dist(a, b) - dist(a, c)).slice(0, 2).forEach(b => {
+    planets.filter(b => b !== a).sort((b, c) => paths[a.id * N + b.id].len - paths[a.id * N + c.id].len).slice(0, 2).forEach(b => {
       const key = Math.min(a.id, b.id) + '-' + Math.max(a.id, b.id);
       if (seen.has(key)) return;
       seen.add(key);
-      const mx = (a.x + b.x) / 2 + (rnd() - 0.5) * 50, my = (a.y + b.y) / 2 + (rnd() - 0.5) * 50;
-      roads.push({ a, b, mx, my });
+      const mid = paths[a.id * N + b.id].pts.slice(0, -1);
+      roads.push({ a, b, pts: [{ x: a.x, y: a.y + a.r * 0.5 }, ...mid, { x: b.x, y: b.y + b.r * 0.5 }] });
     });
   }
   const meadows = Array.from({ length: 9 }, () => ({ x: rnd() * w, y: rnd() * h, rx: 80 + rnd() * 140, ry: 50 + rnd() * 90 }));
+  const dry = (x, y, pad) => waterDist(T, { x, y }) > pad;
   const pools = [];
   for (let i = 0; i < 300 && pools.length < theme.pools; i++) {
     const x = 40 + rnd() * (w - 80), y = 40 + rnd() * (h - 80), rx = 18 + rnd() * 26;
-    if (clear(x, y, rx + 24)) pools.push({ x, y, rx, ry: rx * (0.45 + rnd() * 0.2) });
+    if (clear(x, y, rx + 24) && dry(x, y, rx + 14) && !inForest(T, { x, y })) pools.push({ x, y, rx, ry: rx * (0.45 + rnd() * 0.2) });
   }
   const trees = [];
-  for (let i = 0; i < 600 && trees.length < theme.trees; i++) {
+  const plant = (x, y) => {
+    if (x < 8 || y < 8 || x > w - 8 || y > h - 8 || !clear(x, y, 30) || !dry(x, y, 10)) return;
+    if (theme.tree !== 'palm' && pools.some(o => Math.hypot((o.x - x) / o.rx, (o.y - y) / o.ry) < 1.2)) return;
+    trees.push({ x, y, s: 5 + rnd() * 4, shade: rnd() });
+  };
+  // Forests are thick with trees; a few more grow scattered elsewhere.
+  for (const f of T.forests) {
+    for (let i = 0; i < Math.round(f.r * f.r / 70); i++) {
+      const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * (f.r - 4);
+      plant(f.x + Math.cos(a) * d, f.y + Math.sin(a) * d);
+    }
+  }
+  const scattered = theme.forest ? Math.round(theme.trees * 0.3) : theme.trees;
+  for (let i = 0, placed = trees.length; i < 600 && trees.length - placed < scattered; i++) {
     let x, y;
     if (theme.tree === 'palm' && pools.length) {
       // Palms grow around the oases.
       const o = pools[Math.floor(rnd() * pools.length)], a = rnd() * Math.PI * 2;
       x = o.x + Math.cos(a) * (o.rx + 6 + rnd() * 14); y = o.y + Math.sin(a) * (o.ry + 5 + rnd() * 10);
     } else {
-      const base = trees.length && rnd() < theme.clump ? trees[Math.floor(rnd() * trees.length)] : { x: rnd() * w, y: rnd() * h };
+      const base = trees.length > placed && rnd() < theme.clump ? trees[placed + Math.floor(rnd() * (trees.length - placed))] : { x: rnd() * w, y: rnd() * h };
       x = base.x + (rnd() - 0.5) * 60; y = base.y + (rnd() - 0.5) * 60;
+      if (inForest(T, { x, y })) continue;
     }
-    if (x < 8 || y < 8 || x > w - 8 || y > h - 8 || !clear(x, y, 30)) continue;
-    if (theme.tree !== 'palm' && pools.some(o => Math.hypot((o.x - x) / o.rx, (o.y - y) / o.ry) < 1.2)) continue;
-    trees.push({ x, y, s: 5 + rnd() * 4, shade: rnd() });
+    plant(x, y);
   }
   trees.sort((a, b) => a.y - b.y);
   const rocks = [];
   for (let i = 0; i < 300 && rocks.length < theme.rocks; i++) {
     const x = rnd() * w, y = rnd() * h;
-    if (clear(x, y, 22)) rocks.push({ x, y, s: 2 + rnd() * 3.5 });
+    if (clear(x, y, 22) && dry(x, y, 8)) rocks.push({ x, y, s: 2 + rnd() * 3.5 });
   }
-  return { planets, w, h, roads, meadows, trees, pools, rocks };
+  return { planets, w, h, roads, meadows, trees, pools, rocks, terrain: T, paths };
 }
 
 // ---------- game state ----------
@@ -125,7 +334,7 @@ function newGame(cfg, portrait = false) {
   const theme = THEMES[ARMIES[cfg.map].map];
   const map = genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral });
   assignKinds(map.planets, cfg.seed);
-  const owners = players === 2 ? [1, 2] : [1, 2, 3];
+  const owners = Array.from({ length: players }, (_, i) => i + 1);
   const aiIds = cfg.demo ? [1, 2] : owners.slice(1);
   G = {
     cfg, ...map, theme, packets: [], fx: [], time: 0, over: false, paused: false, owners,
@@ -135,7 +344,7 @@ function newGame(cfg, portrait = false) {
     caps: 0, peak: 0, hintDone: !!cfg.demo, portrait,
     intro: false, lastTaunt: -99, tauntAt: {}, nearDefeat: new Set(), maxCastles: {}, weakSince: {}, surrendered: new Set(),
     coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
-    roadPts: roadSamples(map.roads), rallyClock: 0,
+    roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0,
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
   };
   emit('newGame', G);
@@ -148,6 +357,9 @@ function demoCfg() {
 
 // ---------- army stats and powers ----------
 const army = o => ARMIES[G.fac[o]];
+const pathOf = (a, b) => G.paths[a.id * G.np + b.id];
+// Marching distance between two castles, counting bridges and the slow going through forests.
+const travel = (a, b) => a === b ? 0 : pathOf(a, b).len;
 const col = o => o ? army(o).color : NEUTRAL;
 const powerOn = (o, id) => o && army(o).power.id === id && G.time < G.pw[o].until;
 const atkOf = o => army(o).stats.atk * (powerOn(o, 'bloodMoon') ? 1.5 : 1);
@@ -280,14 +492,19 @@ function send(owner, sources, target, frac = 0.5) {
     launched = true;
     if (owner === 1) G.stats.sent += n;
     const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
-    const ang = Math.atan2(target.y - s.y, target.x - s.x);
+    // Set off towards the first waypoint (a bridge, or the target itself).
+    const path = pathOf(s, target).pts, first = path[0];
+    const ang = Math.atan2(first.y - s.y, first.x - s.x);
     for (let i = 0; i < k; i++) {
       const cnt = Math.floor(n / k) + (i < n % k ? 1 : 0);
-      const off = (Math.random() - 0.5) * s.r * 1.1;
+      const jx = (Math.random() - 0.5) * 4, jy = (Math.random() - 0.5) * 4;
+      const at = off => ({ x: s.x + Math.cos(ang) * s.r * 0.8 - Math.sin(ang) * off, y: s.y + Math.sin(ang) * s.r * 0.8 + Math.cos(ang) * off });
+      // Columns spread across the castle front, unless that would put the outer files in the water.
+      let start = at((Math.random() - 0.5) * s.r * 1.1);
+      if (crossesWater(G.terrain, start, path.length > 1 ? { x: first.x + jx, y: first.y + jy } : first)) start = at(0);
       G.packets.push({
         owner, from: s, to: target, n: cnt, str: soldierStr(s), delay: i * 0.06, phase: Math.random() * 6.28,
-        x: s.x + Math.cos(ang) * s.r * 0.8 - Math.sin(ang) * off,
-        y: s.y + Math.sin(ang) * s.r * 0.8 + Math.cos(ang) * off,
+        path, wp: 0, jx, jy, x: start.x, y: start.y,
       });
     }
   }
@@ -295,7 +512,7 @@ function send(owner, sources, target, frac = 0.5) {
 }
 
 function incomingTable() {
-  const inc = G.planets.map(() => [0, 0, 0, 0]);
+  const inc = G.planets.map(() => new Array(G.owners.length + 1).fill(0));
   for (const k of G.packets) inc[k.to.id][k.owner] += k.n;
   return inc;
 }
@@ -349,6 +566,11 @@ function aiPower(ai, inc, mine) {
   if (use) usePower(me);
 }
 
+// With three or more kingdoms, the AI lords spend the opening claiming unclaimed keeps rather than
+// knocking a neighbour out in the first seconds, which on a crowded map is otherwise common.
+const MUSTER_TIME = 25;
+const mustering = () => G.owners.length > 2 && G.time < MUSTER_TIME;
+
 function aiThink(ai) {
   const me = ai.id, id = G.fac[me], P = G.planets, d = ai.diff;
   const pz = { ...army(me).ai };
@@ -356,7 +578,8 @@ function aiThink(ai) {
   if (!mine.length) return;
   const inc = incomingTable();
   const enemyCastles = P.filter(p => p.owner && p.owner !== me);
-  const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => dist(p, q))) : Infinity;
+  // Marching distance to the nearest castle in a list: rivers and forests count, not just the crow's flight.
+  const nearestOf = (p, list) => list.length ? Math.min(...list.map(q => travel(p, q))) : Infinity;
   aiPower(ai, inc, mine);
   aiBuyUnit(ai, mine);
 
@@ -366,7 +589,7 @@ function aiThink(ai) {
     ai.counter = null;
     if (targets.length) {
       const t = targets[0];
-      const srcs = mine.filter(s => s.units > 8).sort((a, b) => dist(a, t) - dist(b, t)).slice(0, 4);
+      const srcs = mine.filter(s => s.units > 8).sort((a, b) => travel(a, t) - travel(b, t)).slice(0, 4);
       if (send(me, srcs, t, 0.6)) { lordSays(me, 'counter', true); return; }
     }
   }
@@ -376,7 +599,7 @@ function aiThink(ai) {
     const srcs = mine.filter(p => p.units >= Math.max(14, pz.keep));
     if (!srcs.length) return;
     const s = pick(srcs);
-    let ts = P.filter(p => p.owner !== me).sort((a, b) => dist(s, a) - dist(s, b)).slice(0, 5);
+    let ts = P.filter(p => p.owner !== me && (p.owner === 0 || !mustering())).sort((a, b) => travel(s, a) - travel(s, b)).slice(0, 5);
     // Aggressive armies prefer enemy castles even on easy; defensive ones prefer quiet expansion.
     const enemies = ts.filter(t => t.owner), neutrals = ts.filter(t => !t.owner);
     if (pz.enemyBias > 1.5 && enemies.length) ts = enemies;
@@ -395,7 +618,7 @@ function aiThink(ai) {
       const threat = threatOn(p, me, inc);
       const hold = (p.units + inc[p.id][me]) * defAt(p) + rate(p) * 1.5;
       if (threat > 0 && threat > hold * pz.defendAt) {
-        const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => dist(a, p) - dist(b, p));
+        const helpers = mine.filter(q => q !== p && q.units > 8).sort((a, b) => travel(a, p) - travel(b, p));
         if (helpers.length) {
           send(me, d === 'hard' ? helpers.slice(0, 2) : [helpers[0]], p, 0.5);
           if (d === 'medium') return;
@@ -419,7 +642,7 @@ function aiThink(ai) {
       const enemyIn = G.packets.filter(k => k.to === nt && k.owner !== me);
       if (!enemyIn.length || inc[nt.id][me] > 0) continue;
       const strength = enemyIn.reduce((a, k) => a + k.n * roadOf(k.owner), 0);
-      const h = mine.filter(s => s.units > 10).sort((a, b) => dist(a, nt) - dist(b, nt))[0];
+      const h = mine.filter(s => s.units > 10).sort((a, b) => travel(a, nt) - travel(b, nt))[0];
       if (h && Math.floor(h.units * 0.5) * roadOf(me) > strength) { send(me, [h], nt, 0.5); return; }
     }
   }
@@ -431,13 +654,15 @@ function aiThink(ai) {
 
   // Torvek fixes on the strongest rival's biggest castle and keeps hammering it.
   if (id === 'kharzul' && (!ai.focus || ai.focus.owner === me || ai.focus.owner === 0)) {
-    const rivals = G.owners.filter(o => o !== me).sort((a, b) => totalOf(b) - totalOf(a));
+    // Strongest rival first; on a tie (as at the start), the nearest one, rather than always the player.
+    const near = o => Math.min(...P.filter(p => p.owner === o).map(p => nearestOf(p, mine)), Infinity);
+    const rivals = G.owners.filter(o => o !== me && P.some(p => p.owner === o)).sort((a, b) => (totalOf(b) - totalOf(a)) || (near(a) - near(b)));
     ai.focus = P.filter(p => p.owner === rivals[0]).sort((a, b) => b.units - a.units)[0] || null;
   }
 
   if (aiUpgrade(ai, mine, enemyCastles, inc, pz)) return;
 
-  let candidates = P.filter(t => t.owner !== me);
+  let candidates = P.filter(t => t.owner !== me && (t.owner === 0 || !mustering()));
   // Sigrun holds her army home early, taking only neutrals and near-empty castles.
   if (id === 'frostmark' && G.time < 100 && bold === 1) candidates = candidates.filter(t => t.owner === 0 || t.units < 5);
   // Amaru's first minute: claim every keep on his side of the map, and nothing that brings him close to a rival.
@@ -450,7 +675,7 @@ function aiThink(ai) {
   // While rushing, Amaru's castles within reach of a rival keep at least 10 troops home.
   const exposed = s => amaruRush && nearestOf(s, enemyCastles) < 300;
   for (const t of candidates) {
-    const srcs = mine.filter(s => s.units >= pz.keep && (!exposed(s) || s.units * (1 - pz.sendFrac) >= 10)).sort((a, b) => dist(a, t) - dist(b, t));
+    const srcs = mine.filter(s => s.units >= pz.keep && (!exposed(s) || s.units * (1 - pz.sendFrac) >= 10)).sort((a, b) => travel(a, t) - travel(b, t));
     const chosen = [];
     let sum = 0, far = 0, need = Infinity;
     // Amaru avoids even fights against other kingdoms.
@@ -459,7 +684,7 @@ function aiThink(ai) {
       if (chosen.length >= maxSrc) break;
       chosen.push(s);
       sum += Math.floor(s.units * pz.sendFrac);
-      far = Math.max(far, dist(s, t));
+      far = Math.max(far, travel(s, t));
       need = needAt(t, far, inc, me) * margin;
       if (sum >= need) break;
     }
@@ -504,12 +729,9 @@ function aiThink(ai) {
 // Points along each drawn road, so map units aren't placed on top of one.
 function roadSamples(roads) {
   const pts = [];
-  for (const r of roads) {
-    const x0 = r.a.x, y0 = r.a.y + r.a.r * 0.5, x1 = r.b.x, y1 = r.b.y + r.b.r * 0.5;
-    for (let i = 0; i <= 16; i++) {
-      const t = i / 16, u = 1 - t;
-      pts.push({ x: u * u * x0 + 2 * u * t * r.mx + t * t * x1, y: u * u * y0 + 2 * u * t * r.my + t * t * y1 });
-    }
+  for (const r of roads) for (let i = 0; i < r.pts.length - 1; i++) {
+    const p = r.pts[i], q = r.pts[i + 1], n = Math.max(1, Math.ceil(dist(p, q) / 8));
+    for (let k = 0; k <= n; k++) pts.push({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n });
   }
   return pts;
 }
@@ -520,6 +742,7 @@ function placeProblem(o, x, y) {
   if (!G.planets.some(p => p.owner === o && Math.hypot(p.x - x, p.y - y) <= PLACE_REACH)) return 'Too far from your castles';
   if (G.planets.some(p => Math.hypot(p.x - x, p.y - (y - 6)) < p.r * 1.25 + 14)) return 'Too close to a castle';
   if (G.roadPts.some(q => Math.hypot(q.x - x, q.y - y) < 12)) return 'Can\'t build on a road';
+  if (waterDist(G.terrain, { x, y }) < 14) return 'Can\'t build in water';
   if (G.units.some(u => Math.hypot(u.x - x, u.y - y) < 36)) return 'Too close to another map unit';
   return null;
 }
@@ -637,13 +860,17 @@ function update(dt) {
     const k = G.packets[i];
     if (frozen(k.owner)) continue;
     if (k.delay > 0) { k.delay -= dt; continue; }
-    const t = k.to, dx = t.x - k.x, dy = t.y - k.y, dd = Math.hypot(dx, dy);
-    if (dd <= t.r * 0.8) {
+    // March towards the next waypoint on the route (bridge ends), then the castle itself.
+    const t = k.to, last = k.wp >= k.path.length - 1, wpt = k.path[k.wp];
+    const gx = last ? t.x : wpt.x + k.jx, gy = last ? t.y : wpt.y + k.jy;
+    const dx = gx - k.x, dy = gy - k.y, dd = Math.hypot(dx, dy);
+    if (last && dd <= t.r * 0.8) {
       G.packets.splice(i, 1);
       arrive(k, t);
       continue;
     }
-    const step = Math.min(dd, speedOf(k.owner) * (slowedAt(k) ? 0.5 : 1) * dt);
+    if (!last && dd < 3) { k.wp++; continue; }
+    const step = Math.min(dd, speedOf(k.owner) * (slowedAt(k) ? 0.5 : 1) * (inForest(G.terrain, k) ? (army(k.owner).stats.forest ?? FOREST_SLOW) : 1) * dt);
     k.x += dx / dd * step; k.y += dy / dd * step;
     k.dir = dx < 0 ? -1 : 1;
   }

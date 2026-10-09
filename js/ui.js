@@ -544,7 +544,7 @@ function quickCfg() {
   const c = readCustom(), fixed = c.seed !== null;
   return {
     seed: fixed ? c.seed : Math.floor(Math.random() * 1e9), fixedSeed: fixed,
-    n: c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge,
+    n: qAis === 4 ? Math.round(c.castles * 1.75) : c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge,
     diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0],
   };
 }
@@ -552,8 +552,8 @@ function quickCfg() {
 // A battle is saved to the browser when the tab is hidden or closed, and every 10 seconds.
 // Anything that can be rebuilt (the map, scenery, effects) is left out; resume rebuilds the
 // same map from its seed, then lays the saved state over it. Castle references are stored as ids.
-const SAVE_KEY = 'cs-save', SAVE_VERSION = 1;
-const SAVE_SKIP = new Set(['theme', 'roadPts', 'fx', 'shots', 'roads', 'meadows', 'trees', 'pools', 'rocks', 'planets', 'placing', 'shake', 'paused']);
+const SAVE_KEY = 'cs-save', SAVE_VERSION = 2;
+const SAVE_SKIP = new Set(['theme', 'roadPts', 'fx', 'shots', 'roads', 'meadows', 'trees', 'pools', 'rocks', 'planets', 'placing', 'shake', 'paused', 'terrain', 'paths']);
 function enc(v) {
   if (v === null || typeof v !== 'object') return v;
   if (G.planets.includes(v)) return { $p: v.id };

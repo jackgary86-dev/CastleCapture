@@ -5,6 +5,7 @@
 //   node tools/balance.js                 # 4 games per pairing on Warlord, 600 s cap, band 25–75%
 //   node tools/balance.js --games 8 --diff medium --seconds 900 --band 0.35,0.65
 //   node tools/balance.js --json          # machine-readable results
+//   node tools/balance.js --fps 30        # coarser, faster simulation step (default 60, as in the game)
 //
 // Only js/data.js and js/sim.js are loaded, so this also proves the simulation has no DOM
 // dependencies. Math.random is seeded per game, so the same arguments always give the same result.
@@ -23,7 +24,9 @@ const SECONDS = +opt('seconds', 600);
 // The agreed band is deliberately wide to start with (see issue #47); tighten it as the armies are retuned.
 const [BAND_LO, BAND_HI] = opt('band', '0.25,0.75').split(',').map(Number);
 const JSON_OUT = process.argv.includes('--json');
-const DT = 1 / 30;
+// Simulate at the game's own step (the browser runs 1/60 s substeps); coarser steps let fast columns skip
+// past each other on the road and skew the results.
+const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
