@@ -67,6 +67,15 @@ Each army is commanded by a named lord when it's your rival. They introduce them
 
 The lords reinforce and intercept with cavalry. Under fog of war they play by the same rules you do.
 
+They also remember and adapt (`js/mind.js`):
+
+- **Coalitions:** when one realm holds 40% of all the troops on the map, the other lords make peace with each other and turn on it. A banner announces it, and against another lord the player is offered a place in it. The truces break once the leader falls below 30%.
+- **Grudges:** a lord remembers who took its castles and who broke a truce with it, wants that realm's castles more, and tells you when it has had enough of you. Grudges fade slowly and are kept in saved games.
+- **Reading you:** a lord notices if you rush (it keeps more troops home) or turtle behind upgrades (it expands faster).
+- **Openings:** each lord has two or three named openings and picks one per battle (Isolde's *Stone by stone*, Torvek's *Red dawn*, Veyra's *Whispering mire*...), so the same lord plays differently from game to game.
+
+Open the game with `?aidebug` in the address (or set localStorage `cs-ai-debug` to `1`) for an overlay of each lord's opening, current target and grudges. `tools/balance.js --set mind.on=0` (or `mind.openings=0`, `mind.grudgeWeight=0`...) measures any of it switched off.
+
 ## Modes
 
 - **Skirmish:** pick your rival (or a random one); 1 rival, 2 rivals, or a free-for-all against all four; and whether to invade their homeland or defend yours. Difficulty is Squire, Knight or Warlord. In battles with three or more kingdoms, nobody may attack another kingdom for the first 25 seconds while the armies muster. The Skirmish menu also has toggles for fog of war, map events, two players and lord taunts.
@@ -196,6 +205,8 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 | `js/sfx.js` | Synthesised sound effects and music |
 | `js/sim.js` | Map generation and terrain, battle state, army stats and powers, fog of war, weather, truces, the AI lords, coins and map units, and the simulation step. No DOM access: it reports what happens through `emit()` |
 | `js/grand.js` | The Grand Campaign's rules: the five-realm map and the wave loop. No DOM access |
+| `js/mind.js` | Smarter lords (#68): coalitions against a runaway leader, grudges, reading the player's style, and each lord's openings. No DOM access |
+| `js/mind-ui.js` | The coalition banners and the `?aidebug` overlay |
 | `js/hill.js` | King of the Hill rules: scoring the crowned keep, seats, the race's end, and each lord's tactics for the hill. No DOM access |
 | `js/defense.js` | Siege Defense's rules: the fortress map, the waves and their twists, payouts, coin upgrades and the daily seed. No DOM access |
 | `js/crown.js` | Capture the Crown rules: hiding and moving crowns, scouts, knockouts, the heralds' reveal, and each lord's guessing, scouting and bluffing. No DOM access |

@@ -189,6 +189,41 @@ if (run('progression check', `typeof buyUnlock === 'function'`)) run('progressio
   document.getElementById('profClose').click();
   toMenu();
 }`);
+// ---------- 3a2. smarter lords (#68): a coalition against a runaway leader, and a grudge said aloud ----------
+if (run('smarter lords check', `typeof mindTick === 'function'`)) run('smarter lords', `{
+  play({ diff: 'hard', n: 15, map: 'aldmere', armies: ['aldmere', 'kharzul', 'solmara'], seed: 21 });
+  if (typeof startBattle === 'function') startBattle();
+  G.intro = false; G.paused = false;
+  for (let i = 0; i < 30; i++) update(1 / 30);
+  // The player snowballs past 40% of every troop on the map.
+  G.time = AI_MIND.coalitionAfter + 1;
+  for (const p of G.planets) if (p.owner === 1) p.units += 400;
+  mindTick(0.1);
+  const C = G.mind.coalition;
+  if (!C || C.against !== 1 || !allied(2, 3)) throw new Error('no coalition formed against a 40%+ leader');
+  if (!G.pacts.some(p => p.coalition)) throw new Error('the coalition truce is missing');
+  hud(); draw(${clock});
+  // A save and resume keeps the coalition and its grudges.
+  for (let i = 0; i < 3; i++) emit('capture', { o: 1, was: 2, castle: G.planets[0] });
+  const said = [];
+  on('taunt', e => { if (e.kind === 'grudge') said.push(e.o); });
+  mindTick(0.1);
+  if (!said.includes(2)) throw new Error('a lord with a grudge against the player said nothing');
+  if (typeof saveBattle === 'function') {
+    saveBattle(); resumeBattle(); setPaused(false);
+    if (!G.mind.coalition || !(G.mind.grudges[2][1] >= AI_MIND.grudgeSay - 0.1)) throw new Error('grudges or the coalition were lost on resume');
+  }
+  // Once the leader is cut down, the coalition breaks up.
+  for (const p of G.planets) if (p.owner === 1) p.units = 1;
+  mindTick(0.1);
+  if (G.mind.coalition || allied(2, 3)) throw new Error('the coalition outlived the threat');
+  // With the smarter lords switched off, nothing forms.
+  G.cfg.aiMind = false; G.mind.coalCool = 0;
+  for (const p of G.planets) if (p.owner === 1) p.units += 400;
+  mindTick(0.1);
+  if (G.mind.coalition) throw new Error('cfg.aiMind = false did not switch the coalition off');
+  toMenu();
+}`);
 // ---------- 3b. King of the Hill (#64): a short race, saved and resumed, then won and lost by points ----------
 const hasHill = run('king of the hill check', `typeof startHill === 'function'`);
 if (hasHill) {

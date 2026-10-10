@@ -864,6 +864,8 @@ function aiThink(ai) {
   // The Grand Campaign's opening: every lord fills out its own realm's unclaimed keeps before marching on a
   // neighbour, so an aggressive lord isn't bled white fighting walls in the first waves.
   if (G.mode === 'grand' && (G.wave || 1) <= GRAND.openingWaves) { pz.enemyBias = Math.min(pz.enemyBias, 1); pz.neutralBias = Math.max(pz.neutralBias, 1.3); }
+  // Smarter lords (#68): this battle's opening, and what the lord has read of the player's style (js/mind.js).
+  if (typeof mindPz === 'function') mindPz(ai, pz);
   const mine = P.filter(p => p.owner === me);
   if (!mine.length) return;
   // A Grand Campaign monster near death is worth a lord's turn (js/monsters.js).
@@ -1027,6 +1029,8 @@ function aiThink(ai) {
     if (G.monster && typeof monsterWorthMul === 'function') worth *= monsterWorthMul(t, me);
     if (G.mode === 'hill' && typeof hillWorthMul === 'function') worth *= hillWorthMul(ai, t, P);
     if (G.mode === 'crown' && typeof crownWorthMul === 'function') worth *= crownWorthMul(ai, t, P);
+    if (typeof mindWorthMul === 'function') worth *= mindWorthMul(ai, t);   // grudges and the coalition's target (js/mind.js)
+    if (G.cfg.strategy && typeof strategyWorthMul === 'function') worth *= strategyWorthMul(t, me);   // deeper strategy (#67, js/strategy.js)
     if (worth <= 0) continue;
     if (id === 'kharzul' && real(t) === ai.focus) worth *= 2.5;
     // Grand Campaign: lords turn on whichever rival has fallen well behind them, so a dying realm gets finished off.
@@ -1046,6 +1050,7 @@ function aiThink(ai) {
     const big = best.t.owner && (best.sum >= best.t.r || (id === 'kharzul' && best.sum >= best.t.r * 0.5));
     // Veyra drops the crows before her main attack lands; Torvek charges alongside his.
     if (id === 'nyx' && big && G.pw[me].ready === 0) usePower(me);
+    ai.plan = { t: real(best.t).id, owner: best.t.owner || 0, at: G.time };   // for the debug overlay (js/mind-ui.js)
     for (const s of best.chosen) aiAttackFrom(me, s, real(best.t), best.frac ?? fracOf(s), best.type);
     if (id === 'kharzul' && big && G.pw[me].ready === 0) usePower(me);
     return;
@@ -1212,6 +1217,7 @@ function update(dt) {
   G.time += dt;
   if (G.weather) updateWeather();
   if (G.pacts && (G.diploClock += dt) >= DIPLO_EVERY) { G.diploClock = 0; diplomacyTick(); }
+  if (typeof mindTick === 'function') mindTick(dt);   // grudges, the player's style and coalitions (js/mind.js)
   if (G.cfg.fog && (G.sightClock += dt) >= SIGHT_EVERY) { G.sightClock = 0; updateSight(); }
   for (const p of G.planets) {
     const cap = capOf(p);

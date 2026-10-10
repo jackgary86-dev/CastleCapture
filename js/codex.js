@@ -59,7 +59,7 @@
   const para = t => `<p>${esc(t)}</p>`;
   const list = items => `<ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
   const stat = (label, v) => `<div><span>${esc(label)}</span><strong>${esc(v)}</strong></div>`;
-  const lineKinds = { capture: 'Taking one of your castles', lose: 'Losing a castle', power: 'Using their power', counter: 'Striking back', nearDefeat: 'Near defeat', hill: 'Taking the hill', crown: 'Seizing a crown', crownLost: 'Losing their crown', surrender: 'Surrendering', victory: 'Victory', defeat: 'Defeat' };
+  const lineKinds = { capture: 'Taking one of your castles', lose: 'Losing a castle', power: 'Using their power', counter: 'Striking back', nearDefeat: 'Near defeat', grudge: 'Bearing a grudge', coalition: 'Joining a coalition', hill: 'Taking the hill', crown: 'Seizing a crown', crownLost: 'Losing their crown', surrender: 'Surrendering', victory: 'Victory', defeat: 'Defeat' };
 
   function armyEntry(id) {
     const g = game.armies && game.armies[id], L = game.lords && game.lords[id], a = info.ARMIES[id], T = info.THEMES[a.theme];

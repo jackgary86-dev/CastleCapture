@@ -38,13 +38,13 @@ const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
-const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/defense.js', 'js/crown.js', 'js/monsters.js']
+const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/defense.js', 'js/crown.js', 'js/monsters.js', 'js/mind.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8'))
   .join('\n;\n');
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
+  ARMIES, ARMY_IDS, LORDS, AI_MIND, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
@@ -54,8 +54,10 @@ const ids = api.ARMY_IDS;
 //   --set surrenderShare=0.3,siegeSources.hard=10
 for (const pair of (opt('set', '') || '').split(',').filter(Boolean)) {
   const [keyPath, raw] = pair.split('='), keys = keyPath.split('.'), last = keys.pop();
-  const obj = keys.reduce((o, k) => o[k], api.GRAND);
-  if (!obj || !(last in obj)) { console.error(`--set: no GRAND setting ${keyPath}`); process.exit(1); }
+  // mind.<key> sets the smarter-AI switches (js/mind.js, #68), e.g. --set mind.on=0; anything else is a GRAND setting.
+  const root = keys[0] === 'mind' ? (keys.shift(), api.AI_MIND) : api.GRAND;
+  const obj = keys.reduce((o, k) => o[k], root);
+  if (!obj || !(last in obj)) { console.error(`--set: no setting ${keyPath}`); process.exit(1); }
   obj[last] = isNaN(+raw) ? raw : +raw;
 }
 if (MODE === 'grand') { runGrand(); process.exit(0); }
