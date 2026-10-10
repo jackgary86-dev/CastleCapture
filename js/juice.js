@@ -61,7 +61,11 @@ function closeCinema() {
   if (next) next.focus({ preventScroll: true });
 }
 cinema.addEventListener('click', closeCinema);
-addEventListener('keydown', e => { if (!cinema.hidden) { e.preventDefault(); e.stopImmediatePropagation(); closeCinema(); } }, true);
+// Any key closes it, except browser shortcuts (Ctrl, Cmd or Alt held), which go through untouched (#84).
+addEventListener('keydown', e => {
+  if (cinema.hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault(); e.stopImmediatePropagation(); closeCinema();
+}, true);
 
 function endWinner(win) {
   if (win) return 1;
@@ -112,10 +116,13 @@ function renderSparkline() {
 }
 
 // ui.js's endGame runs first (it registered on 'end' earlier), so the end screen is filled in by now.
+// No sparkline for the tutorial or the menu's demo (and none left over from the last game, #84), and no cinematic
+// in Siege Defense, which has its own ending, or in two-player games, whose end screen names the winning player.
 on('end', ({ win }) => {
-  if (!G || G.cfg.demo || G.cfg.tutorial) return;
+  const spark = document.getElementById('endSpark');
+  if (!G || G.cfg.demo || G.cfg.tutorial) { if (spark) spark.hidden = true; return; }
   renderSparkline();
-  if (G.mode !== 'defense') showCinema(win);
+  if (G.mode !== 'defense' && (G.cfg.humans || 1) === 1) showCinema(win);
 });
 on('newGame', () => closeCinema());
 
