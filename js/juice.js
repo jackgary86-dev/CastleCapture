@@ -15,7 +15,7 @@ on('clash', ({ attacker, defender, n = 0, road, lost }) => {
   const size = road && lost ? Object.values(lost).reduce((a, v) => a + v, 0) : n;
   if (size < JUICE_BIG_CLASH) return;
   const mag = Math.min(5, 1.5 + size / 30);
-  if (!G.shake || G.time >= G.shake.until || G.shake.mag < mag) G.shake = { until: G.time + 0.3, mag };
+  if (!G.shake || G.time >= G.shake.until || G.shake.mag < mag) G.shake = { until: G.time + 0.3, len: 0.3, mag };
 });
 
 // ---------- the Grand Campaign camera follows the monster ----------

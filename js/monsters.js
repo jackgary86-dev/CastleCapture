@@ -340,7 +340,7 @@ function breatheFire(c) {
   if (target.n !== undefined) { target.n -= burnt; if (target.owner === 1) G.stats.roadLost += burnt; }
   else target.units = Math.max(0, target.units - burnt);
   G.fx.push({ kind: 'fire', x: c.x, y: c.y - 10, x1: target.x, y1: target.y, age: 0 });
-  if (target.owner === 1 && !reduceMotion) G.shake = { until: G.time + 0.3, mag: 4 };
+  if (target.owner === 1 && !reduceMotion) G.shake = { until: G.time + 0.3, len: 0.3, mag: 4 };
   emit('monster', { kind: 'fire', monster: M, o: target.owner, castle: target.n === undefined ? target : null, lost: burnt });
 }
 
@@ -358,7 +358,7 @@ function smashCastle(c, p) {
   const a = Math.atan2(c.y - p.y, c.x - p.x) || 0;
   c.x = p.x + Math.cos(a) * (p.r * 1.3 + 6); c.y = p.y + Math.sin(a) * (p.r * 1.3 + 6);
   G.fx.push({ kind: 'smash', x: p.x, y: p.y, r: p.r, age: 0 });
-  if (!reduceMotion) G.shake = { until: G.time + 0.4, mag: p.owner === 1 ? 7 : 4 };
+  if (!reduceMotion) G.shake = { until: G.time + 0.4, len: 0.4, mag: p.owner === 1 ? 7 : 4 };
   emit('monster', { kind: 'smash', monster: M, o: p.owner, castle: p, level });
 }
 

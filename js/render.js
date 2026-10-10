@@ -894,8 +894,9 @@ function draw(now) {
   ctx.fillStyle = G ? G.theme.bg : TIMBER; ctx.fillRect(0, 0, cw, ch);
   if (!G) return;
   let shakeX = 0, shakeY = 0;
-  if (G.shake && G.time < G.shake.until) {
-    const k = (G.shake.until - G.time) / 0.35 * G.shake.mag;
+  // No shake once the battle is over or paused: the clock has stopped, so it would never run out (#83).
+  if (G.shake && G.time < G.shake.until && !G.over && !G.paused) {
+    const k = Math.min(1, (G.shake.until - G.time) / (G.shake.len || 0.35)) * G.shake.mag;
     shakeX = (Math.random() - 0.5) * 2 * k; shakeY = (Math.random() - 0.5) * 2 * k;
   }
   ctx.translate(ox + shakeX, oy + shakeY); ctx.scale(sc, sc);
