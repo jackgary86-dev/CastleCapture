@@ -25,8 +25,8 @@ const DEFENSE = {
   beastFrom: 10, beastBase: 30, beastPer: 4, beastStr: 3,
   columns: 10,                 // most columns one order of a wave marches in
   focus: 0.6,                  // chance each later lord joins the first lord's target
-  capturedSend: 0.7,
-  maxUnits: 2,                 // map units a defender may have standing at once (one more may be built each break)           // share of each castle a lord has taken that joins the next wave
+  capturedSend: 0.7,           // share of each castle a lord has taken that joins the next wave
+  maxUnits: 2,                 // map units a defender may have standing at once (one more may be built each break)
   payout: 25, payoutPerWave: 3, payoutPerKeep: 5,   // coins at the end of each wave
   coinPerTroop: 1,             // coin price of a Walls or Barracks level, per troop it would cost
   aiSpendShare: 0.5,           // share of its coins an AI defender spends on upgrades at each break

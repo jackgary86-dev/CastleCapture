@@ -7,7 +7,8 @@
 // One crowned keep stands at the centre of the map (genMap marks it hill: true). It is large, its walls
 // count HILL.def more, and it can't be upgraded. Each kingdom's starting castle is its seat, which can
 // be emptied but never taken, so the race is never cut short by a knockout. Whoever holds it scores a point a second; the first to
-// HILL.goal wins, and at HILL.cap seconds the most points wins. Knocking every rival out also wins.
+// HILL.goal wins, and at HILL.cap seconds the most points wins. (Since seats can't fall and nobody surrenders, the
+// last-one-standing branch in hillTick is only a safeguard; it can't happen in a normal race.)
 // sim.js calls hillTick() from update(), hillAi() and hillWorthMul() from aiThink(), and hillBuyUnit()
 // from aiBuyUnit(), only while G.mode === 'hill'.
 

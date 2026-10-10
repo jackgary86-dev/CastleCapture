@@ -12,7 +12,7 @@
 //   node tools/balance.js --mode defense --games 8   # Siege Defense: the AI holds the fortress; median waves per army
 //   node tools/balance.js --mode crown --games 16    # Capture the Crown (#66): every pairing hunts the other's hidden crown
 //
-// Only js/data.js, js/sim.js, js/grand.js, js/hill.js, js/defense.js, js/crown.js and js/monsters.js are loaded, so this also proves the simulation has no DOM
+// Only the simulation files in `code` below are loaded (data, sim, grand, hill, strategy, defense, crown, monsters, mind), so this also proves the simulation has no DOM
 // dependencies. Math.random is seeded per game, so the same arguments always give the same result.
 
 const fs = require('fs');
@@ -218,7 +218,7 @@ function runGrand() {
 
 // ---------- King of the Hill (#64) ----------
 // Every pairing races for the crowned keep, alternating whose homeland it is fought on, with the AI
-// playing both seats. A game is decided by the goal, a knockout, or the time cap (most points), so every
+// playing both seats. A game is decided by the goal or the time cap (most points; the knockout count stays 0, as seats can't fall), so every
 // game counts towards the band. Two three-way races follow for crash coverage. Returns true on failure.
 function runHill() {
   const H = api.HILL, st = Object.fromEntries(ids.map(id => [id, { games: 0, wins: 0, held: 0, goal: 0 }]));
