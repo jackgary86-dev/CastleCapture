@@ -9,9 +9,9 @@
 // It shows only what the player knows: your own crown, crowns your scouts or captures have found, crown
 // columns in sight, and every crown once the heralds reveal them. Rival crowns stay hidden otherwise.
 
-// Start a Capture the Crown battle: `army` against `rivals` random lords (1, 2 or 4) on `diff`.
+// Start a Capture the Crown duel: `army` against one random lord on `diff`, on a large map.
 function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
-  const foes = shuffle(ARMY_IDS.filter(id => id !== armyId)).slice(0, Math.max(1, Math.min(4, rivals)));
+  const foes = shuffle(ARMY_IDS.filter(id => id !== armyId)).slice(0, 1);
   play(crownCfg(armyId, foes, diff));
 }
 
@@ -237,14 +237,13 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
     if (after) after.after(modes); else sheet.append(modes);
   }
   let cDiff = ['easy', 'medium', 'hard'].includes(store.get('cs-crown-diff', 'medium')) ? store.get('cs-crown-diff', 'medium') : 'medium';
-  let cRivals = [1, 2, 4].includes(store.get('cs-crown-rivals', 1)) ? store.get('cs-crown-rivals', 1) : 1;
   const card = document.createElement('div');
   card.className = 'resume crown-card';
   card.innerHTML = `<div><b>Capture the Crown</b>
-      <span>A scouting and bluffing raid under fog of war. Every realm hides its crown in one of its castles; take the castle holding a rival's crown and that realm is out at once. Send Scouts to look inside castles, move your crown for ${CROWN.moveCost} coins (${CROWN.moveTime} seconds on the road, where it can be seized), and fool the lords with decoy garrisons. The last crown wins.</span>
+      <span>A scouting and bluffing duel under fog of war: you against one lord on a large map. Each realm hides its crown in one of its castles; take the castle holding a rival's crown and that realm is out at once. Send Scouts to look inside castles, move your crown for ${CROWN.moveCost} coins (${CROWN.moveTime} seconds on the road, where it can be seized), and fool the lords with decoy garrisons. The last crown wins.</span>
       <span id="crownRec"></span>
       <span class="crown-opts"><span class="seg" id="crownDiffSeg" role="group" aria-label="Capture the Crown difficulty">${['easy', 'medium', 'hard'].map(d => `<button data-cdiff="${d}" aria-pressed="${d === cDiff}">${DIFF_NAME[d]}</button>`).join('')}</span>
-      <span class="seg" id="crownRivalSeg" role="group" aria-label="Capture the Crown rivals">${[[1, '1 rival'], [2, '2 rivals'], [4, 'All four']].map(([n, t]) => `<button data-crivals="${n}" aria-pressed="${n === cRivals}">${t}</button>`).join('')}</span></span></div>
+</span></div>
     <button class="primary" id="btnCrown">Raid for the crown</button>`;
   if (modes) modes.append(card);
   const pickIn = (id, attr, set) => $(id).addEventListener('click', e => {
@@ -253,13 +252,12 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
     set(b.dataset[attr]);
   });
   pickIn('crownDiffSeg', 'cdiff', v => { cDiff = v; store.set('cs-crown-diff', v); });
-  pickIn('crownRivalSeg', 'crivals', v => { cRivals = +v; store.set('cs-crown-rivals', cRivals); });
   function renderRec() {
     const r = typeof ach === 'object' && ach && ach.rec ? ach.rec : {};
     $('crownRec').textContent = r.crownPlayed ? `Raids won: ${r.crownWon || 0} of ${r.crownPlayed} · crowns taken: ${r.crownsTaken || 0}` : 'No raids yet.';
   }
   renderRec();
-  $('btnCrown').addEventListener('click', () => startCrown(myArmy, cRivals, cDiff));
+  $('btnCrown').addEventListener('click', () => startCrown(myArmy, 1, cDiff));
   const menu = $('menu');
   if (menu && typeof MutationObserver === 'function') new MutationObserver(() => { if (!menu.hidden) renderRec(); }).observe(menu, { attributes: true, attributeFilter: ['hidden'] });
 })();

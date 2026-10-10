@@ -25,7 +25,8 @@
 // crownScout() from send() and crownArrive() from arrive(), only while G.mode === 'crown'.
 
 const CROWN = {
-  castles: { 2: 18, 3: 19, 5: 26 },  // castles on the map by number of kingdoms
+  castles: 30,             // castles on the map: a duel, you against one lord, on a large map
+  mapScale: 1.6,           // map size against a standard battle (1.25 is the Long preset)
   startCoins: 15,          // coins each realm starts with: enough for one move
   hideTime: 30,            // seconds at the start when a crown may be re-hidden for free, at once
   moveCost: 15,            // coins to move a crown afterwards
@@ -33,7 +34,7 @@ const CROWN = {
   moveEscort: 0.5,         // share of the crown castle's garrison that rides with it (the player's send % instead)
   scoutTroops: 2,          // troops a band of scouts costs
   intelFresh: 90,          // seconds a scout's or a capture's report counts as fresh
-  revealAt: 480,           // from here every realm knows where every crown is
+  revealAt: 600,           // from here every realm knows where every crown is
   rivalWorth: 0.55,        // how much a lord wants a rival castle that surely holds no crown, next to a battle
   huntWorth: 3.2,          // ...and how much more for a castle in proportion to the odds it holds one
 };
@@ -54,19 +55,19 @@ UNIT_TYPES.scout = {
 //   habit, this often. decoy: stacks troops in another castle to draw the hunt. walls: walls the crown castle.
 const CROWN_LORDS = {
   // Isolde, the Mason Queen: the crown sits in her biggest castle behind her best walls, and stays there.
-  aldmere: { pick: 'strong', guard: 1.2, sharp: 1.6, hunt: 1.3, scout: 0.5, scoutGap: 25, moveOnScout: false, flee: false, every: 0, decoy: false, walls: true },
+  aldmere: { pick: 'strong', guard: 1.2, sharp: 1.6, hunt: 1.3, scout: 0.8, scoutGap: 20, moveOnScout: false, flee: false, every: 0, decoy: false, walls: true },
   // Torvek, the Red Wind: the crown stays in his own hall and never runs. He sends no scouts; he hits the
   // fattest castle he can see, every time.
   kharzul: { pick: 'home', guard: 0.9, sharp: 1.8, hunt: 1.0, scout: 0, scoutGap: 0, moveOnScout: false, flee: false, every: 0, decoy: false, walls: false },
   // Sigrun, the White Wall: hidden in the castle farthest from every rival, guarded well; moved deeper
   // the moment she is found out.
-  frostmark: { pick: 'home', guard: 1.0, sharp: 1.0, hunt: 0.85, scout: 0.15, scoutGap: 30, moveOnScout: true, flee: false, every: 0, decoy: false, walls: false },
+  frostmark: { pick: 'home', guard: 1.0, sharp: 1.0, hunt: 0.85, scout: 0.4, scoutGap: 22, moveOnScout: true, flee: false, every: 0, decoy: false, walls: false },
   // Amaru, the Golden Hand: hides it anywhere but his seat, buys information (scouts often) and pays to
   // keep his crown moving.
-  solmara: { pick: 'random', guard: 1.0, sharp: 1.1, hunt: 0.85, scout: 0.6, scoutGap: 15, moveOnScout: true, flee: true, every: 160, decoy: false, walls: false },
+  solmara: { pick: 'random', guard: 1.0, sharp: 1.1, hunt: 0.85, scout: 0.5, scoutGap: 22, moveOnScout: true, flee: true, every: 240, decoy: false, walls: false },
   // Veyra, Mother of Crows: the crown hides in a quiet castle away from her seat, kept thinly held while
   // a fat decoy draws the hunt; found out, she slips it away.
-  nyx: { pick: 'quiet', guard: 0.8, sharp: 1.1, hunt: 1.15, scout: 0.5, scoutGap: 18, moveOnScout: true, flee: false, every: 0, decoy: true, walls: false },
+  nyx: { pick: 'quiet', guard: 0.8, sharp: 1.1, hunt: 1.15, scout: 0.6, scoutGap: 18, moveOnScout: true, flee: false, every: 0, decoy: true, walls: false },
 };
 const crownLord = o => CROWN_LORDS[lordStyle(o)] || CROWN_LORDS.solmara;
 
@@ -460,7 +461,8 @@ function crownScoutAi(ai, P, mine) {
 
 // The cfg for a Capture the Crown battle: the player's army against `rivals` (army ids), on the homeland
 // of the first rival, always under fog of war.
+// Always a duel: the first of `rivals` is the lord faced (the rest are ignored).
 function crownCfg(armyId, rivals, diff, seed = Math.floor(Math.random() * 1e9)) {
-  const armies = [armyId, ...rivals];
-  return { mode: 'crown', seed, n: CROWN.castles[armies.length] || CROWN.castles[armies.length >= 5 ? 5 : 3], diff, armies, map: rivals[0], fog: true };
+  const armies = [armyId, rivals[0]];
+  return { mode: 'crown', seed, n: CROWN.castles, mapScale: CROWN.mapScale, diff, armies, map: rivals[0], fog: true };
 }

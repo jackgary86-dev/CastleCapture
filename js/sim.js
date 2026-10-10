@@ -420,13 +420,16 @@ const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPK
 const coinCap = () => G.mode === 'grand' ? Infinity : (G.cfg.coinCap ?? COIN_CAP);
 // Harvest map event (#35): one kingdom trains faster for a while, shaped like a power.
 const harvestMul = o => G.ev && G.ev.harvest && G.ev.harvest.o === o && G.time < G.ev.harvest.until ? 1.5 : 1;
-const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() * (G.cfg.strategy ? stratRateMul(p) : 1) : 0;   // branches and supply lines (js/strategy.js)
+const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? (bigMapOf(G) ? BIG_MAP.tithe : 2) : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() * (G.cfg.strategy ? stratRateMul(p) : 1) : 0;   // branches and supply lines (js/strategy.js)
+// A big map has more than BIG_MAP.castlesPer castles a kingdom (the Grand Campaign has its own rules).
+const bigMapOf = g => g.mode !== 'grand' && g.planets.length / g.owners.length > BIG_MAP.castlesPer;
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.
 const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1) * (p.hill ? HILL.def : 1) * (G.cfg.strategy ? stratDefMul(p) : 1);   // Keeps and hills (js/strategy.js)
 // Enemy Great Wards halve marching speed inside them.
 const slowedAt = k => G.units.some(u => u.type === 'ward' && u.owner !== k.owner && dist(u, k) <= MAP_UNITS.ward.range);
 const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] * (G.cfg.strategy ? stratCoinMul(p) : 1) : 0), 0);   // Markets (js/strategy.js)
-const frozen = o => G.owners.some(q => q !== o && powerOn(q, 'wintersGrip'));
+// Winter's Grip freezes every rival, but not a kingdom under truce with Sigrun.
+const frozen = o => G.owners.some(q => q !== o && !allied(q, o) && powerOn(q, 'wintersGrip'));
 
 // ---------- castle upgrades and archers ----------
 const lvl = (p, kind) => (p.up && p.up[kind]) || 0;
@@ -882,6 +885,9 @@ function aiThink(ai) {
   if (typeof mindPz === 'function') mindPz(ai, pz);
   const mine = P.filter(p => p.owner === me);
   if (!mine.length) return;
+  // Big maps (more than ten castles a kingdom, like the Long preset or a Capture the Crown duel): the slow
+  // builders keep fewer troops home, or the fast expanders run away with the extra keeps.
+  if (bigMapOf(G)) pz.keep = Math.min(pz.keep, BIG_MAP.keep);
   // A Grand Campaign monster near death is worth a lord's turn (js/monsters.js).
   if (G.monster && typeof monsterAi === 'function' && monsterAi(ai)) return;
   const inc = incomingFor(me), pow = incomingPowerFor(me);

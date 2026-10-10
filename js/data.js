@@ -65,6 +65,9 @@ const AI_SIEGE = false;         // the AI may field catapults (with a foot escor
 const RAID_MARCH = 6;          // seconds of foot marching beyond which an AI lord raids a nearly empty castle with cavalry
 const SIEGE_ESCORT = 0.4;       // share of an AI catapult force sent as foot marching alongside at catapult pace
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
+// Big maps (over castlesPer castles a kingdom: the Long preset, Capture the Crown): on the standard map these
+// don't apply, so its balance is untouched. The extra keeps let fast expanders snowball otherwise.
+const BIG_MAP = { castlesPer: 10, keep: 6, tithe: 1.3 };   // keep: most troops a lord leaves home; tithe: Golden Tithe training multiplier (2 on a standard map)
 // Grand Campaign (#46): a wave-based mode with all five armies on one large map.
 const GRAND = {
   castles: 51,                 // 5 starting castles, a central keep, and 9 neutral keeps per realm

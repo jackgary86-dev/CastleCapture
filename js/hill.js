@@ -113,7 +113,7 @@ function hillAi(ai, P, inc, pow) {
   const mine = P.filter(p => p.owner === me);
   // Sigrun: once her columns close on someone else's hill, or the holder's own columns ride in to
   // reinforce it, the blizzard freezes them in the field.
-  if (id === 'frostmark' && keep.owner && keep.owner !== me && G.pw[me].ready === 0 && ai.diff !== 'easy') {
+  if (id === 'frostmark' && keep.owner && keep.owner !== me && !allied(me, keep.owner) && G.pw[me].ready === 0 && ai.diff !== 'easy') {
     const mineIn = G.packets.filter(k => k.owner === me && k.to === keep && k.delay <= 0);
     const near = mineIn.some(k => Math.hypot(k.x - keep.x, k.y - keep.y) < 220);
     const theirs = G.packets.filter(k => k.owner === keep.owner && k.to === keep).reduce((a, k) => a + k.n, 0);

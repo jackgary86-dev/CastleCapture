@@ -26,6 +26,8 @@ const opt = (name, def) => {
 const GAMES = +opt('games', 4);
 const DIFF = opt('diff', 'hard');
 const SECONDS = +opt('seconds', 600);
+// --castles N and --scale X play ordinary battles on another map size (the menu's Long preset is 26 and 1.25).
+const CASTLES = +opt('castles', 0), SCALE = +opt('scale', 0);
 // The agreed band (see issue #47), tightened from 25–75% once every army sat inside 38–63% at 8 games on
 // Warlord and Knight; tighten it again as the armies are retuned.
 const [BAND_LO, BAND_HI] = opt('band', '0.33,0.67').split(',').map(Number);
@@ -86,7 +88,7 @@ let crashes = 0;
 
 function runGame(armies, mapOf, seed, label) {
   api.seedRandom(seed);
-  api.newGame({ seed, n: armies.length === 2 ? 18 : 19, diff: DIFF, armies, map: mapOf, ...(STRATEGY_RUN ? { strategy: { ...STRATEGY_RUN } } : {}) });
+  api.newGame({ seed, n: CASTLES || (armies.length === 2 ? 18 : 19), diff: DIFF, armies, map: mapOf, ...(SCALE ? { mapScale: SCALE } : {}), ...(STRATEGY_RUN ? { strategy: { ...STRATEGY_RUN } } : {}) });
   const G = api.G;
   // The player's seat is driven by the AI too.
   G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
@@ -321,7 +323,7 @@ function runDefense() {
 // Every pairing hunts the other's hidden crown under fog, alternating whose homeland it is fought on,
 // with the AI playing both seats (the player's seat hides its crown in character too). A game is decided
 // when one realm holds the last crown; games still running at --seconds (default 1500) are undecided.
-// Two three-way and one five-way game follow for crash coverage. Returns true on failure.
+// The mode is always a duel on a large map. Returns true on failure.
 function runCrown() {
   const CAP = +opt('seconds', 1500), st = Object.fromEntries(ids.map(id => [id, { games: 0, decided: 0, wins: 0, moves: 0, scouts: 0, road: 0 }]));
   const lens = [], how = { castle: 0, road: 0 };
@@ -361,9 +363,6 @@ function runCrown() {
       }
     }
   }
-  play(['kharzul', 'frostmark', 'nyx'], 'solmara', 5, 'three-way A');
-  play(['aldmere', 'solmara', 'kharzul'], 'nyx', 9, 'three-way B');
-  play(['aldmere', 'solmara', 'kharzul', 'frostmark', 'nyx'], 'nyx', 11, 'five-way');
   lens.sort((x, y) => x - y);
   const rows = ids.map(id => {
     const s = st[id], rate = s.decided ? s.wins / s.decided : null;
