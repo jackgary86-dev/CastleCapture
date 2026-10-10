@@ -133,12 +133,13 @@ function setLordPick(army, alt) {
 }
 // Which seats an alternate lord takes in a new game (cfg.lordAlt, read by newGame in sim.js): the player's own
 // pick, and each rival with an alternate the player owns half the time. Never in the menu's demo, the
-// tutorial, a story chapter (written for the base lords) or a second player's seat.
+// tutorial, a story chapter (written for the base lords) or a second player's seat; and a daily siege, which is
+// the same for everyone, always seats the base lords as rivals (#80).
 function pickLordAlts(cfg) {
   if (cfg.demo || cfg.tutorial || cfg.campaign) return undefined;
   const people = cfg.humans || 1;
   return cfg.armies.map((army, i) => !!LORDS_ALT[army] && ownsLord(army)
-    && (i === 0 ? career.lordPick[army] === 'alt' : i >= people && Math.random() < 0.5));
+    && (i === 0 ? career.lordPick[army] === 'alt' : i >= people && !cfg.daily && Math.random() < 0.5));
 }
 
 // ---------- earning ----------
