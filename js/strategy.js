@@ -52,7 +52,11 @@ on('newGame', g => {
     }
     const want = Math.round(g.planets.filter(p => !p.owner).length * STRATEGY.hillShare);
     let given = 0;
-    for (const set of [...groups.values()].sort(() => rnd() - 0.5)) {
+    // A seeded Fisher-Yates shuffle, as assignKinds uses, so every browser picks the same hills for a seed (#89);
+    // sorting with a random comparator left the order to each browser's sort.
+    const sets = [...groups.values()];
+    for (let i = sets.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [sets[i], sets[j]] = [sets[j], sets[i]]; }
+    for (const set of sets) {
       if (given >= want) break;
       for (const p of set) p.high = true;
       given += set.length;
