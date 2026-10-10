@@ -178,6 +178,12 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .cp-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); }
 .cp-head b { font-family: var(--display); font-size: 17px; font-weight: 400; color: var(--text); }
 .cp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cp-spec { grid-template-columns: repeat(3, 1fr); margin-top: 6px; }
+.cp-spec .cp-note { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--muted); }
+.strategy-box { display: grid; gap: 6px; margin: 4px 0 0; padding: 8px 10px; border: 1px solid #b39d6c; border-radius: 4px; }
+.strategy-box legend { font-size: 13px; font-weight: 700; padding: 0 4px; }
+.strategy-box .check { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font-weight: 400; }
+.strategy-box .check small { color: var(--muted); }
 .upg { display: grid; gap: 1px; text-align: left; padding: 6px 9px; background: rgb(255 255 255 / 0.03); }
 .upg:not(:disabled):hover { border-color: var(--army); }
 .upg .u-top { display: flex; align-items: baseline; gap: 6px; }
@@ -698,6 +704,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
         <div class="group">
           <span class="label">Rules of war</span>
           <ul class="rules">
+            <li><b>Deeper strategy</b> (skirmishes; switch each part off under Custom battle settings): a castle with an upgrade can become a <b>Keep</b>, <b>Barracks</b> or <b>Market</b> for a few coins; castles more than three castles away from your capital's chain of castles are cut off and train at half speed; castles on <b>hills</b> defend 25% better, river crossings slow columns and roads speed them up; and your lord's <b>champion</b> rides with the first attack of 6 or more troops from their castle, striking 30% harder, and falls with it if it fails (back after 90 seconds); while it waits in a castle, that castle defends 20% better.</li>
             <li><b>Drag</b> from your castle to any castle to send troops. Keys <b>1–4</b> or the <b>scroll wheel</b> choose how many: 25%, 50%, 75% or all.</li>
             <li><b>Drag across</b> several of your castles to attack from all of them. Or <b>tap</b> castles to select, then tap a target.</li>
             <li><b>Special power:</b> press <b>Q</b> or click the power panel in the top left of the map. The panel shows what your power does and counts down until it's ready: 45 seconds into the battle, then every five minutes.</li>
@@ -797,6 +804,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/sim.js"></script>
 <script src="js/grand.js"></script>
 <script src="js/hill.js"></script>
+<script src="js/strategy.js"></script>
 <script src="js/defense.js"></script>
 <script src="js/crown.js"></script>
 <script src="js/render.js"></script>
@@ -822,4 +830,5 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/twoplayer.js"></script>
 <script src="js/codex.js"></script>
 <script src="js/tutorial.js"></script>
+<script src="js/strategy-ui.js"></script>
 <script src="js/juice.js"></script>

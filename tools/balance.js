@@ -31,6 +31,12 @@ const SECONDS = +opt('seconds', 600);
 const [BAND_LO, BAND_HI] = opt('band', '0.33,0.67').split(',').map(Number);
 const JSON_OUT = process.argv.includes('--json');
 const MODE = opt('mode', 'battle');
+// --strategy on plays battles with every deeper-strategy feature (#67) switched on; off (the default) leaves them
+// out; a list such as --strategy spec,terrain switches on just those (spec, supply, terrain, heroes).
+const STRATEGY_OPT = opt('strategy', 'off');
+const STRATEGY_RUN = STRATEGY_OPT === 'off' ? null
+  : STRATEGY_OPT === 'on' ? { spec: true, supply: true, terrain: true, heroes: true }
+  : Object.fromEntries(['spec', 'supply', 'terrain', 'heroes'].map(f => [f, STRATEGY_OPT.split(',').includes(f)]));
 const SEED0 = +opt('seed', 7000);  // Grand Campaign seeds run from here
 // Simulate at the game's own step (the browser runs 1/60 s substeps); coarser steps let fast columns skip
 // past each other on the road and skew the results.
@@ -38,13 +44,13 @@ const DT = 1 / +opt('fps', 60);
 const MIN_DECIDED = 6; // fewer decided games than this and the band is reported but not enforced
 
 const root = path.join(__dirname, '..');
-const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/defense.js', 'js/crown.js', 'js/monsters.js', 'js/mind.js']
+const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/strategy.js', 'js/defense.js', 'js/crown.js', 'js/monsters.js', 'js/mind.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8'))
   .join('\n;\n');
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, AI_MIND, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
+  ARMIES, ARMY_IDS, LORDS, AI_MIND, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, STRATEGY, STRATEGY_ALL, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
@@ -54,8 +60,9 @@ const ids = api.ARMY_IDS;
 //   --set surrenderShare=0.3,siegeSources.hard=10
 for (const pair of (opt('set', '') || '').split(',').filter(Boolean)) {
   const [keyPath, raw] = pair.split('='), keys = keyPath.split('.'), last = keys.pop();
-  // mind.<key> sets the smarter-AI switches (js/mind.js, #68), e.g. --set mind.on=0; anything else is a GRAND setting.
-  const root = keys[0] === 'mind' ? (keys.shift(), api.AI_MIND) : api.GRAND;
+  // mind.<key> sets the smarter-AI switches (js/mind.js, #68), e.g. --set mind.on=0; strategy.<key> a deeper-strategy
+  // setting (js/strategy.js, #67), e.g. --set strategy.supplyHops=3; anything else is a GRAND setting.
+  const root = keys[0] === 'mind' ? (keys.shift(), api.AI_MIND) : keys[0] === 'strategy' ? (keys.shift(), api.STRATEGY) : api.GRAND;
   const obj = keys.reduce((o, k) => o[k], root);
   if (!obj || !(last in obj)) { console.error(`--set: no setting ${keyPath}`); process.exit(1); }
   obj[last] = isNaN(+raw) ? raw : +raw;
@@ -71,7 +78,7 @@ let crashes = 0;
 
 function runGame(armies, mapOf, seed, label) {
   api.seedRandom(seed);
-  api.newGame({ seed, n: armies.length === 2 ? 18 : 19, diff: DIFF, armies, map: mapOf });
+  api.newGame({ seed, n: armies.length === 2 ? 18 : 19, diff: DIFF, armies, map: mapOf, ...(STRATEGY_RUN ? { strategy: { ...STRATEGY_RUN } } : {}) });
   const G = api.G;
   // The player's seat is driven by the AI too.
   G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });

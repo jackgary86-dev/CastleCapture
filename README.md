@@ -163,6 +163,15 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 
 Each homeland has its own synthesised theme (no audio files): a lute-like air in the Vale of Aldmere, droning saws and frame drums on the Red Steppe, slow bells in the Frostmark Fjords, a Hijaz melody and hand drums in the Sunscorched Sands, and a beating drone in Nyxhollow Mire. The music swells with the fighting, adding drums and quicker, higher lines when armies are on the march, clashing, or using a special power. A snare joins on the backbeat once the fighting is real, with tom rolls when it is fiercest, and the main menu has a stately theme of its own. The Music button or **N** turns it on or off, separately from the sound effects, and the **Sound** sliders on the menu and the pause sheet set the overall, effects and music volume.
 
+## Deeper strategy
+
+Skirmishes add four layers of strategy, each switched on or off under **Custom battle settings → Deeper strategy**:
+
+- **Castle branches.** Once a castle has an upgrade (of its Walls or Barracks) it can become, for good, a **Keep** (defenders count 25% more and it holds 40% more), a **Barracks** (trains 30% faster) or a **Market** (2.5× the coins, 10% slower training), for 10, 15 or 20 coins by its size. Pick one from the castle panel; each shows as a badge beside the garrison. The rival lords specialise their own castles, Keeps facing the enemy and the rest Barracks or Markets.
+- **Supply lines.** Supply runs out from your capital (your starting castle, or your biggest once it falls) from castle to neighbouring castle, through your own castles. A castle more than three castles away from that chain is cut off, shows a broken chain, and trains at half speed, so a deep raid needs castles behind it.
+- **Terrain.** A quarter of the unclaimed keeps, in matching sets so every kingdom gets the same, stand on hills, where defenders count 25% more. Columns wade river crossings at 60% speed and march 20% faster on the roads.
+- **Champions.** Each lord's champion waits in a castle (at first, your capital) and rides out with the first attack of 6 or more troops sent from it: every column of that attack strikes 30% harder, and the first carries the champion's standard. While waiting in a castle the champion stiffens its defenders by 20%. Win, and the champion holds the castle taken; fail, or lose the castle the champion waits in, and they fall, returning after 90 seconds at your strongest castle.
+
 ## Feel
 
 Each army sounds like itself: Aldmere's steel rings, Kharzul's horde clatters on hoof and horn, Frostmark's shields thud, Solmara's brass is bright and Nyxhollow's notes slide, both in a clash and in the call that sounds when a castle changes hands. Marching columns kick up dust, a captured castle throws sparks in its new colours as the banner changes, walls crack and rubble falls as a garrison runs low, and scaffolding goes up round a castle being upgraded. Big clashes you are part of shake the board a little, and in the Grand Campaign the camera glides to the monster when it strikes somewhere off screen. Every battle ends with a short cinematic (the winning army's banner unfurls, its lord appears and has a last word; click or press a key to skip) and the end screen shows a sparkline of your share of all troops from start to finish. With reduced motion set in your system, the dust, sparks, shake, camera glides and animation are all left out.
@@ -208,6 +217,7 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 | `js/mind.js` | Smarter lords (#68): coalitions against a runaway leader, grudges, reading the player's style, and each lord's openings. No DOM access |
 | `js/mind-ui.js` | The coalition banners and the `?aidebug` overlay |
 | `js/hill.js` | King of the Hill rules: scoring the crowned keep, seats, the race's end, and each lord's tactics for the hill. No DOM access |
+| `js/strategy.js` | Deeper strategy rules: castle branches, supply lines, hills, fords and roads, champions, the lords' branch picks, and `strategyWorthMul` for the AI. Off unless a battle's `cfg.strategy` turns it on. No DOM access |
 | `js/defense.js` | Siege Defense's rules: the fortress map, the waves and their twists, payouts, coin upgrades and the daily seed. No DOM access |
 | `js/crown.js` | Capture the Crown rules: hiding and moving crowns, scouts, knockouts, the heralds' reveal, and each lord's guessing, scouting and bluffing. No DOM access |
 | `js/render.js` | Canvas drawing and the view state the input writes (`ptr`, `sel`) |
@@ -230,6 +240,7 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 | `js/twoplayer.js` | Two players on one screen: player 2's keyboard controls, panel and truce cards |
 | `js/codex.js` | The Armies and monsters cards and codex entries |
 | `js/tutorial.js` | The guided first battle |
+| `js/strategy-ui.js` | Deeper strategy in the browser: the Custom battle switches, the branch buttons on the castle panel, hills, badges, the broken chain and the champion's standard, and the champion's banners |
 | `js/juice.js` | Feel and juice: the shake on big clashes, the Grand camera following the monster, the victory and defeat cinematic, the end-screen sparkline and the volume sliders. Dust, sparks, cracks and scaffolding are drawn in `render.js` |
 
 `data.js`, `campaigns.js`, `sim.js`, `grand.js`, `hill.js`, `defense.js`, `crown.js` and the simulation half of `monsters.js` never touch the DOM, so the headless tools in `tools/` load them directly. The files after `ui.js` only hook into what loads before them.
@@ -247,7 +258,7 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 node tools/balance.js --games 8
 ```
 
-Options: `--games N` per pairing, `--diff easy|medium|hard`, `--seconds` cap per battle, `--band 0.25,0.75`, `--json`. `--mode hill` races every pairing for the crowned keep of King of the Hill instead (each race ends at 300 points or the 12-minute cap, so every game counts); `--mode defense` seats the AI in the Siege Defense fortress for every army and reports the median waves survived per army (it fails if any army's median is more than `--spread`, default 40%, from the overall median; the target is 8–15 waves on Warlord); `--mode crown` plays every pairing of Capture the Crown to the last crown (games still running at `--seconds`, default 1500, are undecided) and checks the same win band; and `--mode grand` plays Grand Campaigns. Runs are seeded, so the same arguments always give the same result. GitHub Actions runs it on every push and pull request (`.github/workflows/balance.yml`).
+Options: `--games N` per pairing, `--diff easy|medium|hard`, `--seconds` cap per battle, `--band 0.25,0.75`, `--json`. `--strategy on` plays the battles with every deeper-strategy feature switched on (off by default). `--mode hill` races every pairing for the crowned keep of King of the Hill instead (each race ends at 300 points or the 12-minute cap, so every game counts); `--mode defense` seats the AI in the Siege Defense fortress for every army and reports the median waves survived per army (it fails if any army's median is more than `--spread`, default 40%, from the overall median; the target is 8–15 waves on Warlord); `--mode crown` plays every pairing of Capture the Crown to the last crown (games still running at `--seconds`, default 1500, are undecided) and checks the same win band; and `--mode grand` plays Grand Campaigns. Runs are seeded, so the same arguments always give the same result. GitHub Actions runs it on every push and pull request (`.github/workflows/balance.yml`).
 
 ## Smoke test
 

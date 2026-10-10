@@ -341,6 +341,7 @@ function drawCastle(p, now) {
   let roofCol = p.owner ? army(p.owner).roof : '#6f6a5e';
   if (p.owner === 1 && typeof playerRoofCol === 'function') roofCol = playerRoofCol(roofCol);   // a roof skin (progress-ui.js)
   const glow = p.owner ? c : '#5a5468';
+  if (G.cfg.strategy && typeof drawStrategyGround === 'function') drawStrategyGround(p, s, baseY);   // a hill (js/strategy-ui.js)
   const flags = CASTLE[style](p, s, baseY, tier, roofCol, glow);
   if (p.kind) drawKindDetail(p, s, baseY);
   drawWallWear(p, s, baseY);
@@ -387,6 +388,8 @@ function drawCastle(p, now) {
   }
   // Kind badge to the right of the plaque; the plaque itself and its left side stay unchanged.
   if (p.kind) drawKindBadge(p, p.x + tw / 2 + 3, py, th);
+  // Branch badge, cut-off chain and champion (js/strategy-ui.js).
+  if (G.cfg.strategy && typeof drawStrategyMarks === 'function') drawStrategyMarks(p, s, baseY, py, th, tw, now);
   // Hourglass beside the plaque when upkeep is slowing training: amber at half speed, red at a quarter.
   const up = p.owner ? upkeepOf(p) : 1;
   if (up < 1) {
@@ -956,6 +959,7 @@ function draw(now) {
       // A gold crest on soldiers from upgraded barracks.
       if ((k.str || 1) > 1) { const cy = fy - (style === 'rider' ? 8.3 : 7.2); poly([[fx - 1.4, cy], [fx + 1.4, cy], [fx, cy - 2.6]], '#f3c64a'); }
     }
+    if (k.hero && typeof drawHeroStandard === 'function') drawHeroStandard(k, now);   // the champion rides with this column
     if (isFrozen) { ctx.fillStyle = 'rgba(210,235,255,0.45)'; ctx.beginPath(); ctx.ellipse(k.x, k.y - 3, 8, 7, 0, 0, Math.PI * 2); ctx.fill(); }
   }
 

@@ -402,7 +402,7 @@ const neutralMul = o => G.mode === 'grand' ? 1 + (army(o).stats.neutral - 1) * G
 const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? neutralMul(o) : 1) * bribes(o, t);
 const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
 // The Custom battle setting scales the cap (capMul); Walls add to it.
-const capOf = p => GARRISON_CAP[tierOf(p)] * (G.cfg.capMul ?? 1) + WALL_CAP * lvl(p, 'walls');
+const capOf = p => (GARRISON_CAP[tierOf(p)] * (G.cfg.capMul ?? 1) + WALL_CAP * lvl(p, 'walls')) * (G.cfg.strategy ? stratCapMul(p) : 1);   // a Keep holds more (js/strategy.js)
 const kindOf = p => p.kind ? CASTLE_KINDS[p.kind] : null;
 // Villages speed up their owner's other castles within reach: +25% for each, up to +50%.
 function villageBoost(p) {
@@ -419,12 +419,12 @@ const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPK
 const coinCap = () => G.mode === 'grand' ? Infinity : (G.cfg.coinCap ?? COIN_CAP);
 // Harvest map event (#35): one kingdom trains faster for a while, shaped like a power.
 const harvestMul = o => G.ev && G.ev.harvest && G.ev.harvest.o === o && G.time < G.ev.harvest.until ? 1.5 : 1;
-const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() : 0;
+const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? 2 : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() * (G.cfg.strategy ? stratRateMul(p) : 1) : 0;   // branches and supply lines (js/strategy.js)
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.
-const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1) * (p.hill ? HILL.def : 1);
+const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) * (p.owner ? wallsMul(p) : 1) * (kindOf(p) ? kindOf(p).def : 1) * (p.hill ? HILL.def : 1) * (G.cfg.strategy ? stratDefMul(p) : 1);   // Keeps and hills (js/strategy.js)
 // Enemy Great Wards halve marching speed inside them.
 const slowedAt = k => G.units.some(u => u.type === 'ward' && u.owner !== k.owner && dist(u, k) <= MAP_UNITS.ward.range);
-const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] : 0), 0);
+const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] * (G.cfg.strategy ? stratCoinMul(p) : 1) : 0), 0);   // Markets (js/strategy.js)
 const frozen = o => G.owners.some(q => q !== o && powerOn(q, 'wintersGrip'));
 
 // ---------- castle upgrades and archers ----------
@@ -687,6 +687,7 @@ function incomingFor(o) {
 // March n troops (already taken from s) to target as columns along the path.
 function launch(owner, s, target, n, type = 'foot', escort = false) {
   if (allied(owner, target.owner)) { s.units += n; return; }
+  const before = G.packets.length;
   if (owner === 1) G.stats.sent += n;
   const k = Math.min(30, n, Math.max(3, Math.ceil(n / 2)));
   // Set off towards the first waypoint (a bridge, or the target itself).
@@ -704,6 +705,7 @@ function launch(owner, s, target, n, type = 'foot', escort = false) {
       path, wp: 0, jx, jy, x: start.x, y: start.y,
     });
   }
+  if (G.cfg.strategy) stratLaunch(owner, s, G.packets.slice(before));   // a champion may ride with them (js/strategy.js)
 }
 
 // ---------- weather and day/night ----------
@@ -1249,7 +1251,7 @@ function update(dt) {
     if (!last && dd < 3) { k.wp++; continue; }
     // An escort keeps pace with the catapults it guards.
     const pace = k.escort ? UNIT_TYPES.siege.speed : unitOf(k).speed;
-    const step = Math.min(dd, speedOf(k.owner) * pace * (slowedAt(k) ? 0.5 : 1) * (inForest(G.terrain, k) ? (army(k.owner).stats.forest ?? FOREST_SLOW) : 1) * dt);
+    const step = Math.min(dd, speedOf(k.owner) * pace * (slowedAt(k) ? 0.5 : 1) * (inForest(G.terrain, k) ? (army(k.owner).stats.forest ?? FOREST_SLOW) : 1) * (G.cfg.strategy ? stratSpeedMul(k) : 1) * dt);   // fords and roads (js/strategy.js)
     k.x += dx / dd * step; k.y += dy / dd * step;
     k.dir = dx < 0 ? -1 : 1;
   }
@@ -1303,6 +1305,8 @@ function update(dt) {
   checkSurrender();
   // King of the Hill (#64): the crowned keep scores, and the race can end the battle (js/hill.js).
   if (G.mode === 'hill' && typeof hillTick === 'function' && hillTick(dt)) return;
+  // Deeper strategy (#67): supply lines, the lords' branches and the champions' fates (js/strategy.js).
+  if (G.cfg.strategy && typeof strategyTick === 'function') strategyTick(dt);
   // Capture the Crown (#66): crowns on the road, knockouts and the last crown standing (js/crown.js).
   if (G.mode === 'crown' && typeof crownTick === 'function' && crownTick(dt)) return;
 

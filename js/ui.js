@@ -204,7 +204,7 @@ function updateCastlePanel() {
   const p = selectedCastle();
   castlePanel.hidden = !p;
   if (!p) { castlePanelKey = ''; return; }
-  const units = Math.floor(p.units), key = `${p.id}|${units}|${lvl(p, 'walls')}|${lvl(p, 'barracks')}`;
+  const units = Math.floor(p.units), key = `${p.id}|${units}|${lvl(p, 'walls')}|${lvl(p, 'barracks')}|${p.spec || ''}|${G.cfg.strategy ? Math.floor(G.coins[1]) : ''}`;
   if (key === castlePanelKey) return;
   castlePanelKey = key;
   document.getElementById('cpInfo').textContent = `${kindOf(p) ? kindOf(p).name + ' · ' : ''}${units} troops · Walls ${ROMAN[lvl(p, 'walls')]} · Barracks ${ROMAN[lvl(p, 'barracks')]}`;
@@ -219,6 +219,7 @@ function updateCastlePanel() {
     btn.classList.toggle('can', ok);
     btn.disabled = !ok;
   }
+  if (typeof strategyPanel === 'function') strategyPanel(p);   // branch buttons (js/strategy-ui.js)
 }
 // Upgrade every selected castle that can afford it.
 // True while a Grand Campaign march runs (grand-ui.js), when powers, upgrades, the shop and sends wait.
@@ -674,6 +675,7 @@ function quickCfg() {
     seed: fixed ? c.seed : Math.floor(Math.random() * 1e9), fixedSeed: fixed,
     n: qAis === 4 ? Math.round(c.castles * 1.75) : c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge, capMul: c.cap,
     diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0], fog: fogOn,
+    strategy: typeof strategySetting === 'function' ? strategySetting() : undefined,   // Custom battle's Deeper strategy switches (js/strategy-ui.js)
   };
 }
 // ---------- save and resume ----------
@@ -681,7 +683,7 @@ function quickCfg() {
 // Anything that can be rebuilt (the map, scenery, effects) is left out; resume rebuilds the
 // same map from its seed, then lays the saved state over it. Castle references are stored as ids.
 const SAVE_KEY = 'cs-save', SAVE_VERSION = 2;
-const SAVE_SKIP = new Set(['theme', 'roadPts', 'fx', 'shots', 'roads', 'meadows', 'trees', 'pools', 'rocks', 'planets', 'placing', 'shake', 'paused', 'terrain', 'paths', 'sight']);
+const SAVE_SKIP = new Set(['theme', 'roadPts', 'fx', 'shots', 'roads', 'meadows', 'trees', 'pools', 'rocks', 'planets', 'placing', 'shake', 'paused', 'terrain', 'paths', 'sight', 'roadNext', 'roadCells']);
 function enc(v) {
   if (v === null || typeof v !== 'object') return v;
   if (G.planets.includes(v)) return { $p: v.id };

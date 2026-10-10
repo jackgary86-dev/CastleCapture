@@ -541,6 +541,55 @@ if (hasCrown) {
     hud(); draw(${clock});
   }`);
 }
+// ---------- deeper strategy (#67): a branch, a cut-off castle, a hill, and a champion who falls and returns ----------
+const hasStrategy = run('strategy check', `typeof strategyTick === 'function' && typeof specialise === 'function'`);
+if (hasStrategy) {
+  run('deeper strategy', `{
+    play({ seed: 4242, n: 18, diff: 'medium', armies: ['aldmere', 'kharzul'], map: 'aldmere', strategy: { ...STRATEGY_ALL } });
+    if (typeof startBattle === 'function') startBattle();
+    G.intro = false; setPaused(false);
+    for (let i = 0; i < 30; i++) update(1 / 30);
+    if (!G.strat) throw new Error('a strategy battle has no G.strat');
+    // Terrain: hills exist and defend 25% better.
+    const hill = G.planets.find(p => p.high);
+    if (!hill) throw new Error('no castle stands on a hill');
+    G.cfg.strategy.terrain = false; const flat = defAt(hill); G.cfg.strategy.terrain = true;
+    if (Math.abs(defAt(hill) / flat - STRATEGY.hillDef) > 1e-9) throw new Error('a hill does not add its defence');
+    // A branch: two upgrade levels, enough troops, then Barracks trains 30% faster.
+    const cap = G.planets[G.strat.capital[1]];
+    cap.up = { walls: 1, barracks: 1 }; cap.units = 120; G.coins[1] = 100;
+    if (!specialise(cap, 'barracks') || cap.spec !== 'barracks') throw new Error('the capital could not become a Barracks');
+    if (specialise(cap, 'market')) throw new Error('a castle took a second branch');
+    G.cfg.strategy.spec = false; const r0 = rate(cap); G.cfg.strategy.spec = true;
+    if (Math.abs(rate(cap) / r0 - STRATEGY.spec.barracks.rate) > 1e-9) throw new Error('the Barracks branch does not speed training');
+    // Supply: a castle far from the capital's chain trains at half speed.
+    const hops = new Map([[cap.id, 0]]), q = [cap.id];
+    while (q.length) { const id = q.shift(); for (const n of G.roadNext[id]) if (!hops.has(n)) { hops.set(n, hops.get(id) + 1); q.push(n); } }
+    const far = G.planets.filter(p => !p.owner && hops.get(p.id) > STRATEGY.supplyHops).sort((a, b) => hops.get(b.id) - hops.get(a.id))[0];
+    if (!far) throw new Error('no castle lies beyond the supply hops');
+    far.owner = 1; far.units = 20; refreshSupply();
+    if (suppliedAt(far)) throw new Error('a far castle with no chain behind it is still supplied');
+    G.cfg.strategy.supply = false; const fed = rate(far); G.cfg.strategy.supply = true;
+    if (Math.abs(rate(far) / fed - STRATEGY.cutOff) > 1e-9) throw new Error('a cut-off castle does not train at half speed');
+    // Saved and resumed, the branch and the champion's whereabouts survive.
+    saveBattle(); resumeBattle(); setPaused(false);
+    const capR = G.planets[cap.id];
+    if (capR.spec !== 'barracks' || !G.strat || G.strat.heroes[1].at !== cap.id) throw new Error('branch or champion lost on resume');
+    // The champion rides with a big attack on a castle that holds, falls, and comes back.
+    const foe = G.planets.filter(p => p.owner === 2).sort((a, b) => travel(capR, a) - travel(capR, b))[0];
+    foe.units = 900; capR.units = 120;
+    send(1, [capR], foe, 0.5);
+    if (!G.packets.some(k => k.hero === 1) || G.strat.heroes[1].at !== null) throw new Error('the champion did not ride out');
+    if (!G.packets.filter(k => k.owner === 1 && k.from === capR).every(k => k.str >= STRATEGY.heroStr - 1e-9)) throw new Error('the champion did not strengthen the attack');
+    for (let i = 0; i < 30 * 120 && G.packets.some(k => k.hero === 1); i++) { foe.units = 900; update(1 / 30); }
+    for (let i = 0; i < 5; i++) update(1 / 30);
+    const H = G.strat.heroes[1];
+    if (H.at !== null || H.back === null) throw new Error('the champion did not fall when the attack failed');
+    G.time = H.back; update(1 / 30);
+    if (H.at === null) throw new Error('the champion did not return');
+    hud(); draw(${clock});
+  }`);
+}
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', and a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', and a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}.`);
