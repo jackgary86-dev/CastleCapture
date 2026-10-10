@@ -21,8 +21,29 @@ function polyDist(pts, p) {
   for (let i = 0; i < pts.length - 1; i++) m = Math.min(m, segDist(pts[i], pts[i + 1], p));
   return m;
 }
-// Distance from a point to the nearest water (rivers or the central lake).
-const waterDist = (T, p) => Math.min(...T.rivers.map(r => polyDist(r, p)), T.lake ? Math.hypot(p.x - T.lake.x, p.y - T.lake.y) - T.lake.r : Infinity);
+// Distance from a point to the nearest water (rivers or the central lake). Map building asks this thousands
+// of times, so river segments whose bounding box is already farther than the nearest found are skipped (#77);
+// that can't change the answer, since a segment is never nearer than its box.
+function waterSegs(T) {
+  if (T.wsegsOf !== T.rivers) {   // rebuilt if the rivers are replaced (portrait maps turn them)
+    T.wsegs = [];
+    for (const r of T.rivers) for (let i = 0; i < r.length - 1; i++) {
+      const a = r[i], b = r[i + 1];
+      T.wsegs.push({ a, b, x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) });
+    }
+    T.wsegsOf = T.rivers;
+  }
+  return T.wsegs;
+}
+function waterDist(T, p) {
+  let m = Infinity;
+  for (const g of waterSegs(T)) {
+    const bx = Math.max(g.x0 - p.x, 0, p.x - g.x1), by = Math.max(g.y0 - p.y, 0, p.y - g.y1);
+    if (bx * bx + by * by >= m * m) continue;
+    m = Math.min(m, segDist(g.a, g.b, p));
+  }
+  return Math.min(m, T.lake ? Math.hypot(p.x - T.lake.x, p.y - T.lake.y) - T.lake.r : Infinity);
+}
 const inForest = (T, p) => T.forests.some(f => Math.hypot(p.x - f.x, p.y - f.y) < f.r);
 // Closest approach between two segments.
 const segSegDist = (a, b, c, d) => segsCross(a, b, c, d) ? 0 : Math.min(segDist(a, b, c), segDist(a, b, d), segDist(c, d, a), segDist(c, d, b));
@@ -149,37 +170,44 @@ function buildPaths(T, planets) {
   }
   const ce = planets.map(p => ends.map(e => crossesWater(T, p, e) ? Infinity : legCost(T, p, e)));
   const paths = new Array(N * N);
-  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
-    const S = planets[i], D = planets[j];
-    const direct = crossesWater(T, S, D) ? Infinity : legCost(T, S, D);
-    // Nodes: 0 = start, 1 = destination, 2.. = bridge ends.
-    const cost = (u, v) => {
-      if (u === 0) return v === 1 ? direct : ce[i][v - 2];
-      if (v === 1) return ce[j][u - 2];
-      return ee[u - 2][v - 2];
-    };
-    const V = E + 2, best = new Array(V).fill(Infinity), prev = new Array(V).fill(-1), done = new Array(V).fill(false);
+  // One shortest-path search per starting castle over the bridge ends (#77), rather than one per pair: the
+  // destination never leads on to anything, so its best route is the direct march or the first end, in the
+  // order the search settles them, that strictly beats it. That is exactly what a search per pair found
+  // (ties included), so every route is the same, in a fraction of the time.
+  const V = E + 1;   // nodes: 0 = start, 1.. = bridge ends
+  for (let i = 0; i < N; i++) {
+    const best = new Array(V).fill(Infinity), prev = new Array(V).fill(-1), done = new Array(V).fill(false), order = [];
     best[0] = 0;
     for (;;) {
       let u = -1;
       for (let k = 0; k < V; k++) if (!done[k] && best[k] < Infinity && (u < 0 || best[k] < best[u])) u = k;
-      if (u < 0 || u === 1) break;
-      done[u] = true;
+      if (u < 0) break;
+      done[u] = true; order.push(u);
       for (let v = 1; v < V; v++) {
         if (done[v]) continue;
-        const c = best[u] + cost(u, v);
+        const c = best[u] + (u === 0 ? ce[i][v - 1] : ee[u - 1][v - 1]);
         if (c < best[v]) { best[v] = c; prev[v] = u; }
       }
     }
-    let pts, len;
-    if (best[1] === Infinity) { pts = [{ x: D.x, y: D.y }]; len = dist(S, D); }
-    else {
-      pts = [];
-      for (let v = 1; v > 0; v = prev[v]) pts.unshift(v === 1 ? { x: D.x, y: D.y } : { x: ends[v - 2].x, y: ends[v - 2].y });
-      len = best[1];
+    const S = planets[i];
+    for (let j = i + 1; j < N; j++) {
+      const D = planets[j];
+      let len = crossesWater(T, S, D) ? Infinity : legCost(T, S, D), via = 0;
+      for (const u of order) {
+        if (u === 0) continue;
+        if (best[u] >= len) break;   // settled in order of distance: nothing later can beat the route so far
+        const c = best[u] + ce[j][u - 1];
+        if (c < len) { len = c; via = u; }
+      }
+      let pts;
+      if (len === Infinity) { pts = [{ x: D.x, y: D.y }]; len = dist(S, D); }
+      else {
+        pts = [{ x: D.x, y: D.y }];
+        for (let v = via; v > 0; v = prev[v]) pts.unshift({ x: ends[v - 1].x, y: ends[v - 1].y });
+      }
+      paths[i * N + j] = { pts, len };
+      paths[j * N + i] = { pts: [...pts.slice(0, -1).reverse(), { x: S.x, y: S.y }], len };
     }
-    paths[i * N + j] = { pts, len };
-    paths[j * N + i] = { pts: [...pts.slice(0, -1).reverse(), { x: S.x, y: S.y }], len };
   }
   return paths;
 }

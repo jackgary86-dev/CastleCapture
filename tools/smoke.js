@@ -630,6 +630,18 @@ if (hasStrategy) {
     hud(); draw(${clock});
   }`);
 }
+// ---------- map build time (#77): a standard river map must build in under 150 ms ----------
+// The Vale's river and bridges are the costly case (the desert has none). After one warm-up build, the median of
+// five builds counts, so one slow tick of the machine doesn't fail the test.
+run('map build time', `{
+  const cfg = s => ({ seed: 900 + s, n: 18, diff: 'medium', armies: ['aldmere', 'kharzul'], map: 'aldmere' });
+  newGame(cfg(0), false);
+  const times = [];
+  for (let s = 1; s <= 5; s++) { const t0 = Date.now(); newGame(cfg(s), false); times.push(Date.now() - t0); }
+  times.sort((a, b) => a - b);
+  if (times[2] > 150) throw new Error('a standard river map took ' + times[2] + ' ms to build (limit 150 ms): ' + times.join(', '));
+  globalThis.__mapBuildMs = times[2];
+}`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
-console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', and a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}.`);
+console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);
