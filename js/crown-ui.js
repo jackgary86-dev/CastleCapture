@@ -90,7 +90,7 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
     const narrow = matchMedia('(max-width: 560px)').matches;
     const rivals = G.owners.slice(1).map(o => narrow ? army(o).name : `${lordOf(o).short} of ${army(o).name}`).join(' & ');
     const C = G.crown, left = G.owners.filter(o => !C.out[o]).length;
-    const when = G.time < CROWN.hideTime ? `Hide your crown: ${Math.ceil(hideLeft())}s free`
+    const when = G.over ? `Over after ${fmtTime(G.time)}` : G.time < CROWN.hideTime ? `Hide your crown: ${Math.ceil(hideLeft())}s free`
       : C.revealed ? 'Every crown is revealed' : `Crowns revealed in ${fmtTime(Math.max(0, CROWN.revealAt - G.time))}`;
     statusEl.textContent = `Capture the Crown · ${DIFF_NAME[G.cfg.diff]} · vs ${rivals} · ${when}${G.owners.length > 2 ? ` · ${left} crowns left` : ''}`;
     statusEl.title = statusEl.textContent;

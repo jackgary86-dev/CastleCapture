@@ -53,7 +53,7 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
     const narrow = matchMedia('(max-width: 560px)').matches;
     const rivals = G.owners.slice(1).map(o => narrow ? army(o).name : `${lordOf(o).short} of ${army(o).name}`).join(' & ');
     const H = G.hill, holder = H.holder ? `${who(H.holder)} ${H.holder === 1 ? 'hold' : 'holds'} the hill` : 'The hill is unclaimed';
-    statusEl.textContent = `King of the Hill · ${DIFF_NAME[G.cfg.diff]} · vs ${rivals} · ${holder} · ${fmtTime(Math.max(0, HILL.cap - G.time))} left`;
+    statusEl.textContent = `King of the Hill · ${DIFF_NAME[G.cfg.diff]} · vs ${rivals} · ${G.over ? `Over after ${fmtTime(G.time)}` : `${holder} · ${fmtTime(Math.max(0, HILL.cap - G.time))} left`}`;
     statusEl.title = statusEl.textContent;
   };
 
