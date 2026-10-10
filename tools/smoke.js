@@ -222,7 +222,35 @@ if (run('smarter lords check', `typeof mindTick === 'function'`)) run('smarter l
   for (const p of G.planets) if (p.owner === 1) p.units += 400;
   mindTick(0.1);
   if (G.mind.coalition) throw new Error('cfg.aiMind = false did not switch the coalition off');
+  // Against an AI leader the player is invited in (#88): accepting makes them a member until the coalition ends.
+  play({ diff: 'hard', n: 15, map: 'aldmere', armies: ['aldmere', 'kharzul', 'solmara', 'nyx'], seed: 23 });
+  if (typeof startBattle === 'function') startBattle();
+  G.intro = false; G.paused = false;
+  for (let i = 0; i < 30; i++) update(1 / 30);
+  G.time = AI_MIND.coalitionAfter + 1;
+  for (const p of G.planets) if (p.owner === 2) p.units += 600;
+  mindTick(0.1);
+  const C2 = G.mind.coalition;
+  if (!C2 || C2.against !== 2 || !G.offer || !G.mind.invite) throw new Error('the player was not invited into a coalition against an AI leader');
+  const host = G.offer.from;
+  answerOffer(true);
+  if (!C2.members.includes(1) || !pactOf(1, host) || !pactOf(1, host).coalition) throw new Error('accepting the invitation did not make the player a coalition member');
+  for (const p of G.planets) if (p.owner === 2) p.units = 1;
+  mindTick(0.1);
+  if (G.mind.coalition || allied(1, host)) throw new Error("the player's coalition truce outlived the coalition");
+  // A player's column counts toward their style once, even across a save and resume.
+  const before = G.mind.style.toEnemy + G.mind.style.toNeutral;
+  const from = G.planets.find(p => p.owner === 1), to = G.planets.find(p => p.owner === 0);
+  if (from && to && send(1, [from], to, 0.5)) {
+    for (let i = 0; i < 10; i++) update(1 / 30);
+    const once = G.mind.style.toEnemy + G.mind.style.toNeutral;
+    if (once <= before) throw new Error('a new column was not counted toward the player style');
+    if (typeof saveBattle === 'function') { saveBattle(); resumeBattle(); setPaused(false); mindTick(0.1); }
+    if (G.mind.style.toEnemy + G.mind.style.toNeutral !== once) throw new Error('a resume counted the same column again');
+  }
   toMenu();
+  // The tutorial keeps the smarter lords out.
+  if (typeof startTutorial === 'function') { startTutorial(); if (mindOn()) throw new Error('the smarter lords play the tutorial'); toMenu(); }
 }`);
 // ---------- 3a3. alternate lords (#71): buy one, pick it on the army card, and play a battle with it ----------
 if (run('alternate lords check', `typeof LORDS_ALT === 'object' && typeof pickLordAlts === 'function'`)) run('alternate lords', `{

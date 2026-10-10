@@ -44,7 +44,7 @@ const LORD_OPENINGS = {
 // King of the Hill, Capture the Crown and Siege Defense give the lords their own tactics for the mode, and are
 // balanced on those alone, so the smarter lords play skirmishes, story battles and the Grand Campaign.
 const MIND_MODES_OFF = ['hill', 'crown', 'defense'];
-const mindOn = () => AI_MIND.on && G && G.cfg.aiMind !== false && !G.cfg.demo && !MIND_MODES_OFF.includes(G.mode);
+const mindOn = () => AI_MIND.on && G && G.cfg.aiMind !== false && !G.cfg.demo && !G.cfg.tutorial && !MIND_MODES_OFF.includes(G.mode);
 on('newGame', g => {
   g.mind = { grudges: {}, said: {}, coalition: null, coalCool: 0, style: { toEnemy: 0, toNeutral: 0 } };
 });
@@ -58,7 +58,6 @@ on('capture', ({ o, was }) => { if (was && G.mind) addGrudge(was, o, AI_MIND.gru
 on('pactEnd', ({ a, b, by }) => { if (by && G.mind) addGrudge(by === a ? b : a, by, AI_MIND.grudgeBetray); });
 
 // ---------- every step ----------
-const mindSeen = new WeakSet();   // the player's columns already counted towards their style
 function mindTick(dt) {
   if (!mindOn() || !G.mind) return;
   const M = G.mind;
@@ -71,8 +70,9 @@ function mindTick(dt) {
   }
   // The player's style, from the columns they have marching.
   if (AI_MIND.adapt) for (const k of G.packets) {
-    if (k.owner !== 1 || mindSeen.has(k)) continue;
-    mindSeen.add(k);
+    // Counted once: the flag rides on the column, so a saved and resumed game doesn't count it again.
+    if (k.owner !== 1 || k.styled) continue;
+    k.styled = true;
     if (k.to && k.to.owner && k.to.owner !== 1 && !k.to.monster) M.style.toEnemy++;
     else if (k.to && !k.to.owner) M.style.toNeutral++;
   }
@@ -102,19 +102,31 @@ function mindCoalition() {
     const p = pactOf(a, b);
     p.until = G.time + 1e7; p.coalition = true;   // until the coalition ends (a finite number: saves are JSON)
   }
-  // Against another lord, the strongest of the rest offers the player a place in the coalition.
+  // Against another lord, the strongest of the rest invites the player into the coalition. Accepting makes the
+  // player a member: their truce with that lord lasts until the coalition breaks up (see 'offerAnswered').
   const people = alive.filter(o => o !== lead && human(o));
   if (people.length && !G.offer) {
     const ranked = [...lords].sort((a, b) => totalOf(b) - totalOf(a));
-    if (proposeTruce(ranked[0], people[0]) === 'pending') G.offer.coalition = true;
+    M.invite = { from: ranked[0], to: people[0], against: lead };
+    if (proposeTruce(ranked[0], people[0]) !== 'pending') M.invite = null;
   }
   M.coalition = { against: lead, since: G.time, members };
   for (const o of lords) lordSays(o, 'coalition');
   emit('coalition', { kind: 'formed', against: lead, members });
 }
+on('offerAnswered', ({ from, yes }) => {
+  const M = G && G.mind, inv = M && M.invite;
+  if (!inv || inv.from !== from) return;
+  M.invite = null;
+  const C = M.coalition, p = yes && pactOf(from, inv.to);
+  if (!p || !C || C.against !== inv.against) return;
+  p.until = G.time + 1e7; p.coalition = true;
+  if (!C.members.includes(inv.to)) C.members.push(inv.to);
+  emit('coalition', { kind: 'joined', against: C.against, members: C.members, o: inv.to });
+});
 function endCoalition(why) {
   const M = G.mind, C = M.coalition;
-  M.coalition = null;
+  M.coalition = null; M.invite = null;
   M.coalCool = G.time + AI_MIND.coalitionCool;
   for (const p of G.pacts) if (p.coalition && G.time < p.until) endPact(p, null);
   emit('coalition', { kind: 'ended', against: C.against, members: C.members, why });

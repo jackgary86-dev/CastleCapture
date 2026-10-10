@@ -8,12 +8,23 @@
 on('coalition', ({ kind, against, members }) => {
   if (!G || G.cfg.demo) return;
   const target = against === 1 ? 'you' : lordOf(against).short;
-  const list = (members || []).map(o => lordOf(o).short);
+  if (kind === 'joined') { toast(`You join the coalition against ${target}`, `Your truce lasts until ${target} is cut down to size.`, army(against).color); return; }
+  const list = (members || []).map(o => human(o) ? 'you' : lordOf(o).short);
   const names = list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list.join('');
   if (kind === 'formed') toast(against === 1 ? 'A coalition rises against you!' : `A coalition against ${target}`,
     against === 1 ? `${names} have made peace with each other to bring you down.` : `${names} have made peace with each other to stop ${target}.`,
     against === 1 ? '#c0392b' : army(against).color);
   else toast('The coalition breaks up', `${target === 'you' ? 'You are' : `${target} is`} no longer the realm's great threat. Every lord for themselves again.`, '#cbbb92');
+});
+
+// The coalition's invitation says what it is on the offer card (ui.js draws the card; this adds the terms).
+on('offer', ({ from }) => {
+  const inv = G && G.mind && G.mind.invite;
+  if (!inv || inv.from !== from) return;
+  const small = document.querySelector('#offerCard small'), q = document.querySelector('#offerCard q');
+  if (small) small.textContent = `Join the coalition against ${lordOf(inv.against).short}: a truce that lasts until they are cut down to size.`;
+  const lines = lordOf(from).lines.coalition;
+  if (q && lines) q.textContent = pick(lines);   // the lord's coalition line, not the usual offer of ninety seconds' peace
 });
 
 const aiDebugOn = (() => {
@@ -27,7 +38,7 @@ if (aiDebugOn) {
     + 'font:12px/1.35 ui-monospace,Consolas,monospace;color:#f4ecd6;background:rgb(10 8 14 / 0.82);border:1px solid #6b5a3a;border-radius:4px;pointer-events:none;white-space:pre-wrap;';
   document.getElementById('board').append(box);
   setInterval(() => {
-    box.hidden = !G || G.cfg.demo || !G.mind;
+    box.hidden = !G || !G.mind || !mindOn();   // nothing to show where the smarter lords are off (hill, crown, defense, demo, tutorial)
     if (box.hidden) return;
     const name = o => o === 0 ? 'unclaimed' : human(o) ? 'you' : lordOf(o).short;
     const C = G.mind.coalition, lines = [`AI debug · ${Math.round(G.time)}s · player reads as ${humanStyle()}`];
