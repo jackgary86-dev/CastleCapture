@@ -46,11 +46,12 @@
       seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     });
   }
-  // The skirmish cfg: kingdom 2 becomes a person, so no AI lord takes it and fog is off.
+  // The skirmish cfg: kingdom 2 becomes a person, so no AI lord takes it, fog is off, and Deeper strategy is off
+  // too, since only player 1 has a castle panel to pick branches from (#87).
   const quickCfgBase = quickCfg;
   quickCfg = function () {
     const c = quickCfgBase();
-    if (twoOn) { c.humans = 2; c.fog = false; }
+    if (twoOn) { c.humans = 2; c.fog = false; delete c.strategy; }
     return c;
   };
 

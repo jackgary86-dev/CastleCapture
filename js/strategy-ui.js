@@ -122,6 +122,7 @@ on('hero', ({ o, kind, castle }) => {
   if (o === 1) {
     if (kind === 'rides') toast('Your champion rides out', `Every column of this attack strikes ${Math.round((STRATEGY.heroStr - 1) * 100)}% harder. If it is wiped out, the champion falls.`, army(1).color);
     else if (kind === 'falls') toast('Your champion has fallen', `They will return in ${STRATEGY.heroBack} seconds, at your strongest castle.`, WARN);
+    else if (kind === 'holds') toast('Your champion holds the castle', `They stay at ${castle && castle.kind ? 'the ' + CASTLE_KINDS[castle.kind].name.toLowerCase() : 'the castle they took'}, which defends ${Math.round((STRATEGY.heroDef - 1) * 100)}% better while they are there.`, army(1).color);
     else if (kind === 'returns') toast('Your champion returns', `They wait at your strongest castle, which defends ${Math.round((STRATEGY.heroDef - 1) * 100)}% better while they are there. Send ${STRATEGY.heroMin} or more troops from it to lead an attack.`, army(1).color);
   } else if (kind === 'falls') toast(`${name} has fallen`, `${army(o).full} attack without them for ${STRATEGY.heroBack} seconds.`, army(o).color);
 });
