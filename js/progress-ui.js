@@ -52,6 +52,9 @@ profOv.innerHTML = `<div class="sheet prof-sheet" role="dialog" aria-labelledby=
   <span class="label">Banners and roofs</span>
   <p class="prof-note">Cosmetic: they change how your castles look and nothing else.</p>
   <div class="prof-shop" id="profLooks"></div>
+  <span class="label">Alternate lords</span>
+  <p class="prof-note">A second lord for each army, with their own tactics, lines and twist on the power. Once bought, pick them on the army card; rival armies may then field them too.</p>
+  <div class="prof-shop" id="profLords"></div>
   <span class="label">Starting map units</span>
   <p class="prof-note">Skirmishes only. The unit stands beside your home castle from the start and uses up that battle's one map unit.</p>
   <label class="prof-toggle"><input type="checkbox" id="profUseUnit"> Bring my starting unit into skirmishes</label>
@@ -81,17 +84,17 @@ const fmtDay = ts => new Date(ts).toLocaleDateString(undefined, { day: 'numeric'
 let seasonArmed = 0;
 
 function shopRow(u) {
-  const owned = career.owned.includes(u.id), on = career.equip[u.kind] === u.id;
+  const owned = career.owned.includes(u.id), on = u.kind === 'lord' ? owned : career.equip[u.kind] === u.id;
   const b = document.createElement('button');
   b.className = 'prof-item' + (on ? ' on' : '');
   b.dataset.id = u.id;
   b.disabled = !owned && career.renown < u.price;
   b.setAttribute('aria-pressed', String(on));
-  const swatch = u.kind === 'roof' ? `<span class="prof-swatch" style="background:${u.color}"></span>` : '';
+  const swatch = u.kind === 'roof' ? `<span class="prof-swatch" style="background:${u.color}"></span>` : u.kind === 'lord' ? portraitHtml(u.army, true) : '';
   b.innerHTML = `${swatch}<span><b></b><small></small></span><em></em>`;
   b.querySelector('b').textContent = u.name;
   b.querySelector('small').textContent = u.desc;
-  b.querySelector('em').textContent = on ? 'In use' : owned ? 'Use' : `${u.price} renown`;
+  b.querySelector('em').textContent = u.kind === 'lord' ? (owned ? 'Owned' : `${u.price} renown`) : on ? 'In use' : owned ? 'Use' : `${u.price} renown`;
   return b;
 }
 function renderProfile() {
@@ -108,7 +111,8 @@ function renderProfile() {
     d.querySelector('dt').textContent = k; d.querySelector('dd').textContent = v;
     $p('profStats').append(d);
   }
-  $p('profLooks').replaceChildren(...UNLOCKS.filter(u => u.kind !== 'unit').map(shopRow));
+  $p('profLooks').replaceChildren(...UNLOCKS.filter(u => u.kind === 'banner' || u.kind === 'roof').map(shopRow));
+  $p('profLords').replaceChildren(...UNLOCKS.filter(u => u.kind === 'lord').map(shopRow));
   $p('profUnits').replaceChildren(...UNLOCKS.filter(u => u.kind === 'unit').map(shopRow));
   $p('profUseUnit').checked = career.useUnit;
   $p('profUseRealm').checked = career.useRealm;
@@ -157,7 +161,10 @@ profOv.addEventListener('click', e => {
   const b = e.target.closest('.prof-item');
   if (!b || b.disabled) return;
   const u = unlockById(b.dataset.id);
-  if (career.equip[u.kind] === u.id) equipUnlock(u.kind, null);
+  if (u.kind === 'lord') {
+    // Lords are picked on the army card; here they are only bought.
+    if (!career.owned.includes(u.id) && buyUnlock(u.id)) { $p('profNote').textContent = `${LORDS_ALT[u.army].short} will lead ${ARMIES[u.army].name} when you pick that army.`; sfx.chime(); renderArmies(); }
+  } else if (career.equip[u.kind] === u.id) equipUnlock(u.kind, null);
   else if (career.owned.includes(u.id)) equipUnlock(u.kind, u.id);
   else if (buyUnlock(u.id)) { $p('profNote').textContent = `Bought: ${u.name}.`; sfx.chime(); }
   renderProfile();
@@ -204,3 +211,25 @@ function importProfile(text) {
   refreshProfileButton();
   return '';
 }
+
+// ---------- alternate lords on the army card (#71) ----------
+// The dossier's Lord line: the lord who will lead the army, and a choice between the two once the alternate is owned.
+function lordCardHtml(army) {
+  const base = LORDS[army], alt = LORDS_ALT[army], useAlt = ownsLord(army) && career.lordPick[army] === 'alt';
+  const L = useAlt ? alt : base;
+  const text = `<b>${L.name}, ${L.title}.</b> ${L.bio}${useAlt ? ` <i>${alt.playstyle} ${alt.power.twist}</i>` : ''}`;
+  if (!alt) return text;
+  if (!ownsLord(army)) return `${text} <small class="lord-note">${alt.name} can lead ${ARMIES[army].name} instead: ${alt.price} renown on the Profile page.</small>`;
+  return `<span class="lord-pick" role="group" aria-label="Who leads ${ARMIES[army].name}">`
+    + `<button type="button" data-lordpick="base" aria-pressed="${!useAlt}">${portraitHtml(army)}${base.short}</button>`
+    + `<button type="button" data-lordpick="alt" aria-pressed="${useAlt}">${portraitHtml(army, true)}${alt.short}</button></span>${text}`;
+}
+document.getElementById('dossier').addEventListener('click', e => {
+  const b = e.target.closest('[data-lordpick]');
+  if (!b) return;
+  setLordPick(myArmy, b.dataset.lordpick === 'alt');
+  renderArmies();
+  const again = document.querySelector(`#dossier [data-lordpick="${b.dataset.lordpick}"]`);
+  if (again) again.focus();
+});
+renderArmies();

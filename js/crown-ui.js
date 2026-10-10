@@ -220,7 +220,7 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
     const lordO = !win && mine && mine.by ? mine.by : null;
     if (lordO) {
       const L = lordOf(lordO);
-      $('endQuote').innerHTML = `${portraitHtml(G.fac[lordO])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
+      $('endQuote').innerHTML = `${lordPortraitHtml(lordO)}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
       $('endQuote').querySelector('q').textContent = pick(L.lines.crown || L.lines.victory);
     }
   });

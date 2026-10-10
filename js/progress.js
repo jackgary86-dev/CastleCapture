@@ -37,13 +37,15 @@ const UNLOCKS = [
   { id: 'unit-ballista', kind: 'unit', unit: 'ballista', name: 'Starting Ballista Tower', price: 150, desc: 'Skirmishes begin with a Ballista Tower beside your home castle.' },
   { id: 'unit-trebuchet', kind: 'unit', unit: 'trebuchet', name: 'Starting Siege Trebuchet', price: 150, desc: 'Skirmishes begin with a Siege Trebuchet beside your home castle.' },
   { id: 'unit-ward', kind: 'unit', unit: 'ward', name: 'Starting Great Ward', price: 150, desc: 'Skirmishes begin with a Great Ward beside your home castle.' },
+  // Alternate lords (#71): a second lord for each army, picked on the army card once bought.
+  ...Object.entries(LORDS_ALT).map(([army, L]) => ({ id: `lord-${army}`, kind: 'lord', army, name: `${L.name}, ${L.title}`, price: L.price, desc: `${ARMIES[army].name}: ${L.playstyle}` })),
 ];
 // Each Grand Campaign map won this season is a claimed region, worth a few troops at home in later campaigns.
 const REALM_BONUS = { perRegion: 4, max: 12 };
 
 const blankProgress = () => ({
   v: 1, renown: 0, earned: 0, owned: [], equip: { banner: null, roof: null, unit: null },
-  useUnit: true, useRealm: true, achSeen: null, pastDeeds: false,
+  useUnit: true, useRealm: true, achSeen: null, pastDeeds: false, lordPick: {},
   season: 1, seasonStart: Date.now(), seasonEarned: 0, regions: {}, hall: [], log: [],
 });
 // Only plain, well-typed fields survive a load or an import; anything else falls back to a fresh start.
@@ -59,6 +61,7 @@ function cleanProgress(d) {
     if (b.owned.includes(id) && UNLOCKS.find(u => u.id === id).kind === k) b.equip[k] = id;
   }
   b.useUnit = d.useUnit !== false; b.useRealm = d.useRealm !== false;
+  if (d.lordPick && typeof d.lordPick === 'object') for (const army of Object.keys(LORDS_ALT)) if (d.lordPick[army] === 'alt' && b.owned.includes(`lord-${army}`)) b.lordPick[army] = 'alt';
   b.achSeen = Number.isFinite(d.achSeen) ? d.achSeen : null; b.pastDeeds = !!d.pastDeeds;
   b.season = num(d.season, 1) || 1; b.seasonStart = num(d.seasonStart, Date.now());
   const maps = typeof GRAND_MAPS === 'object' ? GRAND_MAPS : {};
@@ -93,7 +96,8 @@ function buyUnlock(id) {
   if (!u || career.owned.includes(id) || career.renown < u.price) return false;
   career.renown -= u.price;
   career.owned.push(id);
-  career.equip[u.kind] = id;
+  if (u.kind === 'lord') career.lordPick[u.army] = 'alt';   // a new lord takes the army's seat at once
+  else career.equip[u.kind] = id;
   saveProgress();
   emit('progress', { kind: 'bought', unlock: u });
   return true;
@@ -118,6 +122,24 @@ function payPastDeeds() {
   return got;
 }
 payPastDeeds();
+
+// ---------- alternate lords (#71) ----------
+const ownsLord = army => career.owned.includes(`lord-${army}`);
+function setLordPick(army, alt) {
+  if (alt && !ownsLord(army)) return false;
+  if (alt) career.lordPick[army] = 'alt'; else delete career.lordPick[army];
+  saveProgress();
+  return true;
+}
+// Which seats an alternate lord takes in a new game (cfg.lordAlt, read by newGame in sim.js): the player's own
+// pick, and each rival with an alternate the player owns half the time. Never in the menu's demo, the
+// tutorial, a story chapter (written for the base lords) or a second player's seat.
+function pickLordAlts(cfg) {
+  if (cfg.demo || cfg.tutorial || cfg.campaign) return undefined;
+  const people = cfg.humans || 1;
+  return cfg.armies.map((army, i) => !!LORDS_ALT[army] && ownsLord(army)
+    && (i === 0 ? career.lordPick[army] === 'alt' : i >= people && Math.random() < 0.5));
+}
 
 // ---------- earning ----------
 // What the last game paid, for the end screen: { total, lines: [[why, n], ...] }.

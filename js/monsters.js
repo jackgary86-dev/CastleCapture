@@ -472,7 +472,7 @@ function campFight(dt) {
 function monsterAi(ai) {
   const Mo = G.monster;
   if (!Mo) return false;
-  const me = ai.id, id = G.fac[me], M = MONSTERS[Mo.id], mine = G.planets.filter(p => p.owner === me);
+  const me = ai.id, id = lordStyle(me), M = MONSTERS[Mo.id], mine = G.planets.filter(p => p.owner === me);
   const live = liveCreatures();
   if (!live.length || !mine.length) return false;
   if (ai.monsterWave === G.wave) return false;

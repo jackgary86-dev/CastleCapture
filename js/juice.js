@@ -74,7 +74,7 @@ function showCinema(win) {
   cinema.style.setProperty('--c', A.color);
   cinema.innerHTML = `<div class="cine-stage${reduceMotion ? ' still' : ''}">
       <div class="cine-banner"><svg viewBox="0 0 100 140" aria-hidden="true"><path d="M0 0H100V118L50 140L0 118Z" fill="var(--c)"/><path d="M0 0H100V10H0Z" fill="rgb(0 0 0 / .25)"/></svg><div class="cine-emblem">${svg(A.emblem)}</div></div>
-      <div class="cine-lord">${portraitHtml(G.fac[w])}</div>
+      <div class="cine-lord">${lordPortraitHtml(w)}</div>
       <h2 id="cineTitle" class="${win ? 'result-win' : 'result-lose'}">${win ? 'Victory' : 'Defeat'}</h2>
       <p class="cine-name"></p>
       <blockquote class="cine-quote"></blockquote>

@@ -114,9 +114,9 @@
   let offerTimer2 = 0;
   on('offer', ({ from, to }) => {
     if (to !== ME || !G || G.cfg.humans !== 2) return;
-    const id = G.fac[from], L = LORDS[id];
+    const id = G.fac[from], L = lordOf(from);
     p2offer.style.setProperty('--c', ARMIES[id].color);
-    p2offer.innerHTML = `${portraitHtml(id)}<div><b>To Player 2: ${L.short}, ${L.title}</b><q></q><small>A truce for ${PACT_TIME} seconds. <kbd>Y</kbd> accept · <kbd>N</kbd> decline</small></div>`;
+    p2offer.innerHTML = `${lordPortraitHtml(from)}<div><b>To Player 2: ${L.short}, ${L.title}</b><q></q><small>A truce for ${PACT_TIME} seconds. <kbd>Y</kbd> accept · <kbd>N</kbd> decline</small></div>`;
     p2offer.querySelector('q').textContent = pick(L.lines.offer || ['A truce?']);
     p2offer.hidden = false;
     clearTimeout(offerTimer2);
@@ -182,7 +182,7 @@
     if (!G || G.cfg.humans !== 2) return;
     const winner = win ? 1 : alive2() ? ME : G.owners.slice(2).filter(o => G.planets.some(p => p.owner === o)).sort((a, b) => totalOf(b) - totalOf(a))[0];
     const W = winner ? army(winner) : null;
-    const who = winner === 1 ? 'Player 1' : winner === ME ? 'Player 2' : winner ? LORDS[G.fac[winner]].name : 'Nobody';
+    const who = winner === 1 ? 'Player 1' : winner === ME ? 'Player 2' : winner ? lordOf(winner).name : 'Nobody';
     $('endTitle').textContent = W ? `${W.name} wins` : 'Stalemate';
     $('endTitle').className = winner === 1 ? 'result-win' : 'result-lose';
     $('endText').textContent = W

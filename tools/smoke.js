@@ -224,6 +224,33 @@ if (run('smarter lords check', `typeof mindTick === 'function'`)) run('smarter l
   if (G.mind.coalition) throw new Error('cfg.aiMind = false did not switch the coalition off');
   toMenu();
 }`);
+// ---------- 3a3. alternate lords (#71): buy one, pick it on the army card, and play a battle with it ----------
+if (run('alternate lords check', `typeof LORDS_ALT === 'object' && typeof pickLordAlts === 'function'`)) run('alternate lords', `{
+  career.renown += 500;
+  if (!buyUnlock('lord-aldmere') || !buyUnlock('lord-kharzul')) throw new Error('could not buy an alternate lord');
+  if (!ownsLord('aldmere') || career.lordPick.aldmere !== 'alt') throw new Error('a bought lord did not take the seat');
+  // The army card offers the choice once the lord is owned.
+  myArmy = 'aldmere'; renderArmies();
+  if (!document.getElementById('dossier').innerHTML.includes('data-lordpick')) throw new Error('the army card has no lord choice');
+  setLordPick('aldmere', false);
+  if (pickLordAlts({ armies: ['aldmere', 'kharzul'] })[0]) throw new Error('picking the base lord did not stick');
+  setLordPick('aldmere', true);
+  play({ diff: 'medium', n: 12, map: 'aldmere', armies: ['aldmere', 'kharzul'], seed: 31, lordAlt: [true, true] });
+  if (typeof startBattle === 'function') startBattle();
+  if (lordOf(1).short !== 'Corwin' || lordOf(2).short !== 'Ilkai' || lordStyle(2) !== 'nyx') throw new Error('the alternate lords are not seated');
+  if (lordAi(2) !== LORDS_ALT.kharzul.ai) throw new Error('the alternate lord does not think with its own personality');
+  // The rival speaks the alternate's lines, with the alternate's portrait.
+  emit('taunt', { o: 2, kind: 'capture', force: true });
+  const said = document.getElementById('taunt') ? document.getElementById('taunt').textContent : '';
+  if (said && !LORDS_ALT.kharzul.lines.capture.some(l => said.includes(l))) throw new Error('the rival did not speak the alternate lord lines');
+  for (let i = 0; i < 300; i++) update(1 / 30);
+  hud(); draw(${clock});
+  // Its power twist: Ilkai's Blood Moon lasts 1.4 times as long.
+  G.pw[2].ready = 0; usePower(2);
+  if (Math.abs((G.pw[2].until - G.time) - ARMIES.kharzul.power.dur * 1.4) > 1e-6) throw new Error('the power twist did not apply');
+  if (typeof saveBattle === 'function') { saveBattle(); resumeBattle(); setPaused(false); if (lordOf(2).short !== 'Ilkai') throw new Error('the alternate lord was lost on resume'); }
+  toMenu();
+}`);
 // ---------- 3b. King of the Hill (#64): a short race, saved and resumed, then won and lost by points ----------
 const hasHill = run('king of the hill check', `typeof startHill === 'function'`);
 if (hasHill) {

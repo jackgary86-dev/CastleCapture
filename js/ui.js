@@ -34,7 +34,7 @@ function taunt(o, kind, force = false) {
   G.tauntAt[o] = G.lastTaunt = G.time;
   const A = army(o), L = lordOf(o);
   tauntEl.style.setProperty('--c', A.color);
-  tauntEl.innerHTML = `${portraitHtml(G.fac[o])}<div><b>${L.short}, ${L.title}</b><q></q></div>`;
+  tauntEl.innerHTML = `${lordPortraitHtml(o)}<div><b>${L.short}, ${L.title}</b><q></q></div>`;
   tauntEl.querySelector('q').textContent = pick(lines);
   tauntEl.hidden = false;
   clearTimeout(tauntTimer);
@@ -54,9 +54,9 @@ const offerCard = document.getElementById('offerCard'), diploPanel = document.ge
 let offerTimer = 0;
 on('offer', ({ from, to }) => {
   if (to && to !== 1) return;   // an offer to player 2 is answered on their own card (js/twoplayer.js)
-  const id = G.fac[from], L = LORDS[id], A = ARMIES[id];
+  const id = G.fac[from], L = lordOf(from), A = ARMIES[id];
   offerCard.style.setProperty('--c', A.color);
-  offerCard.innerHTML = `${portraitHtml(id)}<div class="offer-body"><b>${L.short}, ${L.title}</b><q></q><small>A truce for ${PACT_TIME} seconds: neither side may attack the other.</small><div class="row"><button class="primary" id="offerYes">Accept</button><button id="offerNo">Refuse</button></div></div>`;
+  offerCard.innerHTML = `${lordPortraitHtml(from)}<div class="offer-body"><b>${L.short}, ${L.title}</b><q></q><small>A truce for ${PACT_TIME} seconds: neither side may attack the other.</small><div class="row"><button class="primary" id="offerYes">Accept</button><button id="offerNo">Refuse</button></div></div>`;
   offerCard.querySelector('q').textContent = pick(L.lines.offer || ['A truce?']);
   offerCard.hidden = false;
   offerCard.querySelector('#offerYes').onclick = () => answerOffer(true);
@@ -88,7 +88,7 @@ function renderDiplo() {
     const status = p ? `Truce, ${Math.ceil(p.until - G.time)}s left` : 'At war';
     const action = p ? `<button data-break="${o}">Break truce</button>`
       : `<button data-offer="${o}" ${canPact(1, o) ? '' : 'disabled'}>Offer truce${G.fac[o] === 'solmara' ? ` (${AMARU_PRICE} coins)` : ''}</button>`;
-    return { o, status, html: `<div class="diplo-row" style="--c:${army(o).color}">${portraitHtml(G.fac[o])}<div><b>${L.short}</b><small data-status="${o}"></small></div>${action}</div>` };
+    return { o, status, html: `<div class="diplo-row" style="--c:${army(o).color}">${lordPortraitHtml(o)}<div><b>${L.short}</b><small data-status="${o}"></small></div>${action}</div>` };
   });
   // Rebuilt only when a row or button changes, so a focused or half-clicked button survives the countdown ticking.
   const html = `<div class="diplo-head"><b>Diplomacy</b><button id="diploClose" aria-label="Close">✕</button></div>${rows.map(r => r.html).join('')}`;
@@ -579,7 +579,7 @@ function renderArmies() {
       <dt>Power</dt><dd><b>${A.power.name}.</b> ${A.power.desc}</dd>
       <dt>Homeland</dt><dd>${A.homeland}</dd>
       <dt>As a rival</dt><dd>${A.personality}</dd>
-      <dt>Lord</dt><dd><b>${LORDS[myArmy].name}, ${LORDS[myArmy].title}.</b> ${LORDS[myArmy].bio}</dd>
+      <dt>Lord</dt><dd id="dossierLord">${typeof lordCardHtml === 'function' ? lordCardHtml(myArmy) : `<b>${LORDS[myArmy].name}, ${LORDS[myArmy].title}.</b> ${LORDS[myArmy].bio}`}</dd>
     </dl>`;
   if (qRival !== 'random' && qRival === myArmy) qRival = 'random';
   $('rivalSeg').innerHTML = `<button data-rival="random" aria-pressed="${qRival === 'random'}">Random</button>` +
@@ -753,6 +753,8 @@ setInterval(() => { if (G && !G.paused) saveBattle(); }, 10000);
 const placeName = cfg => cfg.mode === 'grand' && typeof GRAND_MAPS !== 'undefined' && GRAND_MAPS[cfg.grandMap]
   ? GRAND_MAPS[cfg.grandMap].name : ARMIES[cfg.map].homeland;
 function play(cfg) {
+  // Alternate lords (#71): the player's pick on the army card, and rivals drawn from the ones they own.
+  if (!cfg.lordAlt && typeof pickLordAlts === 'function') cfg = { ...cfg, lordAlt: pickLordAlts(cfg) };
   clearSave();
   lastCfg = cfg;
   shopOpen = false; btnShop.setAttribute('aria-expanded', 'false');
@@ -765,9 +767,9 @@ function play(cfg) {
   // The rival lords introduce themselves before the battle starts.
   const rivals = cfg.armies.slice(1);
   $('lordHead').textContent = rivals.length > 1 ? `Your rivals in ${placeName(cfg)}` : `Your rival in ${placeName(cfg)}`;
-  $('lordList').innerHTML = rivals.map(id => {
-    const L = LORDS[id], A = ARMIES[id];
-    return `<div class="lord">${portraitHtml(id)}<div><h3>${L.name}</h3><div class="title">${L.title[0].toUpperCase() + L.title.slice(1)} · ${A.full}<span class="chip" style="--c:${A.color};--ci:${A.ink}">${A.role}</span></div><q>${L.challenge}</q></div></div>`;
+  $('lordList').innerHTML = rivals.map((id, i) => {
+    const o = G.owners[i + 1], L = lordOf(o), A = ARMIES[id];   // an alternate lord (#71) may sit in the seat
+    return `<div class="lord">${lordPortraitHtml(o)}<div><h3>${L.name}</h3><div class="title">${L.title[0].toUpperCase() + L.title.slice(1)} · ${A.full}<span class="chip" style="--c:${A.color};--ci:${A.ink}">${A.role}</span></div><q>${L.challenge}</q></div></div>`;
   }).join('');
   G.intro = true;
   lordOv.hidden = false;
@@ -936,7 +938,7 @@ function endGame(win) {
   // The rival lord has the last word: the strongest survivor if you lost, the last one standing if you won.
   const lordO = win ? G.owners[G.owners.length - 1] : G.owners.slice(1).sort((a, b) => totalOf(b) - totalOf(a))[0];
   const L = lordOf(lordO);
-  $('endQuote').innerHTML = `${portraitHtml(G.fac[lordO])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
+  $('endQuote').innerHTML = `${lordPortraitHtml(lordO)}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
   $('endQuote').querySelector('q').textContent = pick(L.lines[!win ? 'victory' : G.surrendered.has(lordO) ? 'surrender' : 'defeat']);
   tauntEl.hidden = true;
   $('seedLine').hidden = !!lv || G.cfg.mode === 'grand';

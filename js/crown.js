@@ -68,7 +68,7 @@ const CROWN_LORDS = {
   // a fat decoy draws the hunt; found out, she slips it away.
   nyx: { pick: 'quiet', guard: 0.8, sharp: 1.1, hunt: 1.15, scout: 0.5, scoutGap: 18, moveOnScout: true, flee: false, every: 0, decoy: true, walls: false },
 };
-const crownLord = o => CROWN_LORDS[G.fac[o]] || CROWN_LORDS.solmara;
+const crownLord = o => CROWN_LORDS[lordStyle(o)] || CROWN_LORDS.solmara;
 
 // Where realm o's crown is: its castle, or null while it is on the road (or the realm is out).
 const crownAt = o => G.crown && G.crown.at[o] != null ? G.planets[G.crown.at[o]] : null;

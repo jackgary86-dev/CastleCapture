@@ -337,8 +337,157 @@ const LORDS = {
   },
 };
 
+// Alternate lords (#71): a second lord for each army, unlocked with renown on the Profile page and picked on
+// the army card; rival seats may draw them too once the player owns them. Each has the same text keys as
+// LORDS, a style (which lord's tactics in aiThink, aiPower, the truce rules and the modes' AI it plays by;
+// see lordStyle in sim.js), its own personality numbers in place of ARMIES[id].ai, a twist on the army's
+// power (duration, recharge and, for the crows, strength), and a portrait (look: skin colour and SVG layers).
+const LORDS_ALT = {
+  aldmere: {
+    name: 'Prince Corwin Varr', short: 'Corwin', title: 'the Lance of Aldmere', style: 'frostmark', price: 120,
+    bio: "Isolde's nephew, who learned the walls from her and the counter-charge on his own. He lets you break on his gates, then rides out through the gap.",
+    challenge: 'My aunt builds walls. I build them so I can ride out of them.',
+    playstyle: 'Holds his castles until you have spent yourself on them, then rides out at the castles you attacked from. Swears the Stone Oath often, but briefly.',
+    ai: { sendFrac: 0.55, keep: 8, enemyBias: 1.2, neutralBias: 1, margin: 1.2, defendAt: 0.9, thinkMul: 1, front: true, opportunist: 1.4, boldAt: 1.4, hill: 1.6 },
+    power: { durMul: 0.6, rechargeMul: 0.7, strengthMul: 1, twist: 'Sworn for 12 seconds instead of 20, but ready again 30% sooner.' },
+    look: { skin: '#ecc9a6', front: '<path d="M20 22c1-9 6-12 12-12s11 3 12 12c-3-3-7-4-12-4s-9 1-12 4z" fill="#3a2a1c"/><path d="M19 19h26v-3c-4-3-8-4-13-4s-9 1-13 4z" fill="#9aa3ab" stroke="#5a636b" stroke-width="0.8"/><path d="M32 8v6" stroke="#4f8ff0" stroke-width="2.4"/><ellipse cx="28" cy="29" rx="1.4" ry="1" fill="#2a2014"/><ellipse cx="36" cy="29" rx="1.4" ry="1" fill="#2a2014"/><path d="M29 36q3 2 6 0" stroke="#7a4a30" stroke-width="1.2" fill="none"/>' },
+    lines: {
+      capture: ['Through the gap, lads!', 'You left the gate open. I came through it.'],
+      lose: ['Let them have it. We take it back at dawn.', 'A gate given up is a gate I know.'],
+      power: ['Hold, Aldmere! Hold, then ride!'],
+      counter: ['Now! Out through the gates!', 'You struck my walls. I strike your gates.'],
+      hill: ['A crown on a hill is a lance-rest.', 'I will take the hill and dare you up it.'],
+      crown: ['Your crown, at the point of my lance.'],
+      crownLost: ['They took the crown. They will not keep it.'],
+      nearDefeat: ['Then the last charge will be the best one.'],
+      slay: ['Lances down, it is dead!'],
+      grudge: ['I remember every gate you broke. I will repay each one.', 'You and I have an account at the gates.'],
+      coalition: ['Ride together against the strongest, then.', 'For now, every lance points the same way.'],
+      victory: ['My aunt would have waited. I did not need to.'],
+      defeat: ['Well ridden. Aldmere will remember the name.'],
+      surrender: ['The charge is spent. I yield.'],
+      accept: ['A truce. My horses need the rest.'],
+      refuse: ['I do not sheath a lance halfway.'],
+      offer: ['Let us not both break on the leader alone. A truce?'],
+      betrayed: ['You broke your word. I will break your gates.'],
+    },
+  },
+  kharzul: {
+    name: 'Ilkai Two-Winds', short: 'Ilkai', title: 'the Patient Arrow', style: 'nyx', price: 120,
+    bio: 'The Horde\'s best scout, who waits on the ridge for a whole day to loose one arrow. Where Torvek charges, Ilkai circles.',
+    challenge: 'I have watched your castles for three days. I know which one is empty.',
+    playstyle: 'Circles and waits, then pounces on castles you have just emptied. Says yes to every truce and keeps none of them. Her Blood Moon lasts longer, but takes longer to rise again.',
+    ai: { sendFrac: 0.6, keep: 6, enemyBias: 1.5, neutralBias: 1.1, margin: 1.15, defendAt: 1.2, thinkMul: 0.85, front: false, opportunist: 1.8, boldAt: 1.1, hill: 1.8 },
+    power: { durMul: 1.4, rechargeMul: 1.3, strengthMul: 1, twist: 'The Blood Moon lasts 21 seconds instead of 15, but takes 30% longer to rise again.' },
+    look: { skin: '#c99b74', back: '<path d="M14 40c0-20 8-30 18-30s18 10 18 30" fill="#3a2a1c"/>', front: '<path d="M19 21c0-8 6-12 13-12s13 4 13 12c-4-3-8-4-13-4s-9 1-13 4z" fill="#6a4a2c"/><path d="M18 21h28" stroke="#c9a14a" stroke-width="2"/><ellipse cx="28" cy="29" rx="1.6" ry="1" fill="#1a1410"/><ellipse cx="36" cy="29" rx="1.6" ry="1" fill="#1a1410"/><path d="M26 27l4-1M34 26l4 1" stroke="#1a1410" stroke-width="1"/><path d="M30 36q2 1 4 0" stroke="#7a4a30" stroke-width="1.2" fill="none"/>' },
+    lines: {
+      capture: ['One arrow, one castle.', 'You looked away.'],
+      lose: ['I will circle back for it.', 'Keep it warm for me.'],
+      power: ['The moon is up. Now we ride.'],
+      hill: ['I will wait for the king of the hill to tire.', 'Hills are for watching from.'],
+      crown: ['I saw where you hid it three days ago.'],
+      crownLost: ['They found my crown. I did not see them coming. That is new.'],
+      nearDefeat: ['Even a patient arrow can miss.'],
+      slay: ['One arrow, through the eye.'],
+      grudge: ['I have been watching you longer than you think.', 'I never forget a face I have aimed at.'],
+      coalition: ['A hunting party, then. We share the kill.', 'I will ride with them, for now.'],
+      victory: ['You never saw me coming. Nobody does.'],
+      defeat: ['You saw me. Few do. Well hunted.'],
+      surrender: ['The arrow is spent. I go back to the steppe.'],
+      accept: ['Peace. For now.', 'Of course. Shake my hand.'],
+      betray: ['Did you think I stopped watching?', 'The truce was the arrow. This is where it lands.'],
+      betrayed: ['So you hunt too. Good.'],
+    },
+  },
+  frostmark: {
+    name: 'Bjorn Avalanche', short: 'Bjorn', title: 'the Breaking Ice', style: 'kharzul', price: 120,
+    bio: "Sigrun's younger brother, who thinks the White Wall waits too long. When the ice breaks, it breaks all at once.",
+    challenge: 'My sister holds the wall. I am what comes down the mountain.',
+    playstyle: 'Picks the strongest castle in sight and keeps throwing the north at it until it falls, freezing its defenders just before he strikes. His Winter\'s Grip is shorter.',
+    ai: { sendFrac: 0.45, keep: 8, enemyBias: 1.1, neutralBias: 1, margin: 1.3, defendAt: 0.9, thinkMul: 1.2, front: false, opportunist: 1.2, boldAt: 1.4, hill: 2 },
+    power: { durMul: 0.75, rechargeMul: 1, strengthMul: 1, twist: "Winter's Grip lasts 9 seconds instead of 12." },
+    look: { skin: '#f0d6c2', front: '<path d="M18 24c1-10 6-14 14-14s13 4 14 14c-3-4-8-5-14-5s-11 1-14 5z" fill="#c9773a"/><path d="M19 19c4-4 8-5 13-5s9 1 13 5" stroke="#9aa3ab" stroke-width="3" fill="none"/><path d="M20 15l-4-7M44 15l4-7" stroke="#e8ecef" stroke-width="3" stroke-linecap="round"/><path d="M23 33c2 12 5 16 9 16s7-4 9-16c-3 3-6 4-9 4s-6-1-9-4z" fill="#c9773a"/><ellipse cx="28" cy="29" rx="1.4" ry="1" fill="#2a2014"/><ellipse cx="36" cy="29" rx="1.4" ry="1" fill="#2a2014"/>' },
+    lines: {
+      capture: ['The ice breaks!', 'Down it comes.'],
+      lose: ['The mountain has more snow.'],
+      power: ['Freeze them, then bury them!'],
+      counter: ['Again! Hit it again!'],
+      hill: ['I will come down on the hill like a slide of snow.'],
+      crown: ['Buried, and the crown with it.'],
+      crownLost: ['The avalanche missed. It will not miss twice.'],
+      nearDefeat: ['Even an avalanche stops at the valley floor.'],
+      slay: ['Crushed under the north!'],
+      grudge: ['You I bury last, and deepest.', 'The mountain remembers who stood in its way.'],
+      coalition: ['Fine. We all come down on them together.', 'Every slope runs to the same valley today.'],
+      victory: ['My sister would have waited. Waiting is for walls.'],
+      defeat: ['You stood under the avalanche and lived. Remarkable.'],
+      surrender: ['The snow is melted. I yield.'],
+      accept: ['A truce. Even ice must settle.'],
+      refuse: ['Avalanches do not negotiate.'],
+      betrayed: ['You cracked the truce. Now the whole mountain comes down.'],
+    },
+  },
+  solmara: {
+    name: 'Vizier Zahra al-Qadir', short: 'Zahra', title: 'the Silver Tongue', style: 'solmara', price: 120,
+    bio: "Amaru's grand vizier, who has never raised her voice and never lost a negotiation. She builds her realm one secured castle at a time.",
+    challenge: 'Let us discuss terms. Yours are poor.',
+    playstyle: 'Talks unclaimed keeps over to her side in the first minute, keeps her front castles strong, and offers truces to turn the realm on its leader. Her Golden Tithe lasts half as long again, but is opened less often.',
+    ai: { sendFrac: 0.55, keep: 7, enemyBias: 1.35, neutralBias: 1.4, margin: 1.05, defendAt: 1, thinkMul: 0.9, front: true, opportunist: 1.7, boldAt: 1.2, hill: 1.4 },
+    power: { durMul: 1.5, rechargeMul: 1.25, strengthMul: 1, twist: 'The Golden Tithe lasts half as long again, but takes 25% longer to come round.' },
+    look: { skin: '#b07c56', back: '<path d="M14 40c0-20 8-32 18-32s18 12 18 32" fill="#e9e1cd"/>', front: '<path d="M18 22c0-10 6-14 14-14s14 4 14 14c-3-3-8-4-14-4s-11 1-14 4z" fill="#3b6d7a"/><circle cx="32" cy="15" r="2.2" fill="#d9cfb8" stroke="#8a8170" stroke-width="0.6"/><ellipse cx="28" cy="29" rx="1.5" ry="1" fill="#1a1410"/><ellipse cx="36" cy="29" rx="1.5" ry="1" fill="#1a1410"/><path d="M29 36q3 1.5 6 0" stroke="#7a3a30" stroke-width="1.2" fill="none"/>' },
+    lines: {
+      capture: ['Annexed, with all due courtesy.', 'The paperwork is already done.'],
+      lose: ['A concession. Temporary.', 'Noted, and entered in the ledger.'],
+      power: ['Open the coffers. Slowly.'],
+      hill: ['A crowned keep is just a well-placed office.'],
+      crown: ['Your crown has been reassigned.'],
+      crownLost: ['An unfortunate transfer of assets.'],
+      nearDefeat: ['Perhaps we should talk terms after all.'],
+      slay: ['The beast is dead. Send the bill to its estate.'],
+      grudge: ['I have your name in the ledger, and it is in red.', 'Every castle you took is a debt. I collect debts.'],
+      coalition: ['A treaty of convenience against the realm\'s greediest.', 'Shall we all agree on one enemy? How civilised.'],
+      victory: ['A pleasure doing business.'],
+      defeat: ['You negotiate well. I will remember the terms.'],
+      surrender: ['I propose an orderly surrender.'],
+      offer: ['Let us not both pay for the leader\'s ambitions. A truce?'],
+      accept: ['Agreed, on the usual terms.'],
+      refuse: ['Your offer does not interest me.'],
+      betrayed: ['A breach of contract. There will be penalties.'],
+    },
+  },
+  nyx: {
+    name: 'Morwen the Pale', short: 'Morwen', title: 'the Drowned Saint', style: 'aldmere', price: 120,
+    bio: 'A mire-witch who drowned and came back, and has been patient ever since. She lets the bog do the fighting, then sends the crows after whoever is left.',
+    challenge: 'The mire is in no hurry. Neither am I.',
+    playstyle: 'Keeps the castles facing you full, lets the bog slow you down, and creeps forward one castle at a time once she is ahead. Her flocks are smaller but fly more often.',
+    ai: { sendFrac: 0.55, keep: 7, enemyBias: 1.45, neutralBias: 1.25, margin: 1.05, defendAt: 1, thinkMul: 0.85, front: true, opportunist: 1.8, boldAt: 1.2, hill: 1.6 },
+    power: { durMul: 1, rechargeMul: 0.8, strengthMul: 0.75, twist: 'The crows take 30% of a garrison instead of 40%, but fly again 20% sooner.' },
+    look: { skin: '#e6e2ec', back: '<path d="M12 64c0-30 6-54 20-58 14 4 20 28 20 58z" fill="#2f3a3a"/>', front: '<path d="M18 40c0-18 5-30 14-32 9 2 14 14 14 32-3-8-7-14-14-14s-11 6-14 14z" fill="#3c4a48"/><ellipse cx="28" cy="31" rx="1.8" ry="1.2" fill="#9fd8c8"/><ellipse cx="36" cy="31" rx="1.8" ry="1.2" fill="#9fd8c8"/><path d="M30 38q2 1 4 0" stroke="#6a6a7a" stroke-width="1" fill="none"/><path d="M24 20q8-6 16 0" stroke="#9fd8c8" stroke-width="1.2" fill="none"/>' },
+    lines: {
+      capture: ['The water rises over it.', 'Sink, and be still.'],
+      lose: ['The mire gives, the mire takes.'],
+      power: ['Go, my little ones. Not too far.'],
+      counter: ['You waded in. Now the bog closes behind you.'],
+      hill: ['Let them climb the hill. The mire waits at the bottom.'],
+      crown: ['Your crown is at the bottom of the bog now.'],
+      crownLost: ['It sank. Everything sinks.'],
+      nearDefeat: ['I drowned once already. It did not take.'],
+      slay: ['Into the water with it.'],
+      grudge: ['The mire remembers what you took from it.', 'I am patient. I am also not forgiving.'],
+      coalition: ['The bog makes friends of us all, for a while.', 'Together, then. The mire is wide enough for everyone.'],
+      victory: ['The water is calm again.'],
+      defeat: ['You crossed the mire. Few do.'],
+      surrender: ['I will go back under the water now.'],
+      accept: ['Peace is the mire\'s natural state.'],
+      refuse: ['The mire does not bargain.'],
+      betrayed: ['You broke faith. The water will not forget it.'],
+    },
+  },
+};
+
 // Painted busts, 64×64.
-function portrait(id) {
+// alt: the army's alternate lord (#71), drawn from LORDS_ALT[id].look on the same bust.
+function portrait(id, alt = false) {
   const A = ARMIES[id];
   const bust = (skin, extra) => `<svg viewBox="0 0 64 64" aria-hidden="true">
     <rect width="64" height="64" fill="${A.roof}"/><circle cx="32" cy="26" r="30" fill="${A.color}" opacity="0.25"/>
@@ -347,6 +496,7 @@ function portrait(id) {
     <rect x="27" y="36" width="10" height="9" fill="${skin}"/>
     <ellipse cx="32" cy="28" rx="11" ry="13" fill="${skin}"/>
     ${extra.front || ''}</svg>`;
+  if (alt && LORDS_ALT[id]) { const L = LORDS_ALT[id].look; return bust(L.skin, L); }
   switch (id) {
     case 'aldmere': return bust('#f0d2b4', {
       back: '<path d="M17 30c0-14 7-20 15-20s15 6 15 20v20H17z" fill="#f4efe4"/>',
@@ -369,7 +519,7 @@ function portrait(id) {
     });
   }
 }
-const portraitHtml = id => `<span class="portrait" style="--c:${ARMIES[id].color}">${portrait(id)}</span>`;
+const portraitHtml = (id, alt = false) => `<span class="portrait" style="--c:${ARMIES[id].color}">${portrait(id, alt)}</span>`;
 
 // Homeland maps: ground, roads, scenery and the style of unclaimed keeps.
 const THEMES = {

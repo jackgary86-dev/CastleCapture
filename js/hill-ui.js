@@ -119,7 +119,7 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
     $('seedLine').hidden = true;
     if (w != null && w !== 1) {
       const L = lordOf(w);
-      $('endQuote').innerHTML = `${portraitHtml(G.fac[w])}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
+      $('endQuote').innerHTML = `${lordPortraitHtml(w)}<div><q></q><small>${L.name}, ${L.title}</small></div>`;
       $('endQuote').querySelector('q').textContent = pick(L.lines.hill || L.lines.victory);
     }
   });

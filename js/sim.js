@@ -369,6 +369,7 @@ function newGame(cfg, portrait = false) {
     roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0, sight: {}, sightClock: 0,
     weather: { kind: 'clear', prev: 'clear', since: -WEATHER_FADE, until: WEATHER_FIRST },
     pacts: [], pactCool: {}, lastOffer: {}, betrayers: {}, offer: null, diploClock: 0,
+    lord: Object.fromEntries(owners.map((o, i) => [o, cfg.lordAlt && cfg.lordAlt[i] && LORDS_ALT[cfg.armies[i]] ? 'alt' : 'base'])),
     seen: Object.fromEntries(owners.map(o => [o, map.planets.map(p => ({ owner: p.owner, units: p.units }))])),
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
   };
@@ -395,7 +396,7 @@ const speedOf = o => SPEED * (G.cfg.speedMul ?? 1) * army(o).stats.speed * (powe
 const rechargeTime = () => G.cfg.recharge ?? RECHARGE;
 const roadOf = o => atkOf(o) * army(o).stats.road;
 // Amaru, as an AI rival, bribes the garrisons of unclaimed keeps in his first minute: they count 1.6×.
-const bribes = (o, t) => t.owner === 0 && G.fac[o] === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
+const bribes = (o, t) => t.owner === 0 && lordStyle(o) === 'solmara' && G.time < 60 && G.ais.some(a => a.id === o) ? 1.6 : 1;
 // Against unclaimed keeps an army's neutral bonus applies; the Grand Campaign's map is mostly unclaimed keeps,
 // so there only part of it counts (GRAND.neutralBonus), or Veyra's +25% snowballed every campaign.
 const neutralMul = o => G.mode === 'grand' ? 1 + (army(o).stats.neutral - 1) * GRAND.neutralBonus : army(o).stats.neutral;
@@ -510,11 +511,11 @@ function usePower(o) {
     emit('order', { order });
     return true;
   }
-  pw.ready = rechargeTime();
-  pw.until = G.time + A.power.dur;
+  pw.ready = rechargeTime() * powerTwist(o, 'rechargeMul');
+  pw.until = G.time + A.power.dur * powerTwist(o, 'durMul');
   if (A.power.id === 'crows') {
     const targets = G.planets.filter(p => p.owner && p.owner !== o && !allied(o, p.owner)).sort((a, b) => b.units - a.units).slice(0, 3);
-    for (const t of targets) { t.units -= Math.min(t.units * 0.4, G.mode === 'grand' ? 25 : Infinity); G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
+    for (const t of targets) { t.units -= Math.min(t.units * 0.4 * powerTwist(o, 'strengthMul'), G.mode === 'grand' ? 25 : Infinity); G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
   }
   emit('power', { o, army: A });
   const ai = G.ais.find(a => a.id === o);
@@ -525,7 +526,18 @@ function usePower(o) {
 }
 
 // A lord has something to say. The UI decides whether and how to show it.
-const lordOf = o => LORDS[G.fac[o]];
+// Which lord sits in each seat (#71): G.lord[o] is 'alt' for an army's alternate lord (LORDS_ALT), else 'base'.
+const lordIsAlt = o => !!(G.lord && G.lord[o] === 'alt' && LORDS_ALT[G.fac[o]]);
+const lordOf = o => lordIsAlt(o) ? LORDS_ALT[G.fac[o]] : LORDS[G.fac[o]];
+// The tactics a lord plays by: an army id whose branches in aiThink, aiPower, the truce rules and the modes' AI
+// it follows. A base lord's style is its own army; an alternate borrows another lord's.
+const lordStyle = o => lordIsAlt(o) ? LORDS_ALT[G.fac[o]].style : G.fac[o];
+// The personality numbers (ARMIES[id].ai, or the alternate's own), and a key for per-lord tables (mind.js).
+const lordAi = o => lordIsAlt(o) ? LORDS_ALT[G.fac[o]].ai : army(o).ai;
+const lordKey = o => lordIsAlt(o) ? `${G.fac[o]}Alt` : G.fac[o];
+const lordPortraitHtml = o => portraitHtml(G.fac[o], lordIsAlt(o));
+// The alternate's twist on the army's power: duration, recharge and (the crows) strength multipliers.
+const powerTwist = (o, k) => lordIsAlt(o) ? LORDS_ALT[G.fac[o]].power[k] : 1;
 const lordSays = (o, kind, force = false) => emit('taunt', { o, kind, force });
 
 function send(owner, sources, target, frac = 0.5, type = 'foot', escort = false) {
@@ -568,7 +580,7 @@ function canPact(a, b) {
 function makePact(a, b) {
   const p = { a, b, since: G.time, until: G.time + PACT_TIME, betrayAt: null, betrayer: null };
   // Veyra smiles, shakes hands, and counts the seconds.
-  const nyx = [a, b].find(o => G.fac[o] === 'nyx' && G.ais.some(ai => ai.id === o));
+  const nyx = [a, b].find(o => lordStyle(o) === 'nyx' && G.ais.some(ai => ai.id === o));
   if (nyx) { p.betrayer = nyx; p.betrayAt = G.time + 45 + Math.random() * 25; }
   G.pacts.push(p);
   emit('pact', { a, b });
@@ -580,7 +592,7 @@ function endPact(p, by) {
 }
 // Does lord o take a truce offered by `from`?
 function lordAccepts(o, from) {
-  switch (G.fac[o]) {
+  switch (lordStyle(o)) {
     case 'kharzul': return G.mode === 'grand' && aliveOwners().every(q => q === o || totalOf(q) > totalOf(o));   // Torvek never stops, unless the realm is closing on him
     case 'nyx': return true;                                        // Veyra always says yes
     case 'aldmere': return leaderOf() !== o;                        // Isolde only when she isn't winning
@@ -599,7 +611,7 @@ function proposeTruce(from, to) {
     return 'pending';
   }
   const yes = lordAccepts(to, from);
-  if (yes && human(from) && G.fac[to] === 'solmara') G.coins[from] -= AMARU_PRICE;
+  if (yes && human(from) && lordStyle(to) === 'solmara') G.coins[from] -= AMARU_PRICE;
   if (yes) makePact(from, to);
   else G.pactCool[pactKey(from, to)] = G.time + PACT_COOLDOWN;
   if (human(from)) lordSays(to, yes ? 'accept' : 'refuse', true);
@@ -639,7 +651,7 @@ function diplomacyTick() {
   if (alive.length < 3) return;
   const ranked = [...alive].sort((a, b) => totalOf(b) - totalOf(a));
   const second = ranked[1];
-  if (!G.ais.some(ai => ai.id === second) || !['aldmere', 'solmara'].includes(G.fac[second])) return;
+  if (!G.ais.some(ai => ai.id === second) || !['aldmere', 'solmara'].includes(lordStyle(second))) return;
   if (G.time - (G.lastOffer[second] ?? -99) < 45) return;
   const partner = ranked.find(o => o !== second && o !== ranked[0] && !(G.betrayers || {})[o] && canPact(second, o));
   if (!partner) return;
@@ -807,7 +819,7 @@ const threatOn = (p, me, inc) => inc[p.id].reduce((a, v, o) => o !== me ? a + v 
 
 // When each AI fires its power. Named lords override their army's default timing.
 function aiPower(ai, inc, mine) {
-  const me = ai.id, id = G.fac[me], pow = incomingPowerFor(me);
+  const me = ai.id, id = lordStyle(me), pow = incomingPowerFor(me);
   if (G.pw[me].ready > 0) return;
   if (ai.readyAt == null) ai.readyAt = G.time;
   const waited = G.time - ai.readyAt;
@@ -848,7 +860,7 @@ const MUSTER_TIME = 25;
 const mustering = () => G.owners.length > 2 && G.time < MUSTER_TIME;
 
 function aiThink(ai) {
-  const me = ai.id, id = G.fac[me], d = ai.diff;
+  const me = ai.id, id = lordStyle(me), d = ai.diff;
   // Under fog of war, castles out of sight are stand-ins carrying this lord's memory of them;
   // orders always go to the real castle (t.ghostOf).
   let P = G.cfg.fog ? G.planets.map(p => knownOf(me, p)) : G.planets;
@@ -860,7 +872,7 @@ function aiThink(ai) {
     if (queued.size) P = P.map(p => queued.has(p.id) ? { ...p, units: p.units + queued.get(p.id), ghostOf: p.ghostOf || p } : p);
   }
   const real = t => t.ghostOf || t;
-  const pz = { ...army(me).ai };
+  const pz = { ...lordAi(me) };
   // A realm on the Grand Campaign's big map can't be held on skeleton garrisons: everyone keeps a few more home.
   if (G.mode === 'grand') { pz.keep = Math.max(pz.keep, GRAND.keepFloor); pz.sendFrac = Math.min(pz.sendFrac, GRAND.sendFracMax); }
   // The Grand Campaign's opening: every lord fills out its own realm's unclaimed keeps before marching on a
@@ -1282,8 +1294,8 @@ function update(dt) {
     ai.timer -= dt;
     if (ai.timer <= 0) {
       // Amaru moves quickly while there are keeps to claim.
-      const hurry = G.fac[ai.id] === 'solmara' && G.time < 60 ? 0.6 : 1;
-      ai.timer = intervals[ai.diff] * army(ai.id).ai.thinkMul * hurry * (0.8 + Math.random() * 0.4);
+      const hurry = lordStyle(ai.id) === 'solmara' && G.time < 60 ? 0.6 : 1;
+      ai.timer = intervals[ai.diff] * lordAi(ai.id).thinkMul * hurry * (0.8 + Math.random() * 0.4);
       aiThink(ai);
     }
   }

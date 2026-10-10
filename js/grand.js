@@ -69,7 +69,7 @@ on('newGame', g => {
 // A lord's tempo carries over from battles: a quick thinker (thinkMul below 1, like Torvek) makes more
 // decisions per wave, a slow one fewer, with the fraction settled by a dice roll so it averages out.
 function planWave(ai) {
-  const n = (GRAND.actionsPerWave[ai.diff] || 2) / army(ai.id).ai.thinkMul;
+  const n = (GRAND.actionsPerWave[ai.diff] || 2) / lordAi(ai.id).thinkMul;
   const actions = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
   for (let i = 0; i < actions; i++) aiThink(ai);
 }

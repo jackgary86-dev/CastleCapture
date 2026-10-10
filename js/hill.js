@@ -83,12 +83,12 @@ function hillTick(dt) {
 const hillBled = keep => keep.units < keep.r * 0.9;
 
 function hillWorthMul(ai, t, P) {
-  const H = G.hill, me = ai.id, id = G.fac[me], keep = G.planets[H.id], real = t.ghostOf || t;
+  const H = G.hill, me = ai.id, id = lordStyle(me), keep = G.planets[H.id], real = t.ghostOf || t;
   const focus = H.focus != null && H.focus !== me ? H.focus : null;
   let m = 1;
   if (real.seat && t.owner !== me) return 0;   // a seat can't be taken: not worth a march
   if (real === keep) {
-    m *= army(me).ai.hill || 1;
+    m *= lordAi(me).hill || 1;
     const held = t.owner && t.owner !== me;
     if (id === 'aldmere') m *= held && G.time - H.since < 25 ? 2.2 : held ? 1 : 0.6;
     else if (id === 'nyx') m *= held ? (hillBled(t) ? 3.5 : 0.5) : 0.8;
@@ -109,7 +109,7 @@ function hillWorthMul(ai, t, P) {
 
 // Tactics that come before a lord's usual plan. Returns true when the lord has acted.
 function hillAi(ai, P, inc, pow) {
-  const H = G.hill, me = ai.id, id = G.fac[me], keep = G.planets[H.id];
+  const H = G.hill, me = ai.id, id = lordStyle(me), keep = G.planets[H.id];
   const mine = P.filter(p => p.owner === me);
   // Sigrun: once her columns close on someone else's hill, or the holder's own columns ride in to
   // reinforce it, the blizzard freezes them in the field.
@@ -134,7 +134,7 @@ function hillAi(ai, P, inc, pow) {
 // marching on it. He keeps saving until he has a castle within reach of the keep.
 function hillBuyUnit(ai, mine) {
   const me = ai.id;
-  if (G.fac[me] !== 'solmara') return false;
+  if (lordStyle(me) !== 'solmara') return false;
   const U = MAP_UNITS.ballista, keep = G.planets[G.hill.id];
   if (G.coins[me] < U.price || (ai.diff === 'easy' && Math.random() < 0.5)) return true;
   // Towards each of his castles nearest the hill (the keep itself doesn't count: he may hold it).

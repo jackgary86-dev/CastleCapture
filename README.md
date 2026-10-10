@@ -67,6 +67,20 @@ Each army is commanded by a named lord when it's your rival. They introduce them
 
 The lords reinforce and intercept with cavalry. Under fog of war they play by the same rules you do.
 
+### Alternate lords
+
+Each army has a second lord, bought with renown on the Profile page and then picked on the army card. Once you own one, rival armies may field them too. Each plays by another lord's tactics with personality numbers of their own, has their own lines and portrait, and puts a twist on the army's power:
+
+| Lord | Army | How they play | Power twist |
+|---|---|---|---|
+| **Prince Corwin Varr**, the Lance of Aldmere | Aldmere | Lets you break on his walls, then counter-attacks the castles you came from (Sigrun's tactics) | Stone Oath lasts 12 s instead of 20, but is ready again 30% sooner |
+| **Ilkai Two-Winds**, the Patient Arrow | Kharzul | Circles, then pounces on castles you have just emptied; agrees to every truce and keeps none (Veyra's tactics) | Blood Moon lasts 21 s instead of 15, but rises 30% later |
+| **Bjorn Avalanche**, the Breaking Ice | Frostmark | Picks the strongest castle in sight and keeps hitting it (Torvek's tactics) | Winter's Grip lasts 9 s instead of 12 |
+| **Vizier Zahra al-Qadir**, the Silver Tongue | Solmara | Talks unclaimed keeps over in the first minute and turns the realm on its leader (Amaru's tactics, bolder numbers) | Golden Tithe lasts half as long again, but comes round 25% later |
+| **Morwen the Pale**, the Drowned Saint | Nyxhollow | Keeps the castles facing you full and creeps forward once ahead (Isolde's tactics) | The crows take 30% instead of 40%, but fly again 20% sooner |
+
+`tools/balance.js --lords alt` plays every seat with its alternate (the default, `--lords base`, the usual lords).
+
 They also remember and adapt (`js/mind.js`):
 
 - **Coalitions:** when one realm holds 40% of all the troops on the map, the other lords make peace with each other and turn on it. A banner announces it, and against another lord the player is offered a place in it. The truces break once the leader falls below 30%.

@@ -37,6 +37,9 @@ const STRATEGY_OPT = opt('strategy', 'off');
 const STRATEGY_RUN = STRATEGY_OPT === 'off' ? null
   : STRATEGY_OPT === 'on' ? { spec: true, supply: true, terrain: true, heroes: true }
   : Object.fromEntries(['spec', 'supply', 'terrain', 'heroes'].map(f => [f, STRATEGY_OPT.split(',').includes(f)]));
+// --lords alt seats every army's alternate lord (#71, LORDS_ALT) in every game; base (the default) the usual ones.
+const LORDSET = opt('lords', 'base');
+if (!['base', 'alt'].includes(LORDSET)) { console.error('--lords must be base or alt'); process.exit(2); }
 const SEED0 = +opt('seed', 7000);  // Grand Campaign seeds run from here
 // Simulate at the game's own step (the browser runs 1/60 s substeps); coarser steps let fast columns skip
 // past each other on the road and skew the results.
@@ -50,11 +53,16 @@ const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/strate
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, AI_MIND, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, STRATEGY, STRATEGY_ALL, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
+  ARMIES, ARMY_IDS, LORDS, LORDS_ALT, AI_MIND, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, STRATEGY, STRATEGY_ALL, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
 const api = ctx.__api;
+if (LORDSET === 'alt') {
+  const plain = api.newGame;
+  api.newGame = (cfg, ...rest) => plain({ ...cfg, lordAlt: cfg.armies.map(() => true) }, ...rest);
+}
+const lordShort = id => (LORDSET === 'alt' ? api.LORDS_ALT : api.LORDS)[id].short;
 const ids = api.ARMY_IDS;
 // --set overrides GRAND settings for a run without editing data.js, e.g.
 //   --set surrenderShare=0.3,siegeSources.hard=10
@@ -125,7 +133,7 @@ const rows = ids.map(id => {
   const s = pairStat[id];
   const rate = s.decided ? s.wins / s.decided : null;
   const outside = rate !== null && s.decided >= MIN_DECIDED && (rate < BAND_LO || rate > BAND_HI);
-  return { army: id, lord: api.LORDS[id].short, games: s.games, decided: s.decided, wins: s.wins, winRate: rate, powers: stat[id].powers, mapUnits: stat[id].units, surrenders: stat[id].surrenders, outside };
+  return { army: id, lord: lordShort(id), games: s.games, decided: s.decided, wins: s.wins, winRate: rate, powers: stat[id].powers, mapUnits: stat[id].units, surrenders: stat[id].surrenders, outside };
 });
 const summary = {
   diff: DIFF, gamesPerPairing: GAMES, secondsCap: SECONDS, band: [BAND_LO, BAND_HI],
@@ -255,7 +263,7 @@ function runHill() {
   lens.sort((x, y) => x - y);
   const rows = ids.map(id => {
     const s = st[id], rate = s.games ? s.wins / s.games : null;
-    return { army: id, lord: api.LORDS[id].short, games: s.games, wins: s.wins, winRate: rate, byGoal: s.goal, avgPoints: s.games ? Math.round(s.held / s.games) : 0,
+    return { army: id, lord: lordShort(id), games: s.games, wins: s.wins, winRate: rate, byGoal: s.goal, avgPoints: s.games ? Math.round(s.held / s.games) : 0,
       outside: rate !== null && s.games >= MIN_DECIDED && (rate < BAND_LO || rate > BAND_HI) };
   });
   const median = lens.length ? Math.round(lens[lens.length >> 1]) : null;
@@ -359,7 +367,7 @@ function runCrown() {
   lens.sort((x, y) => x - y);
   const rows = ids.map(id => {
     const s = st[id], rate = s.decided ? s.wins / s.decided : null;
-    return { army: id, lord: api.LORDS[id].short, games: s.games, decided: s.decided, wins: s.wins, winRate: rate,
+    return { army: id, lord: lordShort(id), games: s.games, decided: s.decided, wins: s.wins, winRate: rate,
       movesPerGame: s.games ? +(s.moves / s.games).toFixed(1) : 0, scoutsPerGame: s.games ? +(s.scouts / s.games).toFixed(1) : 0,
       outside: rate !== null && s.decided >= MIN_DECIDED && (rate < BAND_LO || rate > BAND_HI) };
   });

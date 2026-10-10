@@ -32,6 +32,12 @@ const LORD_OPENINGS = {
   frostmark: [{ name: 'Shield wall', defendAt: 1.12, keep: 1 }, { name: 'Raiding season', enemyBias: 1.1 }],
   solmara: [{ name: 'Caravan roads', neutralBias: 1.15 }, { name: 'Gold for blood', opportunist: 1.15 }, { name: 'The patient purse', keep: 2 }],
   nyx: [{ name: 'Whispering mire', opportunist: 1.15 }, { name: 'Night tide', enemyBias: 1.1 }],
+  // The alternate lords (#71, LORDS_ALT in data.js).
+  aldmereAlt: [{ name: 'Open gates', defendAt: 1.12 }, { name: 'First lance', enemyBias: 1.1 }],
+  kharzulAlt: [{ name: 'On the ridge', keep: 2 }, { name: 'Loose and wheel', opportunist: 1.15 }],
+  frostmarkAlt: [{ name: 'Thaw', neutralBias: 1.12 }, { name: 'First slide', enemyBias: 1.1 }],
+  solmaraAlt: [{ name: 'Signed and sealed', keep: 2 }, { name: 'Trade winds', neutralBias: 1.15 }],
+  nyxAlt: [{ name: 'Still water', defendAt: 1.12, keep: 1 }, { name: 'Rising damp', neutralBias: 1.12 }],
 };
 
 // King of the Hill, Capture the Crown and Siege Defense give the lords their own tactics for the mode, and are
@@ -127,7 +133,7 @@ const humanStyle = () => {
 function mindPz(ai, pz) {
   if (!mindOn()) return;
   if (AI_MIND.openings && G.mode !== 'grand') {
-    const list = LORD_OPENINGS[G.fac[ai.id]];
+    const list = LORD_OPENINGS[lordKey(ai.id)];
     // Chosen from the map's seed, not Math.random: a replayed seed gets the same openings, and the choice
     // doesn't shift the random numbers every later decision draws.
     if (list && ai.opening == null) ai.opening = Math.abs(((G.cfg.seed | 0) * 31 + ai.id * 7919) | 0) % list.length;
@@ -152,4 +158,4 @@ function mindWorthMul(ai, t) {
   if (C && t.owner === C.against && C.members.includes(ai.id)) mul *= AI_MIND.coalitionFocus;
   return mul;
 }
-const openingName = ai => { const l = LORD_OPENINGS[G.fac[ai.id]]; return l && ai.opening != null ? l[ai.opening].name : null; };
+const openingName = ai => { const l = LORD_OPENINGS[lordKey(ai.id)]; return l && ai.opening != null ? l[ai.opening].name : null; };

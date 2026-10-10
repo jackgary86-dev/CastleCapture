@@ -84,6 +84,17 @@
       const lines = Object.entries(L.lines).filter(([k]) => lineKinds[k]).map(([k, v]) => `${lineKinds[k]}: “${v[0]}”`);
       html += section('Things they say', list(lines));
     }
+    // The army's alternate lord (#71), bought with renown on the Profile page and picked on the army card.
+    const L2 = typeof LORDS_ALT !== 'undefined' && LORDS_ALT[id];
+    if (L2) {
+      const owned = typeof ownsLord === 'function' && ownsLord(id);
+      html += section(`Alternate lord: ${L2.name}`, `<div class="codex-alt">${portraitHtml(id, true)}<div>`
+        + para(`${L2.title[0].toUpperCase() + L2.title.slice(1)}. ${L2.bio}`)
+        + para(`How ${L2.short} plays: ${L2.playstyle}`)
+        + para(`Power twist: ${L2.power.twist}`)
+        + para(owned ? `You have unlocked ${L2.short}: pick them on the army card.` : `Unlock for ${L2.price} renown on the Profile page.`)
+        + `</div></div><p class="codex-quote">“${esc(L2.challenge)}”</p>`);
+    }
     body.innerHTML = html;
   }
 
