@@ -7,16 +7,13 @@
 
 // Start a King of the Hill battle: `army` against `rivals` random lords (1, 2 or 4) on `diff`.
 function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
-  const foes = shuffle(ARMY_IDS.filter(id => id !== armyId)).slice(0, Math.max(1, Math.min(4, rivals)));
+  const foes = modeUi.pickRivals(armyId, Math.max(1, Math.min(4, rivals)));
   play(hillCfg(armyId, foes, diff));
 }
 
 (() => {
-  const $ = id => document.getElementById(id);
-  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const { $, esc, who, crownSvg } = modeUi;   // shared with the other Modes cards (js/modes-ui.js)
   const on1 = () => G && G.mode === 'hill' && G.hill && !G.cfg.demo;
-  const who = o => o === 1 ? 'You' : lordOf(o).short;
-  const crownSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 19h18l-1.6-11-4.6 4.2L12 5 9.2 12.2 4.6 8z"/></svg>';
 
   // ---------- the score bar in the header ----------
   const bar = document.createElement('div');
@@ -36,7 +33,7 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
       const pts = Math.floor(hillScore(o)), A = army(o);
       const cls = ['hb', o === H.holder ? 'holds' : '', o === H.leader ? 'leads' : '', o === H.focus ? 'hunted' : ''].filter(Boolean).join(' ');
       const state = o === H.holder ? ', holds the hill' : '';
-      return `<span class="${cls}" style="--c:${col(o)}" title="${esc(`${o === 1 ? 'You' : `${lordOf(o).short} of ${A.name}`}: ${pts} of ${HILL.goal}${state}`)}">`
+      return `<span class="${cls}" style="--c:${col(o)}" title="${modeUi.barTitle(o, `${pts} of ${HILL.goal}${state}`)}">`
         + `<span class="hb-name">${o === H.leader ? crownSvg : ''}${esc(o === 1 ? 'You' : A.name)}</span>`
         + `<span class="hb-track"><span style="width:${(100 * pts / HILL.goal).toFixed(1)}%"></span></span>`
         + `<span class="hb-pts">${pts}</span></span>`;
@@ -50,8 +47,7 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
     hudBeforeHill();
     renderBar();
     if (!on1()) return;
-    const narrow = matchMedia('(max-width: 560px)').matches;
-    const rivals = G.owners.slice(1).map(o => narrow ? army(o).name : `${lordOf(o).short} of ${army(o).name}`).join(' & ');
+    const rivals = modeUi.rivalsText();
     const H = G.hill, holder = H.holder ? `${who(H.holder)} ${H.holder === 1 ? 'hold' : 'holds'} the hill` : 'The hill is unclaimed';
     statusEl.textContent = `King of the Hill · ${DIFF_NAME[G.cfg.diff]} · vs ${rivals} · ${G.over ? `Over after ${fmtTime(G.time)}` : `${holder} · ${fmtTime(Math.max(0, HILL.cap - G.time))} left`}`;
     statusEl.title = statusEl.textContent;
@@ -125,13 +121,13 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
   });
 
   // ---------- the menu entry, under Modes ----------
-  const sheet = document.querySelector('#menu .sheet');
-  if (!sheet) return;
-  let hDiff = ['easy', 'medium', 'hard'].includes(store.get('cs-hill-diff', 'medium')) ? store.get('cs-hill-diff', 'medium') : 'medium';
+  // The card is the first in the shared Modes group, which it styles (.group.hill).
+  const group = modeUi.modesGroup();
+  if (!group) return;
+  let hDiff = modeUi.storedDiff('cs-hill-diff');
   let hRivals = [1, 2, 4].includes(store.get('cs-hill-rivals', 1)) ? store.get('cs-hill-rivals', 1) : 1;
-  const group = document.createElement('div');
-  group.className = 'group hill';
-  group.innerHTML = `<span class="label">Modes</span>
+  group.classList.add('hill');
+  group.insertAdjacentHTML('beforeend', `
     <b class="mode-name">King of the Hill</b>
     <p style="font-size:14px">A short race of five to ten minutes. A crowned keep stands at the centre of the map: whoever holds it scores a point a second, and the first to ${HILL.goal} wins. After ${HILL.cap / 60} minutes the most points wins. Your starting castle can be emptied but never taken, and the rival lords know the rule.</p>
     <span class="sublabel">Difficulty</span>
@@ -139,15 +135,8 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
     <span class="sublabel">Rivals</span>
     <div class="seg" id="hillRivalSeg">${[[1, '1 rival'], [2, '2 rivals'], [4, 'All four']].map(([n, t]) => `<button data-hrivals="${n}" aria-pressed="${n === hRivals}">${t}</button>`).join('')}</div>
     <p class="hill-best" id="hillBest"></p>
-    <button class="primary" id="btnHill">Take the hill</button>`;
-  const groups = [...sheet.querySelectorAll('.group')];
-  const anchor = groups.find(g => g.classList.contains('grand')) || ($('ladder') && $('ladder').closest('.group'));
-  if (anchor) anchor.after(group); else sheet.append(group);
-  const pickIn = (id, attr, set) => $(id).addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    set(b.dataset[attr]);
-  });
+    <button class="primary" id="btnHill">Take the hill</button>`);
+  const { pickIn } = modeUi;
   pickIn('hillDiffSeg', 'hdiff', v => { hDiff = v; store.set('cs-hill-diff', v); });
   pickIn('hillRivalSeg', 'hrivals', v => { hRivals = +v; store.set('cs-hill-rivals', hRivals); });
   // The record for the army chosen at the top of the menu (kept by js/achievements.js).
@@ -158,6 +147,5 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
   renderBest();
   $('btnHill').addEventListener('click', () => startHill(myArmy, hRivals, hDiff));
   $('armyPick').addEventListener('click', renderBest);
-  const menu = $('menu');
-  if (menu && typeof MutationObserver === 'function') new MutationObserver(() => { if (!menu.hidden) renderBest(); }).observe(menu, { attributes: true, attributeFilter: ['hidden'] });
+  modeUi.onMenuShown(renderBest);
 })();

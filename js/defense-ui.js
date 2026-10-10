@@ -20,16 +20,7 @@ function startDefense(daily = false) {
   const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
   // ---------- the menu: a Modes group, shared with the other modes, and the Siege Defense card ----------
-  const sheet = document.querySelector('#menu .sheet');
-  const labelled = text => [...document.querySelectorAll('#menu .sheet .group')].find(g => { const l = g.querySelector('.label'); return l && l.textContent.trim() === text; });
-  let modes = labelled('Modes');
-  if (!modes && sheet) {
-    modes = document.createElement('div');
-    modes.className = 'group modes';
-    modes.innerHTML = '<span class="label">Modes</span>';
-    const after = document.querySelector('#menu .sheet .group.grand') || labelled('Campaign');
-    if (after) after.after(modes); else sheet.append(modes);
-  }
+  const modes = modeUi.modesGroup();
   const card = document.createElement('div');
   card.className = 'resume defense-card';
   card.innerHTML = `<div><b>Siege Defense</b>
@@ -45,8 +36,7 @@ function startDefense(daily = false) {
   }
   $('btnDefense').addEventListener('click', () => startDefense(false));
   $('btnDefenseDaily').addEventListener('click', () => startDefense(true));
-  const menu = $('menu');
-  if (typeof MutationObserver === 'function' && menu) new MutationObserver(() => { if (!menu.hidden) renderCard(); }).observe(menu, { attributes: true, attributeFilter: ['hidden'] });
+  modeUi.onMenuShown(renderCard);
   renderCard();
 
   // ---------- the Next wave button, beside Pause ----------

@@ -11,16 +11,13 @@
 
 // Start a Capture the Crown duel: `army` against one random lord on `diff`, on a large map.
 function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
-  const foes = shuffle(ARMY_IDS.filter(id => id !== armyId)).slice(0, 1);
+  const foes = modeUi.pickRivals(armyId, 1);
   play(crownCfg(armyId, foes, diff));
 }
 
 (() => {
-  const $ = id => document.getElementById(id);
-  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const { $, esc, who, crownSvg: crownIcon } = modeUi;   // shared with the other Modes cards (js/modes-ui.js)
   const on1 = () => !!G && G.mode === 'crown' && !!G.crown && !G.cfg.demo;
-  const who = o => o === 1 ? 'You' : lordOf(o).short;
-  const crownIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 19h18l-1.6-11-4.6 4.2L12 5 9.2 12.2 4.6 8z"/></svg>';
   const hideLeft = () => Math.max(0, CROWN.hideTime - G.time);
   // What the player knows about realm o's crown: its castle (or null), and how.
   function knownCrown(o) {
@@ -63,7 +60,7 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
     bar.hidden = false;
     if (key === barKey) return;
     barKey = key;
-    bar.innerHTML = states.map(([o, s]) => `<span class="cb ${s.cls}" style="--c:${col(o)}" title="${esc(`${o === 1 ? 'You' : `${lordOf(o).short} of ${army(o).name}`}: ${s.text}`)}">`
+    bar.innerHTML = states.map(([o, s]) => `<span class="cb ${s.cls}" style="--c:${col(o)}" title="${modeUi.barTitle(o, s.text)}">`
       + `<span class="cb-icon">${crownIcon}</span><span class="cb-name">${esc(o === 1 ? 'You' : army(o).name)}</span><span class="cb-state">${esc(s.text)}</span></span>`).join('');
     bar.setAttribute('aria-label', 'Crowns: ' + states.map(([o, s]) => `${o === 1 ? 'you' : army(o).name}, ${s.text}`).join('; '));
   }
@@ -87,8 +84,7 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
     if (!on1() && unitType === 'scout') setUnitType('foot');
     if (!on1()) return;
     intro();
-    const narrow = matchMedia('(max-width: 560px)').matches;
-    const rivals = G.owners.slice(1).map(o => narrow ? army(o).name : `${lordOf(o).short} of ${army(o).name}`).join(' & ');
+    const rivals = modeUi.rivalsText();
     const C = G.crown, left = G.owners.filter(o => !C.out[o]).length;
     const when = G.over ? `Over after ${fmtTime(G.time)}` : G.time < CROWN.hideTime ? `Hide your crown: ${Math.ceil(hideLeft())}s free`
       : C.revealed ? 'Every crown is revealed' : `Crowns revealed in ${fmtTime(Math.max(0, CROWN.revealAt - G.time))}`;
@@ -226,17 +222,8 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
   });
 
   // ---------- the menu card, under Modes ----------
-  const sheet = document.querySelector('#menu .sheet');
-  const labelled = text => [...document.querySelectorAll('#menu .sheet .group')].find(g => { const l = g.querySelector('.label'); return l && l.textContent.trim() === text; });
-  let modes = labelled('Modes');
-  if (!modes && sheet) {
-    modes = document.createElement('div');
-    modes.className = 'group modes';
-    modes.innerHTML = '<span class="label">Modes</span>';
-    const after = document.querySelector('#menu .sheet .group.grand') || labelled('Campaign');
-    if (after) after.after(modes); else sheet.append(modes);
-  }
-  let cDiff = ['easy', 'medium', 'hard'].includes(store.get('cs-crown-diff', 'medium')) ? store.get('cs-crown-diff', 'medium') : 'medium';
+  const modes = modeUi.modesGroup();
+  let cDiff = modeUi.storedDiff('cs-crown-diff');
   const card = document.createElement('div');
   card.className = 'resume crown-card';
   card.innerHTML = `<div><b>Capture the Crown</b>
@@ -246,18 +233,12 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
 </span></div>
     <button class="primary" id="btnCrown">Raid for the crown</button>`;
   if (modes) modes.append(card);
-  const pickIn = (id, attr, set) => $(id).addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    set(b.dataset[attr]);
-  });
-  pickIn('crownDiffSeg', 'cdiff', v => { cDiff = v; store.set('cs-crown-diff', v); });
+  modeUi.pickIn('crownDiffSeg', 'cdiff', v => { cDiff = v; store.set('cs-crown-diff', v); });
   function renderRec() {
     const r = typeof ach === 'object' && ach && ach.rec ? ach.rec : {};
     $('crownRec').textContent = r.crownPlayed ? `Raids won: ${r.crownWon || 0} of ${r.crownPlayed} · crowns taken: ${r.crownsTaken || 0}` : 'No raids yet.';
   }
   renderRec();
   $('btnCrown').addEventListener('click', () => startCrown(myArmy, 1, cDiff));
-  const menu = $('menu');
-  if (menu && typeof MutationObserver === 'function') new MutationObserver(() => { if (!menu.hidden) renderRec(); }).observe(menu, { attributes: true, attributeFilter: ['hidden'] });
+  modeUi.onMenuShown(renderRec);
 })();
