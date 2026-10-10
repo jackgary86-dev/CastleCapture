@@ -43,9 +43,19 @@ function taunt(o, kind, force = false) {
 
 // What the simulation reports, turned into sound, banners and lord lines.
 on('newGame', () => { sel.clear(); resize(); sfx.music.setTheme(G.cfg.demo ? 'menu' : ARMIES[G.cfg.map].map); });   // the menu has its own theme (#69)
+// A kingdom's power as its seated lord plays it: an alternate lord (#71) twists how long it lasts, how soon it
+// comes round and how hard it bites, so the text, the panel's bar and the toasts follow the twist (#79).
+const powerDur = o => army(o).power.dur * powerTwist(o, 'durMul');
+const powerRecharge = o => rechargeTime() * powerTwist(o, 'rechargeMul');
+function powerDesc(o) {
+  const P = army(o).power, s = powerTwist(o, 'strengthMul');
+  let d = P.desc.replace(/\b(\d+(?:\.\d+)?) seconds\b/, () => `${+powerDur(o).toFixed(1)} seconds`);
+  if (s !== 1) d = d.replace(/\b(\d+)%/, (m, n) => `${Math.round(+n * s)}%`);
+  return d;
+}
 on('power', ({ o, army: A }) => {
   if (G.cfg.demo) return;
-  toast(o === 1 ? `You ${A.power.call}!` : `${A.full} ${A.power.they}!`, o === 1 ? A.power.desc : A.power.desc.replace(/\byour\b/g, 'their'), A.color);
+  toast(o === 1 ? `You ${A.power.call}!` : `${A.full} ${A.power.they}!`, o === 1 ? powerDesc(o) : powerDesc(o).replace(/\byour\b/g, 'their'), A.color);
   sfx.power(o === 1);
   if (o !== 1) taunt(o, 'power', true);
 });
@@ -239,20 +249,20 @@ function updatePowerPanel() {
   powerPanel.hidden = !G || G.cfg.demo || G.over;
   if (powerPanel.hidden) return;
   const id = G.fac[1], A = ARMIES[id], pw = G.pw[1];
-  if (ppArmy !== id) {
-    ppArmy = id;
+  if (ppArmy !== lordKey(1)) {   // by lord, not army: an army's two lords play its power differently
+    ppArmy = lordKey(1);
     ppEmblem.innerHTML = svg(A.emblem);
     ppName.textContent = A.power.name;
-    ppDesc.textContent = A.power.desc;
+    ppDesc.textContent = powerDesc(1);
   }
   const active = G.time < pw.until, ready = !active && pw.ready <= 0;
   let fill, state;
   if (active) {
     const left = pw.until - G.time;
-    fill = left / A.power.dur;
+    fill = left / powerDur(1);
     state = `Active · ${Math.ceil(left)}s left`;
   } else if (!ready) {
-    fill = 1 - pw.ready / (pw.until > 0 ? rechargeTime() : FIRST_CHARGE);
+    fill = 1 - pw.ready / (pw.until > 0 ? powerRecharge(1) : FIRST_CHARGE);
     state = `Ready in ${fmtTime(Math.ceil(pw.ready))}`;
   } else {
     fill = 1;

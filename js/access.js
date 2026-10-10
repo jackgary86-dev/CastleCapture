@@ -178,7 +178,7 @@ on('capture', ({ o, was, castle }) => {
   if (o === 1) announce(`You captured ${was ? `a ${army(was).name} castle` : 'an unclaimed keep'}. ${Math.floor(castle.units)} troops inside`);
   else if (was === 1) announce(`${army(o).name} captured one of your castles`);
 });
-on('power', ({ o, army: A }) => { if (!G.cfg.demo) announce(o === 1 ? `You used ${A.power.name}` : `${A.name} used ${A.power.name}: ${A.power.desc}`); });
+on('power', ({ o, army: A }) => { if (!G.cfg.demo) announce(o === 1 ? `You used ${A.power.name}` : `${A.name} used ${A.power.name}: ${powerDesc(o)}`); });
 on('powerReady', ({ o }) => { if (o === 1 && !G.cfg.demo) announce(`${army(1).power.name} is ready. Press Q`); });
 on('surrender', ({ o }) => { if (!G.cfg.demo) announce(`${army(o).name} surrenders`); });
 on('build', ({ o, unit }) => { if (!G.cfg.demo) announce(`${o === 1 ? 'You' : army(o).name} built a ${unit.name}`); });
