@@ -43,7 +43,7 @@ const LESSONS = [
   },
   {
     title: 'Attack from several castles',
-    text: () => 'Drag across both of your castles, then onto the keep marked in gold. Every castle you pass over sends troops. (Or press Space to select all your castles, then click the keep.)',
+    text: () => 'Drag across both of your castles, then onto the keep marked in gold. Every castle you pass over sends troops. (Or press Space to select all your castles, then click or tap the keep.)',
     setup(t) {
       t.multi = false;
       const mine = mineNow();
@@ -90,14 +90,14 @@ const LESSONS = [
   },
   {
     title: 'Use your special power',
-    text: () => { const P = army(1).power; return `Your army's power is ready: ${P.name}. ${P.desc} Press Q, or click the power panel at the top left.`; },
+    text: () => { const P = army(1).power; return `Your army's power is ready: ${P.name}. ${P.desc} Press Q, or click or tap the power panel at the top left.`; },
     setup(t) { G.pw[1].ready = 0; t.powered = false; },
     rings: () => [],
     done: t => t.powered,
   },
   {
     title: 'Take their castle',
-    text: () => `${lordOf(2).short} will fight back now. Capture every enemy castle to win. Tip: your castles earn coins, and B opens the shop for a map unit.`,
+    text: () => `${lordOf(2).short} will fight back now. Capture every enemy castle to win. Tip: your castles earn coins, and B (or the Map units button) opens the shop for a map unit.`,
     setup() { G.ais = [{ id: 2, diff: 'easy', timer: 2, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() }]; },
     rings: () => G.planets.filter(p => p.owner === 2),
     done: () => G.over,

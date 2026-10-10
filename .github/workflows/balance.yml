@@ -17,8 +17,8 @@ jobs:
         run: for f in js/*.js tools/*.js; do node --check "$f"; done
       - name: Smoke test
         # Loads every script index.html loads, in order, with stand-in browser objects, then plays,
-        # saves, resumes and finishes two battles. Catches load-order mistakes and render/UI crashes
-        # that the balance test, which only loads data.js and sim.js, can't see.
+        # saves, resumes and finishes every mode. Catches load-order mistakes and render/UI crashes
+        # that the balance test, which loads only the rule files (no DOM), can't see.
         run: node tools/smoke.js
       - name: AI-vs-AI balance test (Warlord)
         # 8 games per pairing (32 per army) keeps the win rates stable; runs are seeded, so results are repeatable.

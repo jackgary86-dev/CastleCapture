@@ -129,7 +129,7 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
   group.classList.add('hill');
   group.insertAdjacentHTML('beforeend', `
     <b class="mode-name">King of the Hill</b>
-    <p style="font-size:14px">A short race of five to ten minutes. A crowned keep stands at the centre of the map: whoever holds it scores a point a second, and the first to ${HILL.goal} wins. After ${HILL.cap / 60} minutes the most points wins. Your starting castle can be emptied but never taken, and the rival lords know the rule.</p>
+    <p style="font-size:14px">A short race of ${HILL.goal / 60} to ${HILL.cap / 60} minutes. A crowned keep stands at the centre of the map: whoever holds it scores a point a second, and the first to ${HILL.goal} wins. After ${HILL.cap / 60} minutes the most points wins. Your starting castle can be emptied but never taken, and the rival lords know the rule.</p>
     <span class="sublabel">Difficulty</span>
     <div class="seg" id="hillDiffSeg">${['easy', 'medium', 'hard'].map(d => `<button data-hdiff="${d}" aria-pressed="${d === hDiff}">${DIFF_NAME[d]}</button>`).join('')}</div>
     <span class="sublabel">Rivals</span>

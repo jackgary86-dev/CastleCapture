@@ -74,7 +74,7 @@
       html += section(`Special power: ${g.power.name}`, para(`${g.power.desc} Lasts ${g.power.dur} seconds; ready ${FIRST_CHARGE} seconds into a battle, then every ${Math.round(RECHARGE / 60)} minutes.`));
       const saves = typeof AI_UNIT !== 'undefined' && typeof MAP_UNITS !== 'undefined' && MAP_UNITS[AI_UNIT[id]];
       html += section('As a rival', para(g.personality + (saves ? ` Saves coins for a ${saves.name}.` : '')));
-      if (typeof UNIT_TYPES !== 'undefined') html += section('Troop types', list(Object.values(UNIT_TYPES).map(u => `${u.name}: ${u.desc}`)) + (id === 'kharzul' ? para('Torvek trusts his horses and never fields catapults.') : AI_SIEGE ? '' : para('As a rival, this army rides cavalry to reinforce but does not field catapults yet.')));
+      if (typeof UNIT_TYPES !== 'undefined') html += section('Troop types', list(Object.values(UNIT_TYPES).map(u => `${u.name}: ${u.desc}`)) + (id === 'kharzul' ? para(`${L ? L.short : 'Torvek'} trusts his horses and never fields catapults.`) : AI_SIEGE ? '' : para('As a rival, this army rides cavalry to reinforce but does not field catapults yet.')));
       html += section('Homeland', para(`${g.homeland}. Castles are built in the ${esc(a.castle)} style; its banners are ${g.flag === 'streamer' ? 'long streamers' : g.flag === 'tassel' ? 'horsehair tassels' : g.flag === 'square' ? 'square standards' : g.flag === 'pennant' ? 'long pennants' : 'swallow-tailed flags'}.`));
     } else {
       html += section('Homeland', para(T.name));
@@ -90,9 +90,9 @@
       const owned = typeof ownsLord === 'function' && ownsLord(id);
       html += section(`Alternate lord: ${L2.name}`, `<div class="codex-alt">${portraitHtml(id, true)}<div>`
         + para(`${L2.title[0].toUpperCase() + L2.title.slice(1)}. ${L2.bio}`)
-        + para(`How ${L2.short} plays: ${L2.playstyle}`)
-        + para(`Power twist: ${L2.power.twist}`)
-        + para(owned ? `You have unlocked ${L2.short}: pick them on the army card.` : `Unlock for ${L2.price} renown on the Profile page.`)
+        + para(`How ${L2.short} plays: ${L2.playstyle[0].toLowerCase() + L2.playstyle.slice(1)}`)
+        + para(`Power twist${g ? ` (${g.power.name})` : ''}: ${L2.power.twist}`)
+        + para(owned ? `You have unlocked ${L2.short}: pick ${L2.short} on the army card.` : `Unlock ${L2.short} for ${L2.price} renown on the Profile page, then pick ${L2.short} on the army card.`)
         + `</div></div><p class="codex-quote">“${esc(L2.challenge)}”</p>`);
     }
     body.innerHTML = html;
@@ -100,11 +100,19 @@
 
   function monsterEntry(id) {
     const m = info.MONSTERS[id];
+    // Numbers come from MONSTERS and GRAND_MAPS (data.js) when they are loaded; galleryInfo is the fallback.
+    const M = typeof MONSTERS !== 'undefined' && MONSTERS[id];
+    const gm = typeof GRAND_MAPS !== 'undefined' && Object.values(GRAND_MAPS).find(x => x.monster === id);
+    const band = !!(M && M.count);
+    const mapName = gm ? gm.name : m.map, respawn = M ? M.respawn : m.respawn;
+    const health = M ? (band ? `${M.hp} per captain, ${M.count} captains` : M.hp) : m.health;
+    const bounty = M ? (band ? `${M.payout} per captain, ${M.bonus} more for the last` : `${M.payout} coins`) : (typeof m.bounty === 'number' ? `${m.bounty} coins` : m.bounty);
+    const strength = M ? `${M.bite} troops for every 1 ${band ? 'they fight' : 'it fights'}${M.forest ? ', but only in the trees' : ''}` : m.strength;
     title.innerHTML = `${esc(m.name)}<span class="chip" style="--c:#e0362f;--ci:#fff8e6">Monster</span>`;
     body.innerHTML = section(m.title, para(m.story))
-      + section('Where it roams', para(`${m.map}. It returns ${m.respawn} waves after it is killed, spawning far from every army's castles.`))
+      + section('Where it roams', para(`${mapName}. ${band ? 'They return' : 'It returns'} ${respawn} waves after ${band ? 'the last captain is' : 'it is'} killed, spawning far from every army's castles.`))
       + section('Abilities', list(m.abilities))
-      + section('Health and bounty', `<div class="codex-stats codex-stats-3">${stat('Health', m.health)}${stat('Bounty', `${m.bounty} coins`)}${stat('Strength', m.strength)}</div>` + para('Damage dealt is tracked for every army, but the whole bounty goes to whoever lands the final blow.'))
+      + section('Health and bounty', `<div class="codex-stats codex-stats-3">${stat('Health', health)}${stat('Bounty', bounty)}${stat('Strength', strength)}</div>` + para(band ? "Damage dealt is tracked for every army, but each captain's bounty goes to whoever lands the final blow on that captain." : 'Damage dealt is tracked for every army, but the whole bounty goes to whoever lands the final blow.'))
       + section('How to beat it', para(m.tactics))
       + `<p class="codex-quote">“${esc(m.quote)}”</p>`;
   }
@@ -117,7 +125,7 @@
     { id: 'powers', name: 'Special powers', sub: 'One per army' },
     { id: 'hill', name: 'King of the Hill', sub: 'A mode: race for the crown' },
     { id: 'renown', name: 'Renown and the realm map', sub: 'Unlocks, seasons, hall of fame' },
-    { id: 'crown', name: 'Capture the Crown', sub: 'A mode: find the hidden crowns' },
+    { id: 'crown', name: 'Capture the Crown', sub: 'A mode: a duel for hidden crowns' },
   ];
   const GOLD = '#e9b43b', PALE = '#ece2c6';
   // An army's emblem as plain strokes, the same shapes access.js draws on plaques.
@@ -265,21 +273,21 @@
       html += table(['Type', 'Speed', 'Against castles', 'On the road', 'Best for'], Object.values(UNIT_TYPES).map(t => [t.name, x(t.speed), x(t.siege), x(t.road), t.desc]));
       html += section('Using them', list(['Cavalry reach a threatened castle long before foot, and catch enemy columns on the road, but bounce off walls.', 'Catapults crack castles open but crawl and lose road fights: send foot alongside, or wait until the road is clear.', AI_SIEGE ? 'The rival lords field all three; the AI keeps its catapults for sieges with an escort.' : 'The rival lords field foot and cavalry, never catapults.']));
     } else if (id === 'kinds' && typeof CASTLE_KINDS !== 'undefined') {
-      html += section('Special castles', para('About a quarter of the unclaimed keeps on a map are special. Each carries a badge beside its troop count, and keeps its kind when captured.'));
+      html += section('Special castles', para(`About ${KIND_SHARE === 0.25 ? 'a quarter' : `${Math.round(KIND_SHARE * 100)}%`} of the unclaimed keeps on a map are special. Each carries a badge beside its troop count, and keeps its kind when captured.`));
       html += table(['Kind', 'Badge', 'Defence', 'Training', 'Effect'], Object.values(CASTLE_KINDS).map(k => [k.name, k.name === 'Fortress' ? 'Shield' : k.name === 'War camp' ? 'Crossed swords' : 'Cottage', x(k.def), k.prod ? x(k.prod) : 'none', k.desc]));
-      html += section('Sizes and upkeep', list(['Bigger castles train faster and hold more: small, medium and large keeps are capped at 60, 90 and 120 troops, plus 15 per Walls level; troops above the cap desert.', 'Training halves once a garrison passes twice the castle\'s size and halves again past four times.', 'Walls make defenders count more and archers shoot faster and farther; Barracks train faster and make stronger soldiers. A captured castle loses one level of each.', 'In Siege Defense the lords muster each wave at siege camps on the far edge (a war-banner badge) that cannot be taken, and Walls and Barracks can also be bought with coins.']));
+      html += section('Sizes and upkeep', list([`Bigger castles train faster and hold more: small, medium and large keeps are capped at ${GARRISON_CAP[1]}, ${GARRISON_CAP[2]} and ${GARRISON_CAP[3]} troops, plus ${WALL_CAP} per Walls level; troops above the cap desert.`, `Training halves once a garrison passes ${UPKEEP_AT === 2 ? 'twice' : `${UPKEEP_AT} times`} the castle's size and halves again past ${UPKEEP_AT === 2 ? 'four' : UPKEEP_AT * 2} times.`, 'Walls make defenders count more and archers shoot faster and farther; Barracks train faster and make stronger soldiers. A captured castle loses one level of each.', 'In Siege Defense the lords muster each wave at siege camps on the far edge (a war-banner badge) that cannot be taken, and Walls and Barracks can also be bought with coins.', ...(typeof BIG_MAP !== 'undefined' ? [`On a big map (more than ${BIG_MAP.castlesPer} castles a kingdom, such as a Long war against one rival, or Capture the Crown) the rival lords leave at most ${BIG_MAP.keep} troops at home.`] : [])]));
     } else if (id === 'units' && typeof MAP_UNITS !== 'undefined') {
-      html += section('Buying one', para(`Every castle earns coins each minute by size (1, 2 or 3), up to a treasury of ${typeof COIN_CAP !== 'undefined' ? COIN_CAP : 300}. Press B or Map units to open the shop and place one unit per battle within reach of your castles. In the Grand Campaign purchases are queued as orders. In Siege Defense each wave you beat pays out coins, and you may build another unit after every wave, up to ${typeof DEFENSE !== 'undefined' ? DEFENSE.maxUnits : 2} standing.`));
+      html += section('Buying one', para(`Every castle earns coins each minute by size (${COIN_PER_MIN[1]}, ${COIN_PER_MIN[2]} or ${COIN_PER_MIN[3]}), up to a treasury of ${typeof COIN_CAP !== 'undefined' ? COIN_CAP : 300}. Press B or Map units to open the shop and place one unit per battle within reach of your castles. In the Grand Campaign purchases are queued as orders. In Siege Defense each wave you beat pays out coins, and you may build another unit after every wave, up to ${typeof DEFENSE !== 'undefined' ? DEFENSE.maxUnits : 2} standing.`));
       html += table(['Unit', 'Role', 'Price', 'Range', 'What it does'], Object.values(MAP_UNITS).map(m => [m.name, m.kind, `${m.price} coins`, m.range, m.desc]));
       const lords = typeof AI_UNIT !== 'undefined' && game.lords ? Object.entries(AI_UNIT).filter(([aid]) => game.lords[aid]).map(([aid, u]) => `${game.lords[aid].short} saves for a ${MAP_UNITS[u].name}.`) : [];
       if (lords.length) html += section('What the lords buy', list(lords));
     } else if (id === 'powers' && game.armies) {
       const ids = typeof ARMY_IDS !== 'undefined' ? ARMY_IDS : Object.keys(game.armies);
-      html += section('Timing', para(`Press Q, or click the power panel in the top left of the map. A power is first ready ${typeof FIRST_CHARGE !== 'undefined' ? FIRST_CHARGE : 45} seconds into a battle and then every ${typeof RECHARGE !== 'undefined' ? Math.round(RECHARGE / 60) : 5} minutes (the Power recharge setting changes this). Player 2 uses R. In the Grand Campaign a power is queued as an order and fires when the wave marches.`));
+      html += section('Timing', para(`Press Q, or click the power panel in the top left of the map. A power is first ready ${typeof FIRST_CHARGE !== 'undefined' ? FIRST_CHARGE : 45} seconds into a battle and then every ${typeof RECHARGE !== 'undefined' ? Math.round(RECHARGE / 60) : 5} minutes (the Power recharge setting changes this). Player 2 uses R. In the Grand Campaign a power is queued as an order and fires when the wave marches.${typeof BIG_MAP !== 'undefined' && game.armies.solmara ? ` On a big map (more than ${BIG_MAP.castlesPer} castles a kingdom, such as a Long war against one rival, or Capture the Crown) the ${game.armies.solmara.power.name} multiplies training by ${BIG_MAP.tithe} instead of doubling it.` : ''}`));
       html += table(['Army', 'Power', 'Lasts', 'Effect'], ids.map(aid => { const A = game.armies[aid]; return [A.name, A.power.name, `${A.power.dur}s`, A.power.desc]; }));
     } else if (id === 'hill' && typeof HILL !== 'undefined') {
-      html += section('The race', para(`A short mode of five to ten minutes, found under Modes on the menu. A crowned keep stands at the centre of the map. Whoever holds it scores a point a second; the first to ${HILL.goal} wins, and after ${HILL.cap / 60} minutes the most points wins. The score bar in the header shows every realm's points.`));
-      html += section('The hill keep', list([`It is a large keep with strong walls: defenders count ${HILL.def}× for whoever holds it, and it can't be upgraded.`, `It starts with ${HILL.garrison} unclaimed defenders and trains fast once taken, up to 120.`, "Each kingdom's starting castle flies a gold pennant: it can be emptied but never taken, so nobody is knocked out of the race.", `A banner calls out the leader. At ${HILL.focusAt} points every lord turns on them.`]));
+      html += section('The race', para(`A short mode of ${HILL.goal / 60} to ${HILL.cap / 60} minutes, found under Modes on the menu. A crowned keep stands at the centre of the map. Whoever holds it scores a point a second; the first to ${HILL.goal} wins, and after ${HILL.cap / 60} minutes the most points wins. The score bar in the header shows every realm's points.`));
+      html += section('The hill keep', list([`It is a large keep with strong walls: defenders count ${HILL.def}× for whoever holds it, and it can't be upgraded.`, `It starts with ${HILL.garrison} unclaimed defenders and trains fast once taken, up to ${GARRISON_CAP[3]}.`, "Each kingdom's starting castle flies a gold pennant: it can be emptied but never taken, so nobody is knocked out of the race.", `A banner calls out the leader. At ${HILL.focusAt} points every lord turns on them.`]));
       const lords = game.lords ? [['kharzul', 'rushes the hill, harder than anyone.'], ['aldmere', 'takes the keeps beside it and strikes the moment someone else has paid to take it.'], ['solmara', 'builds a Ballista Tower next to it.'], ['nyx', 'waits for the holder to bleed, then pounces.'], ['frostmark', "freezes the holder's columns with Winter's Grip while hers close in."]].filter(([aid]) => game.lords[aid]).map(([aid, t]) => `${game.lords[aid].short} ${t}`) : [];
       if (lords.length) html += section('How the lords play it', list(lords));
       html += section('Records', para(`Your best time to ${HILL.goal} is kept for each army under Achievements and records.`));
@@ -291,14 +299,15 @@
         `King of the Hill: ${R.hillWin.easy} to ${R.hillWin.hard} for a win. Siege Defense: ${R.defenseWave} for every wave held.`,
         `${R.achievement} for every achievement, and ${R.slain} for the killing blow on a map monster.`,
       ]));
-      html += section('Spending it', para("Open Profile on the menu. Banners and roof colours change how your castles look and nothing else. A starting map unit (Ballista Tower, Siege Trebuchet or Great Ward) stands beside your home castle at the start of every skirmish and uses up that battle's one map unit; it can be switched off."));
+      html += section('Spending it', para(`Open Profile on the menu. Banners and roof colours change how your castles look and nothing else. A starting map unit (Ballista Tower, Siege Trebuchet or Great Ward) stands beside your home castle at the start of every skirmish and uses up that battle's one map unit; it can be switched off.${typeof LORDS_ALT !== 'undefined' ? ` Each army's alternate lord costs ${Math.min(...Object.values(LORDS_ALT).map(l => l.price))} renown and, once bought, is picked on the army card.` : ''}`));
       html += section('The realm map', para(`Winning a Grand Campaign claims its map for the season. Each claimed region adds ${REALM_BONUS.perRegion} troops to your home castle at the start of later Grand Campaigns, at most ${REALM_BONUS.max}, and that can be switched off too. Beginning a new season clears the map and keeps the old one in the hall of fame.`));
     } else if (id === 'crown' && typeof CROWN !== 'undefined') {
-      html += section('The raid', para(`Found under Modes on the menu: a duel against one lord on a large map, always under fog of war. Every realm hides its crown in one of its castles; take the castle that holds a rival's crown and that realm is out at once, its castles left empty. The last crown wins.`));
-      html += section('Hiding and moving', list([`Your crown starts in your seat. For the first ${CROWN.hideTime} seconds you can hide it in any castle you hold, free and unseen: select the castle and press Hide your crown here.`, `After that, moving it costs ${CROWN.moveCost} coins (every realm starts with ${CROWN.startCoins}) and takes ${CROWN.moveTime} seconds on the road, whatever the distance, escorted by your send % of its castle's garrison.`, 'A crown column can be seen and fought like any other. Whoever destroys it takes the crown.', `After ${CROWN.revealAt / 60} minutes the heralds reveal every crown, so no raid drags on forever.`]));
-      html += section('Finding a crown', list([`Scouts are a troop type of this mode: ${CROWN.scoutTroops} fast riders from your nearest selected castle look inside a castle without attacking it and report whether a crown is there. Archers can still shoot them down.`, 'Capturing a castle also shows whether a crown was there. A report stays fresh on the map for a minute and a half.', 'The crown bar in the header shows what you know of every crown.']));
+      html += section('The raid', para(`Found under Modes on the menu: a duel against one lord on a large map of ${CROWN.castles} castles, always under fog of war. You and your rival each hide a crown in one of your castles; take the castle that holds theirs and they are out at once, their castles left empty. The last crown standing wins.`));
+      html += section('Hiding and moving', list([`Your crown starts in your seat. For the first ${CROWN.hideTime} seconds you can hide it in any castle you hold, free and unseen: select the castle and press Hide your crown here.`, `After that, moving it costs ${CROWN.moveCost} coins (both realms start with ${CROWN.startCoins}) and takes ${CROWN.moveTime} seconds on the road, whatever the distance, escorted by your send % of its castle's garrison.`, 'A crown column can be seen and fought like any other. Whoever destroys it takes the crown.', `After ${CROWN.revealAt / 60} minutes the heralds reveal every crown, so no raid drags on forever.`]));
+      html += section('Finding a crown', list([`Scouts are a troop type of this mode: ${CROWN.scoutTroops} fast riders from your nearest selected castle look inside a castle without attacking it and report whether a crown is there. Archers can still shoot them down.`, `Capturing a castle also shows whether a crown was there. A report stays fresh on the map for ${CROWN.intelFresh} seconds.`, 'The crown bar in the header shows what you know of both crowns.']));
+      if (typeof BIG_MAP !== 'undefined' && CROWN.castles / 2 > BIG_MAP.castlesPer) html += section('A big map', para(`With ${CROWN.castles / 2} castles a kingdom this counts as a big map: your rival leaves at most ${BIG_MAP.keep} troops at home, and the ${game.armies && game.armies.solmara ? game.armies.solmara.power.name : 'Golden Tithe'} multiplies training by ${BIG_MAP.tithe} instead of doubling it.`));
       const lords = game.lords ? [['aldmere', 'hides her crown in her biggest castle behind fresh walls and keeps it there, guarded heavily.'], ['kharzul', 'keeps his crown in his own hall and never moves it. He sends no scouts: he hits the fattest castle he can see.'], ['frostmark', 'keeps her crown in her hall and moves it deeper the moment rival scouts find it.'], ['solmara', 'hides his crown anywhere but his seat, scouts more than anyone and pays to keep his crown moving.'], ['nyx', 'hides her crown in a quiet, thinly held castle and fattens a decoy elsewhere; found out, she slips it away.']].filter(([aid]) => game.lords[aid]).map(([aid, t]) => `${game.lords[aid].short} ${t}`) : [];
-      if (lords.length) html += section('How the lords play it', list(['Every lord guesses where a crown is from how heavily castles are held, so a fat decoy garrison draws them.', ...lords]));
+      if (lords.length) html += section('How the lords play it', list(['Your rival is one of these lords. Every lord guesses where a crown is from how heavily castles are held, so a fat decoy garrison draws them.', ...lords]));
     } else {
       html += para('Nothing to show.');
     }

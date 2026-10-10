@@ -3,7 +3,7 @@
 // Siege Defense (#65) in the browser: the menu card under Modes, the wave line in the header, the Next
 // wave button, coin-bought Walls and Barracks in the castle panel, banners as waves come and go, the
 // siege beast drawn over its column, and the end screen with the score and the daily record. The rules
-// live in js/defense.js. Loaded after js/grand-menu.js; it only wraps hud(), updateCastlePanel(), draw()
+// live in js/defense.js. Loaded after js/modes-ui.js and js/hill-ui.js; it only wraps hud(), updateCastlePanel(), draw()
 // and endGame(), as story.js and events.js do.
 
 // Start a game: a fresh siege at the skirmish difficulty, or today's daily siege.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Smoke test: loads every script the page loads, in the same order, into one shared context with
-// stand-in browser objects, then plays a short battle through the UI and draws a frame.
+// stand-in browser objects, then plays every mode through the UI (battles, Hill, Grand, Defense, Crown, Deeper strategy) and draws frames.
 // It fails on any exception, which catches what the balance test can't: load-order mistakes in the
 // UI files (using a name before it is defined), two files declaring the same top-level name, and
 // render or HUD code that throws.
