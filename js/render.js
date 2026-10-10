@@ -920,7 +920,9 @@ function draw(now) {
     ctx.setLineDash([]);
     let troops = 0;
     for (const s of sel) if (s !== ptr.hover) troops += Math.floor(s.units * sendPct);
-    const msg = `${Math.round(sendPct * 100)}% · ${troops}${unitType !== 'foot' ? ' · ' + UNIT_TYPES[unitType].name : ''}`;
+    // Scouts ride as one small band from a single castle, whatever the send amount (#82); to your own castle they march as foot.
+    const scouting = unitType === 'scout' && typeof CROWN !== 'undefined' && !(ptr.hover && ptr.hover.owner === 1);
+    const msg = scouting ? `Scouts · ${CROWN.scoutTroops}` : `${Math.round(sendPct * 100)}% · ${troops}${unitType !== 'foot' && unitType !== 'scout' ? ' · ' + UNIT_TYPES[unitType].name : ''}`;
     const fs = 13 / sc;
     ctx.font = `800 ${fs}px "Alegreya Sans", system-ui, sans-serif`;
     const lw = ctx.measureText(msg).width + fs, lx = ptr.wx + 14 / sc, ly = ptr.wy - 26 / sc;

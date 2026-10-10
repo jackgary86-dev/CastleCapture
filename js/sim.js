@@ -573,7 +573,11 @@ const lordSays = (o, kind, force = false) => emit('taunt', { o, kind, force });
 
 function send(owner, sources, target, frac = 0.5, type = 'foot', escort = false) {
   // Capture the Crown (#66): scouts ride out as one small band from the nearest source (js/crown.js).
-  if (type === 'scout' && G.mode === 'crown' && typeof crownScout === 'function') return crownScout(owner, sources, target);
+  // Scouts sent to one of your own castles simply march there as foot (#82).
+  if (type === 'scout' && G.mode === 'crown' && typeof crownScout === 'function') {
+    if (target.owner !== owner) return crownScout(owner, sources, target);
+    type = 'foot';
+  }
   let launched = false;
   for (const s of sources) {
     if (s === target || s.owner !== owner || allied(owner, target.owner)) continue;
