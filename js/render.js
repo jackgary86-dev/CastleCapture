@@ -239,9 +239,12 @@ function bannerState(p) {
 // Drawn from the battle as it stands and from sim events, on the screen's clock, so none of it can
 // change what happens. Reduced motion turns off the moving parts (dust, sparks); cracks and scaffolding
 // are still pictures, so they stay.
-const juiceFx = { parts: [], scaffold: new Map(), last: 0, dustAt: new Map() };
+const juiceFx = { parts: [], scaffold: new Map(), last: 0, dustAt: new Map(), hitAt: new Map() };
 const JUICE_MAX_PARTS = 260, SCAFFOLD_MS = 2600;
-on('newGame', () => { juiceFx.parts.length = 0; juiceFx.scaffold.clear(); juiceFx.dustAt.clear(); });
+on('newGame', () => { juiceFx.parts.length = 0; juiceFx.scaffold.clear(); juiceFx.dustAt.clear(); juiceFx.hitAt.clear(); });
+// When each castle was last attacked (game time), so only castles under siege show cracked walls (#74).
+on('clash', ({ castle }) => { if (castle && G) juiceFx.hitAt.set(castle.id, G.time); });
+const CRACK_FOR = 25;   // seconds a castle's walls stay cracked after its last attack
 // A taken castle throws up sparks in its new owner's colour as the banner changes.
 on('capture', ({ o, castle }) => {
   if (reduceMotion || !G || G.cfg.demo) return;
@@ -285,10 +288,11 @@ function drawJuice(now, ground) {
   }
 }
 
-// Cracks in the walls as the garrison drops below 40% of what the castle holds: one crack per tenth below,
-// in the same places each time (seeded by the castle), and rubble at the foot of a badly breached keep.
+// Cracks in the walls of a castle under siege (attacked in the last CRACK_FOR seconds) as its garrison drops
+// below 40% of what it holds: one crack per tenth below, in the same places each time (seeded by the castle),
+// and rubble at the foot of a badly breached keep. Quiet castles keep whole walls, however small the garrison.
 function drawWallWear(p, s, baseY) {
-  if (!p.owner) return;
+  if (!p.owner || !(G.time - (juiceFx.hitAt.get(p.id) ?? -1e9) < CRACK_FOR)) return;
   const left = p.units / Math.max(1, capOf(p));
   if (left >= 0.4) return;
   const cracks = Math.min(4, Math.ceil((0.4 - left) / 0.1));
