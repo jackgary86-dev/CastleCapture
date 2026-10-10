@@ -105,8 +105,9 @@ function startDefense(daily = false) {
     [DEFENSE.flankFrom]: 'Cavalry ride for the castle furthest from the main blow.',
     [DEFENSE.beastFrom]: 'A siege beast leads the charge at your biggest garrison: it strikes three times as hard.',
   };
-  let bestAtStart = 0;
-  on('newGame', g => { if (g.mode === 'defense') bestAtStart = records().defenseBestWave || 0; });
+  // The record as the siege began, kept in G.def so a resumed siege still knows it: records update mid-game, so
+  // reading them again on resume would count this siege's own waves as the old record (#86).
+  on('newGame', g => { if (g.mode === 'defense' && g.def) g.def.bestAtStart = records().defenseBestWave || 0; });
   on('defense', e => {
     if (!G || G.cfg.demo) return;
     if (e.kind === 'wave') {
@@ -162,6 +163,7 @@ function startDefense(daily = false) {
     const D = G.def, castles = D.score - D.held, lords = G.owners.slice(1).filter((o, i) => D.wave >= DEFENSE.lordsAt[i]).map(o => army(o).full);
     const lines = [`You held ${plural(D.held, 'wave')} against ${lords.length ? andList(lords) : 'the lords'}.`,
       `Score ${D.score}: ${plural(D.held, 'wave')} survived + ${plural(castles, 'castle')} still held after the last of them.`];
+    const bestAtStart = D.bestAtStart || 0;
     if (D.held > bestAtStart && D.held > 0) lines.push(`A new record: your most waves held.`);
     else if (bestAtStart) lines.push(`Your record is ${plural(bestAtStart, 'wave')}.`);
     if (G.cfg.daily) {
