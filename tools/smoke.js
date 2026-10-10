@@ -567,6 +567,20 @@ if (hasCrown) {
     hud(); draw(${clock});
   }`);
 }
+// Siege Defense on a portrait screen (#75): the map turns a quarter, fortress at the bottom, camps at the top.
+if (hasDefense) run('siege defense portrait', `{
+  newGame(defenseCfg('aldmere', 'medium', null, 4242), true);
+  if (!(G.h > G.w)) throw new Error('a portrait Siege Defense map is not tall');
+  const fort = G.planets.filter(p => p.owner === 1), camps = G.planets.filter(p => p.camp);
+  if (!fort.length || fort.some(p => p.y < G.h * 0.7)) throw new Error('the fortress is not at the bottom of a portrait map');
+  if (camps.length !== 3 || camps.some(p => p.y > G.h * 0.3)) throw new Error('the siege camps are not at the top of a portrait map');
+  G.intro = false; setPaused(false);
+  for (let i = 0; i < 30 * 40 && G.def.wave < 1; i++) update(1 / 30);
+  for (let i = 0; i < 30 * 10; i++) update(1 / 30);
+  if (G.def.wave < 1 || !G.packets.some(k => k.owner > 1)) throw new Error('no wave marched on the portrait map');
+  hud(); draw(${clock});
+}`);
+
 // ---------- deeper strategy (#67): a branch, a cut-off castle, a hill, and a champion who falls and returns ----------
 const hasStrategy = run('strategy check', `typeof strategyTick === 'function' && typeof specialise === 'function'`);
 if (hasStrategy) {

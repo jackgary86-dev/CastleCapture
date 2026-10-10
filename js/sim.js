@@ -348,7 +348,7 @@ function newGame(cfg, portrait = false) {
   // King of the Hill (#64) is fought on dry ground: the rivers' central lake would drown the crowned keep.
   const theme = hill && home.river ? { ...home, river: false } : home;
   const map = grand ? genGrandMap(cfg.seed, cfg)
-    : cfg.mode === 'defense' ? genDefenseMap(cfg.seed, theme)   // Siege Defense (#65), js/defense.js
+    : cfg.mode === 'defense' ? genDefenseMap(cfg.seed, theme, portrait)   // Siege Defense (#65), js/defense.js
     : genMap(cfg.seed, cfg.n, players, portrait, theme, cfg.aiBonus || 0, { scale: cfg.mapScale, start: cfg.start, neutral: cfg.neutral, hill });
   assignKinds(map.planets, cfg.seed);
   // Story campaign setups (#27): a chosen starting garrison and castle kind for the player.

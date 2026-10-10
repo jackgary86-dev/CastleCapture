@@ -59,9 +59,12 @@ function defenseCfg(armyId, diff = 'medium', day = null, seed = null) {
 
 // ---------- the map ----------
 // The same 1000 x 640 field as a two-kingdom battle, with its rivers and forests, but laid out for a
-// siege: the fortress on the west edge, the camps on the east edge, unclaimed keeps in between.
+// siege: the fortress on the west edge, the camps on the east edge, unclaimed keeps in between (turned a quarter
+// on portrait screens: fortress at the bottom, camps at the top).
 const DEFENSE_FORT = [[0, 0, 30], [-15, -150, 22], [-15, 150, 22], [110, -75, 24], [110, 75, 24]];
-function genDefenseMap(seed, theme) {
+// portrait: turn the map a quarter so the fortress sits at the bottom of a tall screen and the camps at the
+// top (#75), exactly as genMap() does for skirmishes; the map is otherwise the same as the landscape one.
+function genDefenseMap(seed, theme, portrait = false) {
   const rnd = mulberry(seed);
   const W = 1000, H = 640, cx = W / 2, cy = H / 2;
   const starts = [{ x: 130, y: cy }, { x: W - 130, y: cy }];
@@ -88,8 +91,17 @@ function genDefenseMap(seed, theme) {
     pts.push({ x, y, r, owner: 0, units: Math.round(r * 0.45 + rnd() * r * 0.7) });
     placed++;
   }
-  const planets = pts.map((p, id) => ({ id, ...p }));
-  return { planets, w: W, h: H, ...buildScenery(planets, T, theme, rnd, W, H) };
+  const rot = p => portrait ? { x: p.y, y: W - p.x } : { x: p.x, y: p.y };
+  const rotV = (vx, vy) => portrait ? [vy, -vx] : [vx, vy];
+  const planets = pts.map((p, id) => ({ id, ...p, ...rot(p) }));
+  if (portrait) {
+    T.rivers = T.rivers.map(r => r.map(rot));
+    if (T.lake) T.lake = { ...rot(T.lake), r: T.lake.r };
+    T.bridges = T.bridges.map(b => { const [tx, ty] = rotV(b.tx, b.ty); return { ...rot(b), tx, ty, e1: rot(b.e1), e2: rot(b.e2) }; });
+    T.forests = T.forests.map(f => ({ ...rot(f), r: f.r }));
+  }
+  const w = portrait ? H : W, h = portrait ? W : H;
+  return { planets, w, h, ...buildScenery(planets, T, theme, rnd, w, h) };
 }
 
 // ---------- the wave loop ----------
