@@ -308,6 +308,15 @@ Options:
 
 Runs are seeded, so the same arguments always give the same result. GitHub Actions runs the smoke test and then `--games 8` on Warlord and on Knight on every push to `main` and every pull request (`.github/workflows/balance.yml`).
 
+For the Grand Campaign, run four seeds in parallel and summarise them with `tools/grandsum.js`: wins, times out first, average place and median wave out for each army, plus the median and longest campaign and any that hit the 400-wave cap (with who was still in them). The target is a median of 120–180 waves, nothing over 300, and every army winning 4–12 of 40:
+
+```
+node tools/balance.js --mode grand --map all --games 10 --diff hard --json --seed 1000 > g1000.json
+node tools/grandsum.js g1000.json g1010.json g1020.json g1030.json
+```
+
+In these runs the player's seat is an AI lord too, and it resigns under the same rule the AI lords surrender by (far enough behind the strongest realm for three waves running), so a hopeless seat can't hold a campaign open to the cap.
+
 ## Smoke test
 
 The balance test only loads the simulation files, so it can't see mistakes in the UI files. `tools/smoke.js` loads every script `index.html` loads, in the same order and sharing one global scope, with stand-in browser objects. Then it:

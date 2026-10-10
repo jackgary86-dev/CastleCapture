@@ -190,6 +190,21 @@ function runGrand() {
         for (const o of G.owners) if (!alive(o) && !out.eliminated.some(e => e.o === o)) out.eliminated.push({ o, army: G.fac[o], wave: G.wave });
         const left = G.owners.filter(o => alive(o) && !G.surrendered.has(o));
         if (left.length <= 1) { out.winner = left.length ? G.fac[left[0]] : null; break; }
+        // The player's seat is an AI lord here too, so it resigns under the same rule the AI lords surrender
+        // by (sim.js checkSurrender): far enough behind the strongest realm for three waves running. In the
+        // game a person is never made to surrender, but one that far behind would resign or be finished;
+        // without this a hopeless seat 1 could hold out to the wave cap (#72).
+        if (alive(1) && !G.surrendered.has(1) && G.wave >= GR.surrenderFromWave) {
+          const share = Math.min(GR.wearyMax, GR.surrenderShare + Math.max(0, G.wave - GR.wearyFrom) * GR.wearyPerWave);
+          const strongest = Math.max(...G.owners.filter(q => q !== 1 && alive(q) && !G.surrendered.has(q)).map(api.totalOf));
+          out.seat1Weak = api.totalOf(1) < strongest * share ? (out.seat1Weak || 0) + 1 : 0;
+          if (out.seat1Weak >= 3) {
+            G.surrendered.add(1);
+            for (const p of G.planets) if (p.owner === 1) { p.owner = 0; p.units = Math.round(p.units * 0.5); }
+            G.packets = G.packets.filter(k => k.owner !== 1);
+            out.seat1Resigned = G.wave;
+          }
+        }
       }
     } catch (e) {
       console.error(`crash in grand campaign seed ${seed}: ${e.stack}`);
@@ -197,6 +212,9 @@ function runGrand() {
     }
     out.waves = G.wave;
     out.castles = G.planets.length;
+    // Who was still in it at the end, with their troops (for a campaign that hit the cap), and who gave up.
+    out.left = G.owners.filter(o => alive(o) && !G.surrendered.has(o)).map(o => ({ army: G.fac[o], seat: o, troops: Math.round(api.totalOf(o)) }));
+    out.surrendered = [...G.surrendered].map(o => G.fac[o]);
     if (G.monster) {
       const slain = monsterLog.filter(e => e.kind === 'slain'), specials = monsterLog.filter(e => ['fire', 'smash', 'raid'].includes(e.kind)).length;
       out.monster = { id: G.monster.id, kills: slain.length, slayers: slain.map(e => G.fac[e.o]), specials, left: G.monster.creatures.filter(c => !c.dead).length };

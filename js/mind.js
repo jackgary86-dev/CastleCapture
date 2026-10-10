@@ -19,7 +19,8 @@
 
 const AI_MIND = {
   on: true,
-  coalitionAt: 0.4, coalitionEnd: 0.3, coalitionFocus: 1.6, coalitionAfter: 60, coalitionCool: 60,
+  // coalitionEnd: 0.35 since #72 (was 0.3), so a coalition breaks up before it stalls a Grand Campaign.
+  coalitionAt: 0.4, coalitionEnd: 0.35, coalitionFocus: 1.6, coalitionAfter: 60, coalitionCool: 60,
   grudgeCapture: 1, grudgeBetray: 3, grudgeDecay: 0.01, grudgeWeight: 0.2, grudgeMax: 4, grudgeSay: 3,
   adapt: true, openings: true, openingSecs: 60,
 };

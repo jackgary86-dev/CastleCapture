@@ -81,7 +81,8 @@ const GRAND = {
   surrenderFromWave: 20,       // ...but never before this wave
   // War-weariness: from wearyFrom, the surrender share rises by wearyPerWave each wave, up to wearyMax,
   // so a long three-way standoff ends with the trailing realm giving up instead of running for hours.
-  wearyFrom: 120, wearyPerWave: 0.01, wearyMax: 0.9,
+  // #72: from wave 100 at 0.012 a wave (was 120 at 0.01), so no campaign stalls past 300 waves.
+  wearyFrom: 100, wearyPerWave: 0.012, wearyMax: 0.9,
   openingWaves: 16,            // waves in which every lord favours unclaimed keeps over its neighbours' castles
   sendFracMax: 0.6,            // the most of a castle's garrison a lord sends in one attack (Torvek sends 0.75 in battles)
   keepFloor: 8,
