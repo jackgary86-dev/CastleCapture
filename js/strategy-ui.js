@@ -56,9 +56,14 @@ function strategyPanel(p) {
     return;
   }
   const ready = canSpecialise(p), cost = specCost(p), coins = Math.floor(G.coins[1]);
+  // Until the castle has an upgrade, one line says what's coming rather than three disabled buttons.
+  if (!ready) {
+    cpSpec.innerHTML = '<p class="cp-note">Upgrade its Walls or Barracks to pick a branch: Keep, Barracks or Market.</p>';
+    return;
+  }
   cpSpec.innerHTML = SPEC_IDS.map(id => {
     const S = STRATEGY.spec[id], ok = ready && coins >= cost;
-    return `<button class="upg${ok ? ' can' : ''}" data-spec="${id}"${ok ? '' : ' disabled'}><span class="u-top"><span class="u-name">${S.name}</span></span><span class="u-desc">${S.desc}</span><span class="u-cost">${ready ? `Costs ${cost} coins${ok ? '' : ` · need ${cost - coins} more`}` : 'Upgrade its Walls or Barracks first'}</span></button>`;
+    return `<button class="upg${ok ? ' can' : ''}" data-spec="${id}"${ok ? '' : ' disabled'}><span class="u-top"><span class="u-name">${S.name}</span></span><span class="u-desc">${S.desc}</span><span class="u-cost">Costs ${cost} coins${ok ? '' : ` · need ${cost - coins} more`}</span></button>`;
   }).join('');
 }
 

@@ -308,6 +308,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   body.touchui #taunt { left: 112px; }
   /* The Grand Campaign orders panel clears the thumb bar and the drag hint (#60). */
   body.touchui #ordersPanel { left: 112px; width: calc(100% - 124px); max-height: calc(100% - 300px); }
+  /* The castle panel sits clear of the thumb bar too (#73), and the thumb bar's Fit stands in for the zoom bar's. */
+  body.touchui #castlePanel { left: 112px; transform: none; width: calc(100% - 124px); }
+  body.touchui #zoomFit { display: none; }
   #taunt .portrait { width: 36px; height: 36px; }
   #taunt q { font-size: 15px; }
 }
