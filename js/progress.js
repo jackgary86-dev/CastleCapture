@@ -64,13 +64,14 @@ function cleanProgress(d) {
   if (d.lordPick && typeof d.lordPick === 'object') for (const army of Object.keys(LORDS_ALT)) if (d.lordPick[army] === 'alt' && b.owned.includes(`lord-${army}`)) b.lordPick[army] = 'alt';
   b.achSeen = Number.isFinite(d.achSeen) ? d.achSeen : null; b.pastDeeds = !!d.pastDeeds;
   b.season = num(d.season, 1) || 1; b.seasonStart = num(d.seasonStart, Date.now());
+  // Own keys only: "constructor" or "__proto__" in a file mustn't pass as a map or an army (#85).
   const maps = typeof GRAND_MAPS === 'object' ? GRAND_MAPS : {};
   if (d.regions && typeof d.regions === 'object') for (const [m, r] of Object.entries(d.regions)) {
-    if (maps[m] && r && ARMIES[r.army]) b.regions[m] = { army: r.army, diff: String(r.diff || ''), at: num(r.at, 0) };
+    if (Object.hasOwn(maps, m) && r && Object.hasOwn(ARMIES, r.army)) b.regions[m] = { army: r.army, diff: String(r.diff || ''), at: num(r.at, 0) };
   }
   if (Array.isArray(d.hall)) b.hall = d.hall.filter(h => h && typeof h === 'object').slice(0, 50).map(h => ({
     season: num(h.season, 0), from: num(h.from, 0), to: num(h.to, 0), earned: num(h.earned, 0),
-    regions: Array.isArray(h.regions) ? h.regions.filter(r => r && maps[r.map] && ARMIES[r.army]).map(r => ({ map: r.map, army: r.army })) : [],
+    regions: Array.isArray(h.regions) ? h.regions.filter(r => r && Object.hasOwn(maps, r.map) && Object.hasOwn(ARMIES, r.army)).map(r => ({ map: r.map, army: r.army })) : [],
   }));
   if (Array.isArray(d.log)) b.log = d.log.filter(e => e && Number.isFinite(e.n) && typeof e.why === 'string').slice(0, 12).map(e => ({ t: num(e.t, 0), n: Math.floor(e.n), why: e.why.slice(0, 80) }));
   return b;
@@ -164,6 +165,8 @@ on('end', ({ win }) => {
     pay(win ? RENOWN.hillWin[diff] : RENOWN.hillLoss, win ? 'King of the Hill won' : 'King of the Hill raced');
   } else if (G.mode === 'defense') {
     pay(RENOWN.defenseWave * ((G.def && G.def.held) || 0), `Siege Defense: ${(G.def && G.def.held) || 0} waves held`);
+  } else if (G.mode === 'crown') {
+    pay(win ? RENOWN.battleWin[diff] : RENOWN.battleLoss, win ? 'Raid won' : 'Raid fought');   // battle rates, its own name (#85)
   } else {
     pay(win ? RENOWN.battleWin[diff] : RENOWN.battleLoss, win ? 'Battle won' : 'Battle fought');
     if (win && G.cfg.campaign) pay(RENOWN.chapter, 'Story chapter won');
@@ -216,7 +219,8 @@ on('newGame', g => {
   for (const d of [home.r + 46, home.r + 70, home.r + 100]) for (const da of [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.4, -2.4]) {
     const x = home.x + Math.cos(base + da) * d, y = home.y + Math.sin(base + da) * d;
     if (placeProblem(1, x, y)) continue;
-    placeUnit(1, U.unit, x, y);
+    // Placed quietly: placeUnit would announce "You build ..." with a drum on every start and every resume (#85).
+    g.units.push({ owner: 1, type: U.unit, x, y, cd: 1, fired: -9, aim: 0 });
     g.bought.add(1);
     g.startUnit = U.unit;
     return;

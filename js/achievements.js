@@ -222,7 +222,7 @@ on('end', ({ win }) => {
     if (G.stats.castlesLost === 0) earned.add('untouched');
     if (lowestShare() < 0.2) earned.add('comeback');
     if (G.owners.length > 2) earned.add('threeWay');
-    if (G.units.some(u => u.owner === 1)) earned.add('builder');
+    if (!G.startUnit && G.units.some(u => u.owner === 1)) earned.add('builder');   // built in battle, not brought from the Profile (#85)
     if (G.cfg.campaign && CAMPAIGNS[G.cfg.campaign] && G.cfg.chapter === CAMPAIGNS[G.cfg.campaign].length) earned.add('campaign');
   }
   showUnlocks(unlockEarned(earned));

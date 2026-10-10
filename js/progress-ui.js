@@ -207,6 +207,8 @@ function importProfile(text) {
   if (!d || typeof d !== 'object' || d.v !== 1 || !Number.isFinite(d.renown)) return 'That file is not a Castle Siege profile.';
   career = cleanProgress(d);
   career.pastDeeds = true;   // an imported profile brings its own history
+  // Achievements already counted in this browser aren't paid again for the imported profile (#85).
+  if (typeof ach === 'object') career.achSeen = Object.keys(ach.unlocked).length;
   saveProgress();
   refreshProfileButton();
   return '';
