@@ -188,7 +188,9 @@ function crownArrive(k, t) {
 function crownReveal(o, t, how) {
   const C = G.crown, q = t.owner;
   if (!C || !C.intel[o]) return;
-  const found = q && C.at[q] === t.id ? q : 0;
+  // Until hideTime the realms are still choosing where to hide (the lords pick at hideTime - 2), so a report
+  // then shows no crown rather than giving the final hiding place away early (#81).
+  const found = q && C.at[q] === t.id && G.time >= CROWN.hideTime ? q : 0;
   const prev = C.intel[o][t.id];
   C.intel[o][t.id] = { crown: found, t: G.time };
   if (G.seen[o]) G.seen[o][t.id] = { owner: t.owner, units: t.units };

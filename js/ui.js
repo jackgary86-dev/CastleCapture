@@ -733,6 +733,8 @@ function resumeBattle(d = loadSave(), onFail = clearSave) {
     newGame(d.cfg, d.portrait);
     for (const [k, v] of Object.entries(d.state)) if (k !== '__proto__') G[k] = dec(v);
     for (const sp of d.planets) Object.assign(G.planets[sp.id], dec(sp));
+    // Sight isn't saved: rebuild it now, or a fogged battle (every Capture the Crown) resumes seeing everything (#81).
+    if (G.cfg.fog) updateSight();
     G.intro = false; G.over = false; G.paused = false;
     setPaused(true);
     if (G.mode === 'grand') toast('Campaign resumed', `Wave ${G.wave}. Press Resume the siege when you are ready.`, army(1).color);
