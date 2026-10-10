@@ -62,6 +62,10 @@ function defenseCfg(armyId, diff = 'medium', day = null, seed = null) {
 // siege: the fortress on the west edge, the camps on the east edge, unclaimed keeps in between (turned a quarter
 // on portrait screens: fortress at the bottom, camps at the top).
 const DEFENSE_FORT = [[0, 0, 30], [-15, -150, 22], [-15, 150, 22], [110, -75, 24], [110, 75, 24]];
+// On a portrait phone the thumb bar (Power, Send, All) covers the lower left of the map and the power panel the
+// top left (#78), so there the fortress draws in (its spread across the bottom shrinks to this share) and the
+// siege camps stand this far in from the top edge rather than on it.
+const DEFENSE_PORTRAIT = { spread: 0.7, campInset: 140 };
 // portrait: turn the map a quarter so the fortress sits at the bottom of a tall screen and the camps at the
 // top (#75), exactly as genMap() does for skirmishes; the map is otherwise the same as the landscape one.
 function genDefenseMap(seed, theme, portrait = false) {
@@ -76,7 +80,7 @@ function genDefenseMap(seed, theme, portrait = false) {
     T.forests.every(f => Math.hypot(f.x - x, f.y - y) > f.r * 0.55 + r);
   // The fortress: a big keep and four towers round it, each nudged a little by the seed where it fits.
   for (const [dx, dy, r] of DEFENSE_FORT) {
-    let x = 125 + dx, y = cy + dy;
+    let x = 125 + dx, y = cy + dy * (portrait ? DEFENSE_PORTRAIT.spread : 1);
     for (let i = 0; i < 30; i++) {
       const jx = x + (rnd() - 0.5) * 30, jy = y + (rnd() - 0.5) * 30;
       if (fits(jx, jy, r)) { x = jx; y = jy; break; }
@@ -84,7 +88,7 @@ function genDefenseMap(seed, theme, portrait = false) {
     pts.push({ x, y, r, owner: 1, units: DEFENSE.start, home: true });
   }
   // A camp for each of the three lords, spread down the east edge.
-  [-200, 0, 200].forEach((dy, i) => pts.push({ x: W - 75, y: cy + dy, r: 24, owner: i + 2, units: 1, kind: 'siegecamp', camp: true }));
+  [-200, 0, 200].forEach((dy, i) => pts.push({ x: W - (portrait ? DEFENSE_PORTRAIT.campInset : 75), y: cy + dy, r: 24, owner: i + 2, units: 1, kind: 'siegecamp', camp: true }));
   for (let tries = 0, placed = 0; placed < DEFENSE.keeps && tries < 4000; tries++) {
     const r = 13 + rnd() * 15, x = 280 + rnd() * (W - 480), y = 50 + rnd() * (H - 100);
     if (!fits(x, y, r)) continue;

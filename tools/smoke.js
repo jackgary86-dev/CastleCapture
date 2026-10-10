@@ -574,10 +574,13 @@ if (hasDefense) run('siege defense portrait', `{
   const fort = G.planets.filter(p => p.owner === 1), camps = G.planets.filter(p => p.camp);
   if (!fort.length || fort.some(p => p.y < G.h * 0.7)) throw new Error('the fortress is not at the bottom of a portrait map');
   if (camps.length !== 3 || camps.some(p => p.y > G.h * 0.3)) throw new Error('the siege camps are not at the top of a portrait map');
+  // Clear of the phone HUD at 375x812 (#78): the thumb bar covers about x < 170 low down, the power panel about y < 100.
+  if (fort.some(p => p.x - p.r < 175)) throw new Error('a fortress castle sits under the thumb bar on a portrait map');
+  if (camps.some(p => p.y - p.r * 1.3 < 100)) throw new Error('a siege camp sits under the power panel on a portrait map');
   G.intro = false; setPaused(false);
-  for (let i = 0; i < 30 * 40 && G.def.wave < 1; i++) update(1 / 30);
-  for (let i = 0; i < 30 * 10; i++) update(1 / 30);
-  if (G.def.wave < 1 || !G.packets.some(k => k.owner > 1)) throw new Error('no wave marched on the portrait map');
+  let marched = false;
+  for (let i = 0; i < 30 * 50 && !marched; i++) { update(1 / 30); marched = G.def.wave >= 1 && G.packets.some(k => k.owner > 1); }
+  if (!marched) throw new Error('no wave marched on the portrait map');
   hud(); draw(${clock});
 }`);
 
