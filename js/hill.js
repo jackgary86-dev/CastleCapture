@@ -125,7 +125,7 @@ function hillAi(ai, P, inc, pow) {
     const threat = threatOn(keep, me, pow), hold = (keep.units + inc[keep.id][me]) * defAt(keep);
     if (hold < Math.max(keep.r * 1.4 * defAt(keep), threat * 1.3)) {
       const rear = mine.filter(q => q !== keep && q.units > q.r * 1.1).sort((a, b) => travel(a, keep) - travel(b, keep))[0];
-      if (rear && send(me, [rear.ghostOf || rear], keep, 0.5, ai.diff === 'easy' ? 'foot' : 'horse')) return true;
+      if (rear && send(me, [rear.ghostOf || rear], keep, 0.5)) return true;
     }
   }
   return false;

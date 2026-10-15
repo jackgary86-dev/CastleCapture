@@ -2,7 +2,7 @@
 //
 // Siege Defense (#65): a solo survival mode. The player holds a fortress of five castles on the west
 // edge; up to three rival lords muster at siege camps on the east edge and attack in timed waves, each
-// bigger than the last and with a new trick: catapults from wave 4, a cavalry flank from wave 6 and a
+// bigger than the last and with a new trick: a second column from wave 6 and a
 // siege beast from wave 10. Between waves come a 20-second break and a coin payout. Score = waves
 // survived + castles held when the last wave was beaten. It ends when the player's last castle falls.
 //
@@ -19,8 +19,7 @@ const DEFENSE = {
   // Troops in a wave, before the difficulty multiplier: base * growth^(w - 1) + lin * (w - 1).
   base: 50, growth: 1.5, lin: 20,
   diffMul: { easy: 0.7, medium: 0.85, hard: 1 },
-  siegeFrom: 4, siegeShare: 0.3,   // share of each lord's force that rolls as catapults (with a foot escort)
-  flankFrom: 6, flankShare: 0.25,  // share that rides as cavalry against a castle away from the main blow
+  flankFrom: 6, flankShare: 0.25,  // share that marches as a second column against a castle away from the main blow
   // The siege beast: one huge column whose every "troop" hits beastStr times as hard, on castles and on the road.
   beastFrom: 10, beastBase: 30, beastPer: 4, beastStr: 3,
   columns: 10,                 // most columns one order of a wave marches in
@@ -135,10 +134,9 @@ function defensePlan(w) {
   const each = total / Math.max(1, lords.length);
   const forces = lords.map((o, i) => {
     const n = Math.round(each);
-    const siege = w >= DEFENSE.siegeFrom ? Math.round(n * DEFENSE.siegeShare) : 0;
     const flank = w >= DEFENSE.flankFrom ? Math.round(n * DEFENSE.flankShare) : 0;
     const beast = i === 0 && w >= DEFENSE.beastFrom ? Math.round((DEFENSE.beastBase + DEFENSE.beastPer * (w - DEFENSE.beastFrom)) * m) : 0;
-    return { o, n, siege, flank, foot: Math.max(1, n - siege - flank), beast };
+    return { o, n, flank, foot: Math.max(1, n - flank), beast };
   });
   return { wave: w, total, forces, joins: lords.filter((o, i) => w === DEFENSE.lordsAt[i]) };
 }
@@ -180,13 +178,8 @@ function defenseLaunch() {
     // The lords mostly strike together: each joins the first lord's target unless it sees a weaker one.
     const main = focus && focus.owner === 1 && rnd() < DEFENSE.focus ? focus : defenseTarget(camp, list, rnd);
     focus = focus || main;
-    if (f.siege) {
-      const cat = Math.max(1, Math.round(f.siege * (1 - SIEGE_ESCORT)));
-      defenseMarch(f.o, camp, main, cat, 'siege');
-      defenseMarch(f.o, camp, main, f.siege - cat, 'foot', true);
-    }
-    // The flank rides for the castle furthest from the main blow, so help can't serve both.
-    if (f.flank) defenseMarch(f.o, camp, [...list].sort((a, b) => travel(main, b) - travel(main, a))[0], f.flank, 'horse');
+    // The flank marches for the castle furthest from the main blow, so help can't serve both.
+    if (f.flank) defenseMarch(f.o, camp, [...list].sort((a, b) => travel(main, b) - travel(main, a))[0], f.flank, 'foot');
     defenseMarch(f.o, camp, main, f.foot, 'foot');
     // The siege beast goes for the biggest garrison, as one column.
     if (f.beast) {

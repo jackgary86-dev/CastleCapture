@@ -24,7 +24,7 @@ function startDefense(daily = false) {
   const card = document.createElement('div');
   card.className = 'resume defense-card';
   card.innerHTML = `<div><b>Siege Defense</b>
-      <span>Hold a fortress of five castles against waves from up to three lords: catapults from wave 4, cavalry on your flank from wave 6, a siege beast from wave 10. Twenty seconds and a coin payout between waves.</span>
+      <span>Hold a fortress of five castles against waves from up to three lords: a second column on your flank from wave 6. Twenty seconds and a coin payout between waves.</span>
       <span id="defenseRec"></span></div>
     <button class="primary" id="btnDefense">Begin the siege</button>
     <button id="btnDefenseDaily">Daily siege</button>`;
@@ -91,8 +91,7 @@ function startDefense(daily = false) {
 
   // ---------- banners ----------
   const TWIST = {
-    [DEFENSE.siegeFrom]: 'Catapults roll with the wave. Catch them on the road before they reach your walls.',
-    [DEFENSE.flankFrom]: 'Cavalry ride for the castle furthest from the main blow.',
+    [DEFENSE.flankFrom]: 'A second column marches for the castle furthest from the main blow.',
     [DEFENSE.beastFrom]: 'A siege beast leads the charge at your biggest garrison: it strikes three times as hard.',
   };
   // The record as the siege began, kept in G.def so a resumed siege still knows it: records update mid-game, so

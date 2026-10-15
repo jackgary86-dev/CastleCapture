@@ -543,7 +543,7 @@ function usePower(o) {
     return true;
   }
   pw.ready = rechargeTime() * powerTwist(o, 'rechargeMul');
-  pw.until = G.time + A.power.dur * powerTwist(o, 'durMul');
+  pw.until = G.time + A.power.dur * powerTwist(o, 'durMul') * (G.mode === 'hill' && A.power.id === 'wintersGrip' ? HILL.freezeMul : 1);
   if (A.power.id === 'crows') {
     const targets = G.planets.filter(p => p.owner && p.owner !== o && !allied(o, p.owner)).sort((a, b) => b.units - a.units).slice(0, 3);
     for (const t of targets) { t.units -= Math.min(t.units * 0.4 * powerTwist(o, 'strengthMul'), G.mode === 'grand' ? 25 : Infinity); G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
@@ -806,7 +806,7 @@ function incomingTable() {
 }
 // A marching column's punch against its target: its troops times its army's strike and its Barracks strength.
 // A column's punch against its target castle: head count, army strength, barracks, and troop type
-// (catapults hit castles hard, cavalry lightly; an escort fights as foot).
+// (a mode's special band, like Crown scouts, may hit differently).
 const packetPower = k => k.n * strikeOf(k.owner, k.to) * (k.str || 1) * unitOf(k).siege;
 // Like incomingFor, but counting each column's punch rather than its head count.
 function incomingPowerFor(o) {
@@ -972,11 +972,10 @@ function aiThink(ai) {
         const eta = Math.min(...G.packets.filter(k => k.to === real(p) && k.owner !== me && (!G.cfg.fog || seesAt(me, k.x, k.y)))
           .map(k => Math.hypot(k.x - p.x, k.y - p.y) / speedOf(k.owner)), Infinity);
         const helpers = mine.filter(q => q !== p && q.units > q.r * 0.4).sort((a, b) => travel(a, p) - travel(b, p));
-        // Help rides as cavalry (except on easy), so judge 'in time' at cavalry speed.
-        const helpSpeed = speedOf(me) * (d === 'easy' ? 1 : UNIT_TYPES.horse.speed);
+        const helpSpeed = speedOf(me);
         const inTime = helpers.filter(q => travel(q, p) / helpSpeed <= eta);
         const pool = inTime.length ? inTime : helpers.filter(q => q.units * 0.5 * defAt(p) > threat);
-        if (pool.length) send(me, d === 'hard' ? pool.slice(0, 2) : [pool[0]], real(p), 0.5, d === 'easy' ? 'foot' : 'horse');
+        if (pool.length) send(me, d === 'hard' ? pool.slice(0, 2) : [pool[0]], real(p), 0.5);
       }
     }
   }
@@ -987,7 +986,7 @@ function aiThink(ai) {
     const frontLine = byDanger.filter(p => nearestOf(p, enemyCastles) < nearestOf(byDanger[0], enemyCastles) * 1.3);
     const weak = frontLine.find(p => p.units < p.r * 1.2);
     const rear = byDanger.slice().reverse().find(p => !frontLine.includes(p) && p.units > p.r * 1.4);
-    if (weak && rear) { send(me, [rear], weak, 0.5, 'horse'); return; }
+    if (weak && rear) { send(me, [rear], weak, 0.5); return; }
   }
 
   // Sigrun intercepts columns marching on unclaimed keeps near her lands when her shieldwall would win.
@@ -997,7 +996,7 @@ function aiThink(ai) {
       if (!enemyIn.length || inc[nt.id][me] > 0) continue;
       const strength = enemyIn.reduce((a, k) => a + k.n * roadOf(k.owner), 0);
       const h = mine.filter(s => s.units > s.r * 0.5).sort((a, b) => travel(a, nt) - travel(b, nt))[0];
-      if (h && Math.floor(h.units * 0.5) * roadOf(me) > strength) { send(me, [h], real(nt), 0.5, 'horse'); return; }
+      if (h && Math.floor(h.units * 0.5) * roadOf(me) > strength) { send(me, [h], real(nt), 0.5); return; }
     }
   }
 
@@ -1043,10 +1042,7 @@ function aiThink(ai) {
     const srcs = mine.filter(s => s.units >= pz.keep / 20 * s.r && (!exposed(s) || s.units * (1 - pz.sendFrac) >= s.r * 0.4)
       && (G.mode !== 'crown' || typeof crownSpare !== 'function' || crownSpare(me, s))).sort((a, b) => travel(a, t) - travel(b, t));
     const chosen = [];
-    let sum = 0, sumAll = 0, far = 0, need = Infinity, needS = Infinity, needH = Infinity;
-    const siegeOk = AI_SIEGE && t.owner && d !== 'easy' && id !== 'kharzul';
-    // A cavalry raid on a nearly empty enemy castle: weak against walls, but it lands before help can.
-    const raidOk = t.owner && d !== 'easy' && t.units < t.r * 0.6;
+    let sum = 0, sumAll = 0, far = 0, need = Infinity;
     // Amaru avoids even fights against other kingdoms.
     const margin0 = pz.margin * (id === 'solmara' && t.owner && bold === 1 ? 1.15 : 1);
     const margin = margin0 - Math.max(0, margin0 - 1) * ease;
@@ -1058,16 +1054,10 @@ function aiThink(ai) {
       sumAll += Math.floor(s.units * 0.8) * soldierStr(s);
       far = Math.max(far, travel(s, t));
       need = needAt(t, far, inc, me, s) * margin;
-      if (siegeOk) needS = siegeNeed(t, far, inc, me, s) * margin;
-      if (raidOk) needH = needAt(t, far / UNIT_TYPES.horse.speed, inc, me, s) / UNIT_TYPES.horse.siege * margin;
-      if (sum >= Math.min(need, needS)) break;
+      if (sum >= need) break;
     }
     if (!chosen.length || need <= 2) continue;
-    // Catapults (with an escort) when they make the attack possible, or need clearly fewer troops than foot.
-    let type = 'foot';
-    if (siegeOk && sum >= needS && (sum < need || needS < need * 0.7)) { type = 'siege'; need = needS; far /= UNIT_TYPES.siege.speed; }
-    // Raid with cavalry when it is affordable and the march is long enough for speed to matter.
-    else if (raidOk && sum >= needH && far / speedOf(me) >= RAID_MARCH) { type = 'horse'; need = needH; far /= UNIT_TYPES.horse.speed; }
+    const type = 'foot';
     // Within 20% of affordable: commit 80% of each chosen garrison rather than give up.
     let frac = null;
     if (sum < need) { if (sum >= need * 0.8 && sumAll >= need) frac = 0.8; else continue; }
@@ -1112,23 +1102,12 @@ function aiThink(ai) {
   if (pz.front && Math.random() < 0.5 && mine.length > 1 && enemyCastles.length) {
     const byDanger = [...mine].sort((a, b) => nearestOf(a, enemyCastles) - nearestOf(b, enemyCastles));
     const front = byDanger[0], rear = byDanger[byDanger.length - 1];
-    if (rear !== front && rear.units > rear.r * 1.2 && front.units < capOf(front) * 0.8) send(me, [rear], front, 0.5, 'horse');
+    if (rear !== front && rear.units > rear.r * 1.2 && front.units < capOf(front) * 0.8) send(me, [rear], front, 0.5);
   }
 }
 
-// Troops needed to take t with an escorted catapult force: slower, so the defenders grow more, but the
-// catapults hit walls far harder. The escort share fights as foot.
-function siegeNeed(t, far, inc, me, src) {
-  const S = UNIT_TYPES.siege, mix = (1 - SIEGE_ESCORT) * S.siege + SIEGE_ESCORT;
-  return needAt(t, far / S.speed, inc, me, src) / mix;
-}
-// Send from one castle; a catapult force always marches with a foot escort from the same castle.
-function aiAttackFrom(me, s, t, frac, type) {
-  if (type !== 'siege') { send(me, [s], t, frac, type); return; }
-  const f1 = frac * (1 - SIEGE_ESCORT);
-  send(me, [s], t, f1, 'siege');
-  send(me, [s], t, frac * SIEGE_ESCORT / (1 - f1), 'foot', true);
-}
+// Send from one castle.
+function aiAttackFrom(me, s, t, frac, type) { send(me, [s], t, frac, type); }
 
 // ---------- coins and map units ----------
 // Points along each drawn road, so map units aren't placed on top of one.
@@ -1299,8 +1278,7 @@ function update(dt) {
       continue;
     }
     if (!last && dd < 3) { k.wp++; continue; }
-    // An escort keeps pace with the catapults it guards.
-    const pace = k.escort ? UNIT_TYPES.siege.speed : unitOf(k).speed;
+    const pace = unitOf(k).speed;
     const step = Math.min(dd, speedOf(k.owner) * pace * (slowedAt(k) ? 0.5 : 1) * (inForest(G.terrain, k) ? (army(k.owner).stats.forest ?? FOREST_SLOW) : 1) * (G.cfg.strategy ? stratSpeedMul(k) : 1) * dt);   // fords and roads (js/strategy.js)
     k.x += dx / dd * step; k.y += dy / dd * step;
     k.dir = dx < 0 ? -1 : 1;

@@ -453,6 +453,8 @@ cv.addEventListener('wheel', e => {
 setSendPct(sendPct);
 
 // ---------- troop type ----------
+// Every column is foot (#92). The Troops bar is hidden except in Capture the Crown, where js/crown-ui.js adds
+// Scouts and shows it; T toggles between foot and scouts there.
 let unitType = 'foot';
 const unitCtl = document.getElementById('unitCtl');
 function setUnitType(v) {
@@ -460,8 +462,9 @@ function setUnitType(v) {
   unitCtl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.unit === v)));
 }
 unitCtl.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setUnitType(b.dataset.unit); });
-const cycleUnit = () => setUnitType(UNIT_IDS[(UNIT_IDS.indexOf(unitType) + 1) % UNIT_IDS.length]);
+const cycleUnit = () => { if (G && G.mode === 'crown' && UNIT_TYPES.scout) setUnitType(unitType === 'scout' ? 'foot' : 'scout'); };
 setUnitType(unitType);
+on('newGame', () => { unitCtl.hidden = true; if (unitType !== 'foot') setUnitType('foot'); });
 
 // ---------- rally points ----------
 const rallyDrag = { from: null, timer: 0 };
@@ -774,6 +777,9 @@ function resumeBattle(d = loadSave(), onFail = clearSave) {
     newGame(d.cfg, d.portrait);
     for (const [k, v] of Object.entries(d.state)) if (k !== '__proto__') G[k] = dec(v);
     for (const sp of d.planets) Object.assign(G.planets[sp.id], dec(sp));
+    // Saves from before #92 may hold cavalry or catapult columns and orders: they march on as foot.
+    for (const k of G.packets) if (k.type !== 'scout') k.type = 'foot';
+    if (G.orders) for (const o of G.orders) if (o.kind === 'send' && o.type !== 'scout') o.type = 'foot';
     // Sight isn't saved: rebuild it now, or a fogged battle (every Capture the Crown) resumes seeing everything (#81).
     if (G.cfg.fog) updateSight();
     G.intro = false; G.over = false; G.paused = false;

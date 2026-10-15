@@ -404,12 +404,12 @@ function crownAi(ai, P, inc, pow) {
   if (!c) return crownScoutAi(ai, P, mine);   // the crown is on the road: nothing to guard at home
   const threat = threatOn(c, me, pow), hold = (c.units + inc[c.id][me]) * defAt(c) + rate(c) * 1.5;
   // The crown's castle is under attack: those who would, move the crown out while the attackers are still
-  // far off (a crown riding out into them is lost); everyone rushes help (cavalry, except on easy).
+  // far off (a crown riding out into them is lost); everyone rushes help.
   if (threat > 0 && threat > hold * 0.7) {
     const far = !G.packets.some(k => k.to === c && k.owner !== me && seesAt(me, k.x, k.y) && Math.hypot(k.x - c.x, k.y - c.y) < 300);
     if (L.flee && d !== 'easy' && far && threat > hold * 1.05 && crownMoveAi(ai, mine, c, P, inc)) return true;
     const helpers = mine.filter(q => q !== c && q.units > q.r * 0.5).sort((a, b) => travel(a, c) - travel(b, c)).slice(0, d === 'hard' ? 2 : 1);
-    if (helpers.length && send(me, helpers, c, 0.6, d === 'easy' ? 'foot' : 'horse')) return true;
+    if (helpers.length && send(me, helpers, c, 0.6)) return true;
   }
   // Found out by a rival's scouts: some lords move the crown on.
   if (L.moveOnScout && d !== 'easy' && C.exposed[me] != null && G.time - C.exposed[me] < 30 && C.exposed[me] > (ai.crownMovedAt ?? -99) && crownMoveAi(ai, mine, c, P, inc)) return true;
@@ -420,7 +420,7 @@ function crownAi(ai, P, inc, pow) {
   // Keep the crown's guard up from castles with troops to spare.
   if (G.time >= CROWN.hideTime && c.units < c.r * L.guard && Math.random() < 0.4) {
     const rear = mine.filter(q => q !== c && q.units > q.r * 1.2 && threatOn(q, me, inc) === 0).sort((a, b) => travel(a, c) - travel(b, c))[0];
-    if (rear && send(me, [rear], c, 0.4, d === 'easy' ? 'foot' : 'horse')) return true;
+    if (rear && send(me, [rear], c, 0.4)) return true;
   }
   // Veyra fattens a decoy: her biggest other castle, fed from the rest (the crown's own castle included).
   if (L.decoy && d !== 'easy' && Math.random() < 0.3) {

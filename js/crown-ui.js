@@ -81,6 +81,7 @@ function startCrown(armyId = myArmy, rivals = 1, diff = 'medium') {
     hudBeforeCrown();
     renderBar();
     scoutBtn.hidden = !on1();
+    unitCtl.hidden = !on1();
     if (!on1() && unitType === 'scout') setUnitType('foot');
     if (!on1()) return;
     intro();
