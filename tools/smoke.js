@@ -852,6 +852,46 @@ run('play button', `{
     }
   }
 }
+// ---------- answering tells (#99): each answer moves the right troops ----------
+run('tell answers', `{
+  Math.random = mulberry(${(+process.env.SMOKE_SEED || 1) * 29 + 11});
+  play({ diff: 'hard', n: 18, map: 'aldmere', armies: ['aldmere', 'nyx', 'frostmark'], fog: false });
+  if (typeof startBattle === 'function') startBattle(); G.intro = false; G.paused = false;
+  for (let i = 0; i < 30 * 10; i++) update(1 / 30);
+  // Give the player three castles to work with.
+  for (const p of G.planets.filter(p => p.owner === 0).slice(0, 2)) { p.owner = 1; p.units = 20; }
+  const mine = G.planets.filter(p => p.owner === 1);
+  // Crows: pull out of a marked castle.
+  const big = [...mine].sort((a, b) => b.units - a.units)[0]; big.units = 40;
+  const before = big.units, said1 = answerTell(1, { kind: 'power', power: 'crows', targets: [big.id] });
+  if (!said1 || big.units >= before - 1) throw new Error('Pull out did not move troops: ' + said1);
+  // Frost: a column of ours near a Sigrun castle turns back.
+  const hers = G.planets.filter(p => p.owner === 3), home = mine.find(p => p !== big) || big;
+  home.units = 60; launch(1, home, hers[0], 10, 'foot');
+  for (let i = 0; i < 30; i++) update(1 / 30);
+  const col = G.packets.find(k => k.owner === 1 && k.to === hers[0]);
+  if (!col) throw new Error('no column to test the frost answer');
+  const said2 = answerTell(1, { kind: 'power', power: 'wintersGrip', targets: hers.map(p => p.id) });
+  if (!said2 || col.to !== home) throw new Error('Step off the roads did not turn the column back: ' + said2);
+  // Blood Moon: brace turns every marching column home.
+  launch(1, home, hers[0], 10, 'foot'); for (let i = 0; i < 30; i++) update(1 / 30);
+  const said3 = answerTell(1, { kind: 'power', power: 'bloodMoon' });
+  if (!said3 || G.packets.some(k => k.owner === 1 && k.to && k.to.owner !== 1)) throw new Error('Brace left a column on the road: ' + said3);
+  // Isolde's attack: reinforce the threatened castle from the two nearest.
+  const target = home, srcs = mine.filter(p => p !== home); for (const p of srcs) p.units = 30;
+  const said4 = answerTell(1, { kind: 'attack', from: hers[0].id, to: target.id });
+  if (!said4 || !G.packets.some(k => k.owner === 1 && k.to === target)) throw new Error('Reinforce sent nothing: ' + said4);
+  // Amaru's unit: the nearest castle is named for selection.
+  const said5 = answerTell(1, { kind: 'unit', x: home.x + 50, y: home.y + 50 });
+  if (!/^race:/.test(said5)) throw new Error('Race him did not pick a castle: ' + said5);
+  // The toast carries the button, and the button runs the answer.
+  G.pw[2].ready = 0; usePower(2);
+  const act = toastEl.querySelector ? null : null;   // the stub DOM can't read children back; check through the action object instead
+  const tellEv = { o: 2, kind: 'power', power: 'crows', lead: 3, targets: G.tells.find(t => t.o === 2).targets };
+  const a = tellAction(tellEv);
+  if (!a || !/Pull out/.test(a.label)) throw new Error('no Pull out action for the crows tell');
+  hud(); draw(${clock});
+}`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
 console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);

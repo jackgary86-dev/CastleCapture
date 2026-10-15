@@ -15,14 +15,22 @@ const toastEl = document.getElementById('toast'), tauntEl = document.getElementB
 let hudTick = 0, toastTimer = 0, tauntTimer = 0;
 let tauntsOn = store.get('cs-taunts', true);
 
-function toast(title, detail, color) {
+// action: { label, run, seconds }: a button on the toast (#99) that stays as long as the action is worth taking.
+function toast(title, detail, color, action) {
   toastEl.innerHTML = '';
   toastEl.append(title);
   if (detail) { const sm = document.createElement('small'); sm.textContent = detail; toastEl.append(sm); }
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'toast-act'; b.textContent = action.label;
+    b.addEventListener('click', () => { const said = action.run(); if (said) toast('Done', said, color); else toastEl.hidden = true; });
+    toastEl.append(b);
+    setTimeout(() => { if (!toastEl.hidden && toastEl.contains(b)) b.focus({ preventScroll: true }); }, 0);
+  }
   toastEl.style.setProperty('--toast', color);
   toastEl.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastEl.hidden = true; }, 3200);
+  toastTimer = setTimeout(() => { toastEl.hidden = true; }, action ? Math.max(3200, (action.seconds || 3) * 1000) : 3200);
 }
 
 // A lord speaks. Routine lines are rate-limited per lord and overall; key moments can force through.
@@ -54,7 +62,8 @@ function powerDesc(o) {
   return d;
 }
 // Signature tells (#96): the warning, with a chime.
-on('tell', ({ o, kind, power }) => {
+on('tell', tell => {
+  const { o, kind, power, lead } = tell;
   if (G.cfg.demo || o === 1) return;
   const L = lordOf(o), what = kind === 'attack' ? 'Scaffold rises on her walls: her columns march in a few seconds.'
     : kind === 'unit' ? `${L.short}'s coins are moving: a map unit is about to be built.`
@@ -62,9 +71,44 @@ on('tell', ({ o, kind, power }) => {
     : power === 'wintersGrip' ? 'Frost creeps along the roads from her castles: step your columns off them.'
     : power === 'crows' ? 'Crows gather over your largest castles: move the troops out.'
     : `${L.short} is about to ${army(o).power.call}.`;
-  toast(`${L.short}'s tell`, what, army(o).color);
+  toast(`${L.short}'s tell`, what, army(o).color, tellAction(tell));
   sfx.chime();
 });
+// The one-click answer to a tell (#99): what it does runs through answerTell() in sim.js. None in two-player
+// games (player 2 has no banners) and none while a Grand march runs.
+function tellAction(tell) {
+  if ((G.cfg.humans || 1) > 1 || handsOff()) return null;
+  const label = tell.kind === 'attack' ? `Reinforce ${tell.to != null && G.planets[tell.to] ? compassName(G.planets[tell.to]) : 'the castle'}`
+    : tell.kind === 'unit' ? 'Race him'
+    : tell.power === 'crows' ? `Pull out of ${tell.targets.filter(id => G.planets[id] && G.planets[id].owner === 1).length === 1 ? compassName(G.planets[tell.targets.find(id => G.planets[id].owner === 1)]) : 'the marked castles'}`
+    : tell.power === 'wintersGrip' ? 'Step off the roads'
+    : tell.power === 'bloodMoon' ? 'Brace' : null;
+  if (!label) return null;
+  if (tell.power === 'crows' && !tell.targets.some(id => G.planets[id] && G.planets[id].owner === 1)) return null;
+  if (tell.kind === 'attack' && !(G.planets[tell.to] && G.planets[tell.to].owner === 1)) return null;
+  return { label, seconds: tell.lead || 3, run: () => {
+    if (!playable() || handsOff()) return '';
+    const said = answerTell(1, tell);
+    if (said.startsWith('race:')) {
+      // Select the castle nearest his spot and arm the cheapest map unit the treasury allows.
+      const p = G.planets[+said.slice(5)]; sel.clear(); if (p) sel.add(p);
+      const type = Object.entries(MAP_UNITS).sort((a, b) => a[1].price - b[1].price).find(([, U]) => G.coins[1] >= U.price);
+      if (type && !G.bought.has(1)) { G.placing = type[0]; renderTreasury(); return `Your castle nearest his spot is selected; click near it to place a ${type[1].name}.`; }
+      return 'Your castle nearest his spot is selected; you cannot afford a map unit yet.';
+    }
+    if (said && typeof announce === 'function') announce(said);
+    if (said && typeof chron === 'function' && G.mode === 'grand' && G.depth) chron(`You answered ${lordOf(tell.o).short}'s tell: ${said}`);
+    return said;
+  } };
+}
+// 'your eastern castle': a castle named by where it lies from the rest of your realm.
+function compassName(p) {
+  const mine = G.planets.filter(q => q.owner === 1 && q !== p);
+  if (!mine.length) return 'your castle';
+  const cx = mine.reduce((a, q) => a + q.x, 0) / mine.length, cy = mine.reduce((a, q) => a + q.y, 0) / mine.length, dx = p.x - cx, dy = p.y - cy;
+  if (Math.hypot(dx, dy) < 60) return 'your central castle';
+  return `your ${Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'eastern' : 'western') : (dy > 0 ? 'southern' : 'northern')} castle`;
+}
 on('power', ({ o, army: A }) => {
   if (G.cfg.demo) return;
   toast(o === 1 ? `You ${A.power.call}!` : `${A.full} ${A.power.they}!`, o === 1 ? powerDesc(o) : powerDesc(o).replace(/\byour\b/g, 'their'), A.color);

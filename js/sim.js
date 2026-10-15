@@ -583,6 +583,52 @@ function usePower(o, now = false) {
   return true;
 }
 
+// ---------- answering a tell (#99) ----------
+// Each answer moves troops through the same send()/order paths the player uses, so in a Grand Campaign plan
+// phase it queues orders like a drag would. Returns a short line of what happened, or '' when nothing could.
+function answerTell(o, tell) {
+  const mine = G.planets.filter(p => p.owner === o);
+  const nearestOf = (p, list) => [...list].sort((a, b) => travel(p, a) - travel(p, b))[0];
+  const back = k => { if (k.from && k.from.owner === o) { k.to = k.from; k.path = [{ x: k.from.x, y: k.from.y }]; k.wp = 0; k.hold = false; return true; } return false; };
+  if (tell.kind === 'power' && tell.power === 'crows') {
+    // Pull out: half of each marked castle's garrison to the nearest castle not marked.
+    // Troops on the road when the crows land are safe, so when every castle is marked the garrisons
+    // march for the nearest unclaimed keep instead (or the nearest marked neighbour, to be on the road).
+    const marked = tell.targets.map(id => G.planets[id]).filter(p => p && p.owner === o && p.units >= 2), moved = [];
+    for (const p of marked) {
+      const safe = nearestOf(p, mine.filter(q => q !== p && !tell.targets.includes(q.id)))
+        || nearestOf(p, G.planets.filter(q => !q.owner)) || nearestOf(p, mine.filter(q => q !== p));
+      if (safe && send(o, [p], safe, 0.5)) moved.push(p);
+    }
+    return moved.length ? `Half of ${moved.length === 1 ? 'the garrison' : `${moved.length} garrisons`} stepped out of the crows' way.` : '';
+  }
+  if (tell.kind === 'attack') {
+    // Reinforce: 30% from the two castles nearest the threatened one.
+    const t = G.planets[tell.to]; if (!t || t.owner !== o) return '';
+    const srcs = [...mine.filter(p => p !== t && p.units >= 6)].sort((a, b) => travel(a, t) - travel(b, t)).slice(0, 2);
+    return srcs.length && send(o, srcs, t, 0.3) ? `Reinforcements march for the castle Isolde means to storm.` : '';
+  }
+  if (tell.kind === 'power' && tell.power === 'wintersGrip') {
+    // Step off the roads: columns marching on her castles, or within reach of one, turn for home.
+    const hers = tell.targets.map(id => G.planets[id]).filter(Boolean);
+    let n = 0;
+    for (const k of G.packets) if (k.owner === o && k.delay <= 0 && ((k.to && hers.includes(k.to)) || hers.some(p => dist(p, k) < 220)) && back(k)) n++;
+    return n ? `${n} column${n === 1 ? '' : 's'} turned back before the frost.` : '';
+  }
+  if (tell.kind === 'power' && tell.power === 'bloodMoon') {
+    // Brace: every column on the road turns for home, so none is caught by the charge.
+    let n = 0;
+    for (const k of G.packets) if (k.owner === o && k.delay <= 0 && k.to && k.to.owner !== o && back(k)) n++;
+    return n ? `${n} column${n === 1 ? '' : 's'} fell back behind the walls.` : 'Your columns are already home.';
+  }
+  if (tell.kind === 'unit') {
+    // Race him: the castle nearest the marked spot is selected; the caller arms a map unit if one is affordable.
+    const near = [...mine].sort((a, b) => dist(a, tell) - dist(b, tell))[0];   // a spot, not a castle: crow's flight
+    return near ? `race:${near.id}` : '';
+  }
+  return '';
+}
+
 // Signature tells (#96): fire the ones that are due. A power fires on its announced targets; an attack
 // (Isolde) is columns held at their castles until the scaffold has risen, launched by launch() itself.
 function tellsTick() {
