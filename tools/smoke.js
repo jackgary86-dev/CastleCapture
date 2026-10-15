@@ -792,6 +792,25 @@ run('grand campaign depth', `{
   update(1 / 30); hud(); draw(${clock});
   if (!G.over || document.getElementById('chronicle').hidden) throw new Error('the end screen has no chronicle');
 }`);
+// ---------- Play (#98): one click to a Classic battle at Knight, the collapsed menu, the first-game hints ----------
+run('play button', `{
+  const cfg = playCfg();
+  if (cfg.diff !== 'medium' || cfg.armies.length !== 2 || cfg.armies[0] !== myArmy || !cfg.fog || cfg.n !== BATTLE_PRESETS.classic.castles) throw new Error('Play does not start a Classic battle at Knight against one lord');
+  setMenuMore(false);
+  if (menuMore || store.get('cs-more', null) !== false) throw new Error('the menu did not collapse');   // the stub DOM can't read classes back
+  setMenuMore(true);
+  if (!menuMore || store.get('cs-more', null) !== true) throw new Error('More ways to play did not expand the menu');
+  store.set('cs-hinted', false); hintStage = 0;
+  play(cfg); if (typeof startBattle === 'function') startBattle(); G.intro = false; G.paused = false;
+  for (let i = 0; i < 30 * 3; i++) { update(1 / 30); hud(); }
+  if (hintStage < 1) throw new Error('the first hint did not show');
+  const mine = G.planets.find(p => p.owner === 1); sel.add(mine);
+  update(1 / 30); hud();
+  if (hintStage < 2) throw new Error('selecting a castle did not bring the march hint');
+  G.pw[1].ready = 0; update(1 / 30); hud();
+  if (hintStage < 3 || store.get('cs-hinted', false) !== true) throw new Error('the power hint did not show or was not remembered');
+  draw(${clock});
+}`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
 console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);

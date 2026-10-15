@@ -4,7 +4,7 @@ A medieval real-time strategy game that runs in the browser. Choose one of five 
 
 ## Play
 
-Open `index.html` in any modern browser. There's no build step and nothing to install.
+Open `index.html` in any modern browser. There's no build step and nothing to install. Press **Play** for a Classic battle at Knight against a random lord with your chosen army; **More ways to play** opens the rest of the menu (it stays open once you have won a battle). Your first game shows three short hints at the right moments; the tutorial is there for the full lesson.
 
 ### Install on Windows
 

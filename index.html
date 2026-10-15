@@ -113,6 +113,14 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 #chronicle { margin: 10px 0; text-align: left; }
 #chronicle h3 { margin: 0 0 6px; font-family: var(--display); font-size: 20px; }
 #chronicle ol { margin: 0 0 8px; padding-left: 20px; max-height: 220px; overflow: auto; font-size: 13px; display: grid; gap: 2px; }
+/* The Play group (#98): one click to a first battle. While the sheet is .collapsed, everything but the title,
+   the resume box, the army choice, the tutorial offer and Play is hidden. */
+.group.play { display: grid; gap: 8px; justify-items: center; text-align: center; }
+.group.play .big { font-size: 24px; padding: 12px 40px; min-width: 220px; }
+.group.play .play-sub { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.sheet.collapsed > .group:not(.play):not(.learn):not(.army), .sheet.collapsed > .menu-intro, .sheet.collapsed > details { display: none; }
+.sheet.collapsed > .group.play { order: 1; }
+@media (max-height: 820px) { .sheet.collapsed .dossier { display: none; } }
 #btnMarch:disabled { opacity: 0.85; background: transparent; color: var(--muted); border-color: var(--edge); font-family: var(--ui); font-size: 15px; }
 #minimap { position: absolute; inset: auto 12px 12px auto; width: 168px; height: 168px; z-index: 1; border-radius: 6px; cursor: crosshair;
   border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); background: rgb(23 20 14 / 0.92); touch-action: none; }
@@ -650,15 +658,20 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
         <p class="mt-title">Castle Siege</p>
         <p class="mt-sub">March your banners across the realm and take every castle before the rival lords take yours.</p>
       </div>
-      <div class="sheet">
+      <div class="sheet" id="menuSheet">
         <h2>Castle Siege</h2>
-        <p>Five kingdoms war over the realm. Choose an army, then take every enemy castle by marching troops along the roads.</p>
+        <p class="menu-intro">Five kingdoms war over the realm. Choose an army, then take every enemy castle by marching troops along the roads.</p>
+        <div class="group play" id="playGroup">
+          <button class="primary big" id="btnPlay">Play</button>
+          <p class="play-sub" id="playSub">A Classic battle at Knight against a random lord, with your chosen army.</p>
+          <button id="btnMore" type="button" aria-expanded="false" aria-controls="menuSheet">More ways to play</button>
+        </div>
         <div class="resume" id="resumeBox" hidden>
           <div><b>Unfinished battle</b><span id="resumeText"></span></div>
           <button class="primary" id="btnResumeSave">Resume battle</button>
           <button id="btnDiscard">Discard</button>
         </div>
-        <div class="group">
+        <div class="group army">
           <span class="label">Choose your army</span>
           <div class="armies" id="armyPick"></div>
           <div class="dossier" id="dossier"></div>

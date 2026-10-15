@@ -127,6 +127,7 @@ function tutorialTick() {
     tut = { game: G, i: -1 };
     G.ais = [];
     G.hintDone = true;
+    store.set('cs-hinted', true);   // the tutorial covers the first-game hints (#98)
   }
   if (G.intro) { tutCardEl.hidden = true; return; }
   if (tut.i < 0) startLesson(0);

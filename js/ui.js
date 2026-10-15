@@ -189,6 +189,7 @@ function defeatText() {
 }
 
 function hud() {
+  firstGameHints();
   if (!G) return;
   // Under fog the bar shows rivals as the player knows them: remembered garrisons and columns in sight.
   const totals = G.owners.map(o => [o, o === 1 || !G.cfg.fog || G.cfg.demo ? totalOf(o) : knownTotal(1, o)]);
@@ -1038,6 +1039,36 @@ function endGame(win) {
 }
 
 $('btnQuick').addEventListener('click', () => play(quickCfg()));
+
+// ---------- Play (#98): a first battle in one click, and the collapsed menu ----------
+// Classic at Knight against a random lord with the chosen army; the player's own settings are untouched.
+function playCfg() {
+  const P = BATTLE_PRESETS.classic, rival = shuffle(others())[0];
+  return { seed: Math.floor(Math.random() * 1e9), n: P.castles, mapScale: P.map, start: P.start, neutral: P.neutral, speedMul: P.speed, recharge: P.recharge, capMul: P.cap,
+    diff: 'medium', armies: [myArmy, rival], map: rival, fog: P.fog, aiMind: P.mind };
+}
+$('btnPlay').addEventListener('click', () => play(playCfg()));
+// The sheet opens collapsed until the player has won a battle or asked for more.
+let menuMore = store.get('cs-more', false) === true;
+function setMenuMore(v) {
+  menuMore = !!v; store.set('cs-more', menuMore);
+  $('menuSheet').classList.toggle('collapsed', !menuMore);
+  $('btnMore').setAttribute('aria-expanded', String(menuMore));
+  $('btnMore').textContent = menuMore ? 'Fewer ways to play' : 'More ways to play';
+}
+$('btnMore').addEventListener('click', () => setMenuMore(!menuMore));
+setMenuMore(menuMore);
+on('end', ({ win }) => { if (win && !G.cfg.demo && !G.cfg.tutorial && !menuMore) setMenuMore(true); });
+// First-game hints: three toasts at the right moments, once, then never again (cs-hinted). The tutorial
+// mode stays for those who want the full lesson.
+let hintStage = store.get('cs-hinted', false) === true ? 3 : 0, hintAt = 0;
+on('newGame', g => { if (hintStage < 3 && !g.cfg.demo && !g.cfg.tutorial) hintAt = 0; });
+function firstGameHints() {
+  if (hintStage >= 3 || !G || G.cfg.demo || G.cfg.tutorial || G.intro || G.over || G.paused) return;
+  if (hintStage === 0 && G.time > 2) { hintStage = 1; hintAt = G.time; toast('Your castle', 'Click a castle flying your banner to select it. Space selects them all.', army(1).color); }
+  else if (hintStage === 1 && (sel.size || G.time - hintAt > 12)) { if (sel.size || G.time - hintAt > 12) { hintStage = 2; hintAt = G.time; toast('March', 'Drag from a selected castle onto another to send troops. The % buttons set how many go.', army(1).color); } }
+  else if (hintStage === 2 && (G.pw[1].ready <= 0 || G.time - hintAt > 40)) { hintStage = 3; store.set('cs-hinted', true); toast('Your power', `Press Q when it is ready: ${army(1).power.desc}`, army(1).color); }
+}
 $('btnResume').addEventListener('click', () => setPaused(false));
 $('btnQuit').addEventListener('click', () => { clearSave(); toMenu(); });
 $('btnResumeSave').addEventListener('click', () => resumeBattle());
