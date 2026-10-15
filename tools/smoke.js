@@ -712,6 +712,14 @@ run('battle presets', `{
   }
   $('setStart').value = '80'; saveCustom();
   if (presetMatch() !== null || $('presetCustom').hidden) throw new Error('a changed field did not read as Custom');
+  // The crowned keep is a rule now (#95): the switch and the preset both put the race in the cfg.
+  applyPreset('hill');
+  if (!hillOn || quickCfg().mode !== 'hill') throw new Error("the 'The hill' preset did not switch the crowned keep on");
+  applyPreset('classic');
+  if (hillOn || quickCfg().mode === 'hill') throw new Error('Classic left the crowned keep on');
+  setHillRule(true);
+  if (!hillOn || quickCfg().mode !== 'hill' || presetMatch() !== null) throw new Error('the Crowned keep switch did not reach the cfg');
+  setHillRule(false);
   applyPreset('classic');
   play(quickCfg()); if (typeof startBattle === 'function') startBattle();
   if (!G.cfg.fog || G.cfg.aiMind !== true) throw new Error('the Classic battle did not start with fog and smarter lords');

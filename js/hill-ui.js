@@ -1,6 +1,6 @@
 // hill-ui.js
 //
-// King of the Hill (#64), the browser side: the menu entry under Modes, the per-realm score bar in the
+// King of the Hill (#64), the browser side: the per-realm score bar in the
 // header, the leader callout banners, the crown over the hill keep and the end-screen text. The rules
 // and the lords' tactics are in js/hill.js. Loaded after js/ui.js and js/grand-menu.js; it only reads
 // the simulation, apart from starting a battle through play().
@@ -120,32 +120,6 @@ function startHill(armyId = myArmy, rivals = 1, diff = 'medium') {
     }
   });
 
-  // ---------- the menu entry, under Modes ----------
-  // The card is the first in the shared Modes group, which it styles (.group.hill).
-  const group = modeUi.modesGroup();
-  if (!group) return;
-  let hDiff = modeUi.storedDiff('cs-hill-diff');
-  let hRivals = [1, 2, 4].includes(store.get('cs-hill-rivals', 1)) ? store.get('cs-hill-rivals', 1) : 1;
-  group.classList.add('hill');
-  group.insertAdjacentHTML('beforeend', `
-    <b class="mode-name">King of the Hill</b>
-    <p style="font-size:14px">A short race of ${HILL.goal / 60} to ${HILL.cap / 60} minutes. A crowned keep stands at the centre of the map: whoever holds it scores a point a second, and the first to ${HILL.goal} wins. After ${HILL.cap / 60} minutes the most points wins. Your starting castle can be emptied but never taken, and the rival lords know the rule.</p>
-    <span class="sublabel">Difficulty</span>
-    <div class="seg" id="hillDiffSeg">${['easy', 'medium', 'hard'].map(d => `<button data-hdiff="${d}" aria-pressed="${d === hDiff}">${DIFF_NAME[d]}</button>`).join('')}</div>
-    <span class="sublabel">Rivals</span>
-    <div class="seg" id="hillRivalSeg">${[[1, '1 rival'], [2, '2 rivals'], [4, 'All four']].map(([n, t]) => `<button data-hrivals="${n}" aria-pressed="${n === hRivals}">${t}</button>`).join('')}</div>
-    <p class="hill-best" id="hillBest"></p>
-    <button class="primary" id="btnHill">Take the hill</button>`);
-  const { pickIn } = modeUi;
-  pickIn('hillDiffSeg', 'hdiff', v => { hDiff = v; store.set('cs-hill-diff', v); });
-  pickIn('hillRivalSeg', 'hrivals', v => { hRivals = +v; store.set('cs-hill-rivals', hRivals); });
-  // The record for the army chosen at the top of the menu (kept by js/achievements.js).
-  function renderBest() {
-    const rec = typeof ach === 'object' && ach && ach.rec && ach.rec.hillBest ? ach.rec.hillBest[myArmy] : null;
-    $('hillBest').textContent = rec != null ? `Best time to ${HILL.goal} with ${ARMIES[myArmy].name}: ${fmtTime(rec)}` : `No crown yet with ${ARMIES[myArmy].name}.`;
-  }
-  renderBest();
-  $('btnHill').addEventListener('click', () => startHill(myArmy, hRivals, hDiff));
-  $('armyPick').addEventListener('click', renderBest);
-  modeUi.onMenuShown(renderBest);
+  // The crowned keep is a Skirmish rule since #95: the 'Crowned keep' switch under Advanced settings (ui.js),
+  // or the 'The hill' preset card. startHill() above still starts a race directly (the smoke test uses it).
 })();

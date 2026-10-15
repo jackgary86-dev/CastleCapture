@@ -123,7 +123,7 @@
     { id: 'kinds', name: 'Castle kinds', sub: 'Fortress, war camp, village' },
     { id: 'units', name: 'Map units', sub: 'Ballista, trebuchet, ward' },
     { id: 'powers', name: 'Special powers', sub: 'One per army' },
-    { id: 'hill', name: 'King of the Hill', sub: 'A mode: race for the crown' },
+    { id: 'hill', name: 'King of the Hill', sub: 'A skirmish rule: race for the crown' },
     { id: 'renown', name: 'Renown and the realm map', sub: 'Unlocks, seasons, hall of fame' },
     { id: 'crown', name: 'Capture the Crown', sub: 'A mode: a duel for hidden crowns' },
   ];
@@ -267,7 +267,7 @@
       html += section('Timing', para(`Press Q, or click the power panel in the top left of the map. A power is first ready ${typeof FIRST_CHARGE !== 'undefined' ? FIRST_CHARGE : 45} seconds into a battle and then every ${typeof RECHARGE !== 'undefined' ? Math.round(RECHARGE / 60) : 5} minutes (the Power recharge setting changes this). Player 2 uses R. In the Grand Campaign a power is queued as an order and fires when the wave marches.${typeof BIG_MAP !== 'undefined' && game.armies.solmara ? ` On a big map (more than ${BIG_MAP.castlesPer} castles a kingdom, such as a Long war against one rival, or Capture the Crown) the ${game.armies.solmara.power.name} multiplies training by ${BIG_MAP.tithe} instead of doubling it.` : ''}`));
       html += table(['Army', 'Power', 'Lasts', 'Effect'], ids.map(aid => { const A = game.armies[aid]; return [A.name, A.power.name, `${A.power.dur}s`, A.power.desc]; }));
     } else if (id === 'hill' && typeof HILL !== 'undefined') {
-      html += section('The race', para(`A short mode of ${HILL.goal / 60} to ${HILL.cap / 60} minutes, found under Modes on the menu. A crowned keep stands at the centre of the map. Whoever holds it scores a point a second; the first to ${HILL.goal} wins, and after ${HILL.cap / 60} minutes the most points wins. The score bar in the header shows every realm's points.`));
+      html += section('The race', para(`A short race of ${HILL.goal / 60} to ${HILL.cap / 60} minutes: switch on the Crowned keep under Advanced settings, or pick the 'The hill' preset. A crowned keep stands at the centre of the map. Whoever holds it scores a point a second; the first to ${HILL.goal} wins, and after ${HILL.cap / 60} minutes the most points wins. The score bar in the header shows every realm's points.`));
       html += section('The hill keep', list([`It is a large keep with strong walls: defenders count ${HILL.def}× for whoever holds it, and it can't be upgraded.`, `It starts with ${HILL.garrison} unclaimed defenders and trains fast once taken, up to ${GARRISON_CAP[3]}.`, "Each kingdom's starting castle flies a gold pennant: it can be emptied but never taken, so nobody is knocked out of the race.", `A banner calls out the leader. At ${HILL.focusAt} points every lord turns on them.`]));
       const lords = game.lords ? [['kharzul', 'rushes the hill, harder than anyone.'], ['aldmere', 'takes the keeps beside it and strikes the moment someone else has paid to take it.'], ['solmara', 'builds a Ballista Tower next to it.'], ['nyx', 'waits for the holder to bleed, then pounces.'], ['frostmark', "freezes the holder's columns with Winter's Grip while hers close in."]].filter(([aid]) => game.lords[aid]).map(([aid, t]) => `${game.lords[aid].short} ${t}`) : [];
       if (lords.length) html += section('How the lords play it', list(lords));

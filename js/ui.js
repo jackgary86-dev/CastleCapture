@@ -639,6 +639,7 @@ const SET_IDS = { castles: 'setCastles', map: 'setMap', start: 'setStart', neutr
 // The strategy switches a preset means, as js/strategy-ui.js keeps them.
 const presetStrategy = p => typeof STRATEGY_ALL === 'undefined' ? {} : Object.fromEntries(Object.keys(STRATEGY_ALL).map(k => [k, p.strategy === 'all' || (Array.isArray(p.strategy) && p.strategy.includes(k))]));
 let mindSetting = store.get('cs-mind', true) !== false;   // smarter lords (js/mind.js); a preset sets it
+let hillOn = store.get('cs-hill', false) === true;         // King of the Hill as a Skirmish rule (#95): a crowned keep at the centre
 function readCustom() {
   const c = {};
   // A blank or unknown value falls back to Standard rather than becoming zero.
@@ -653,7 +654,7 @@ function presetMatch() {
   const now = readCustom(), picks = typeof strategyPicks === 'undefined' ? {} : strategyPicks;
   return Object.keys(BATTLE_PRESETS).find(name => {
     const p = BATTLE_PRESETS[name], want = presetStrategy(p);
-    return Object.keys(SET_IDS).every(k => p[k] === now[k]) && p.fog === fogOn && p.mind === mindSetting
+    return Object.keys(SET_IDS).every(k => p[k] === now[k]) && p.fog === fogOn && p.mind === mindSetting && !!p.hill === hillOn
       && Object.keys(want).every(k => !!picks[k] === want[k]);
   }) || null;
 }
@@ -672,6 +673,7 @@ function applyPreset(name) {
   fogOn = p.fog; store.set('cs-fog', fogOn);
   $('fogSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.fog === 'on') === fogOn)));
   mindSetting = p.mind; store.set('cs-mind', mindSetting); $('setMind').checked = mindSetting;
+  hillOn = !!p.hill; store.set('cs-hill', hillOn); $('setHill').checked = hillOn;   // (setHillRule would re-show; showCustom follows below)
   if (typeof setStrategyPicks === 'function') setStrategyPicks(presetStrategy(p));
   if (p.ais) { qAis = p.ais; $('aiSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.ais === qAis))); }
   showCustom(p); saveCustom();
@@ -697,6 +699,10 @@ $('presetSeg').addEventListener('keydown', e => {
 });
 $('customBox').addEventListener('input', saveCustom);
 $('setMind').checked = mindSetting;
+// The Crowned keep switch (#95), from the checkbox, a preset card or the smoke test.
+function setHillRule(v) { hillOn = !!v; store.set('cs-hill', hillOn); $('setHill').checked = hillOn; showCustom(readCustom()); }
+$('setHill').checked = hillOn;
+$('setHill').addEventListener('change', () => setHillRule($('setHill').checked));
 $('setMind').addEventListener('change', () => { mindSetting = $('setMind').checked; store.set('cs-mind', mindSetting); showCustom(readCustom()); });
 $('fogSeg').addEventListener('click', () => showCustom(readCustom()));
 $('aiSeg').addEventListener('click', () => showCustom(readCustom()));
@@ -729,6 +735,7 @@ function quickCfg() {
     seed: fixed ? c.seed : Math.floor(Math.random() * 1e9), fixedSeed: fixed,
     n: qAis === 4 ? Math.round(c.castles * 1.75) : c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge, capMul: c.cap,
     diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0], fog: fogOn, aiMind: mindSetting,
+    ...(hillOn ? { mode: 'hill' } : {}),   // the crowned keep (js/hill.js): the race's rules, scoring and end
     strategy: typeof strategySetting === 'function' ? strategySetting() : undefined,   // Custom battle's Deeper strategy switches (js/strategy-ui.js)
   };
 }
