@@ -65,6 +65,17 @@ const AI_SIEGE = false;         // the AI may field catapults (with a foot escor
 const RAID_MARCH = 6;          // seconds of foot marching beyond which an AI lord raids a nearly empty castle with cavalry
 const SIEGE_ESCORT = 0.4;       // share of an AI catapult force sent as foot marching alongside at catapult pace
 const UPKEEP_AT = 2;          // training halves above this many troops per unit of castle size, and halves again at twice that
+// Battle presets (#93): what the menu's preset cards set, and what tools/balance.js --preset plays. Map
+// settings (castles, map, start, neutral, speed, recharge, cap) plus fog of war, the Deeper strategy
+// switches (null: none; 'all'; or a list of STRATEGY_ALL keys) and the smarter lords (mind). Anything the
+// player changes afterwards under Advanced makes the battle 'Custom'.
+const BATTLE_PRESETS = {
+  quick:      { name: 'Quick', blurb: 'A small map, fast troops, no fog. Five minutes.', castles: 12, map: 0.8, start: 60, neutral: 0.5, speed: 1.25, recharge: 120, cap: 1, fog: false, strategy: null, mind: false },
+  classic:    { name: 'Classic', blurb: 'The standard map under fog of war, lords at their smartest.', castles: 18, map: 1, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: null, mind: true },
+  siege:      { name: 'Siege', blurb: 'A large map, slow marches, strong keeps; castles can become Keeps.', castles: 26, map: 1.25, start: 30, neutral: 1.5, speed: 0.75, recharge: 480, cap: 1, fog: false, strategy: ['spec'], mind: true },
+  grand:      { name: 'Grand skirmish', blurb: 'All four lords on a huge map, coalitions and fog.', castles: 17, map: 1.6, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: null, mind: true, ais: 4 },
+  everything: { name: 'Everything on', blurb: 'Classic with every strategy layer switched on.', castles: 18, map: 1, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: 'all', mind: true },
+};
 // Big maps (over castlesPer castles a kingdom: the Long preset, Capture the Crown): on the standard map these
 // don't apply, so its balance is untouched. The extra keeps let fast expanders snowball otherwise.
 const BIG_MAP = { castlesPer: 10, keep: 6, tithe: 1.3 };   // keep: most troops a lord leaves home; tithe: Golden Tithe training multiplier (2 on a standard map)

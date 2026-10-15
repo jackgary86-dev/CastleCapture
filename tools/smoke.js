@@ -694,6 +694,28 @@ run('lord intent lines', `{
   diploPanel.hidden = true;
   hud(); draw(${clock});
 }`);
+// ---------- battle presets (#93): each card sets the settings it says, and a changed field reads as Custom ----------
+run('battle presets', `{
+  for (const name of Object.keys(BATTLE_PRESETS)) {
+    const p = BATTLE_PRESETS[name];
+    applyPreset(name);
+    const c = readCustom();
+    for (const k of Object.keys(SET_IDS)) if (c[k] !== p[k]) throw new Error('preset ' + name + ' did not set ' + k + ': ' + c[k] + ' vs ' + p[k]);
+    if (fogOn !== p.fog || mindSetting !== p.mind) throw new Error('preset ' + name + ' did not set fog or smarter lords');
+    const cfg = quickCfg();
+    if (cfg.mapScale !== p.map || cfg.fog !== p.fog || cfg.aiMind !== p.mind) throw new Error('preset ' + name + ' did not reach quickCfg');
+    if (p.strategy === null && cfg.strategy !== undefined) throw new Error('preset ' + name + ' left strategy on');
+    if (p.strategy === 'all' && !(cfg.strategy && Object.values(cfg.strategy).every(Boolean))) throw new Error('preset ' + name + ' did not switch every strategy layer on');
+    if (presetMatch() !== name) throw new Error('preset ' + name + ' does not read back as itself');
+  }
+  $('setStart').value = '80'; saveCustom();
+  if (presetMatch() !== null || $('presetCustom').hidden) throw new Error('a changed field did not read as Custom');
+  applyPreset('classic');
+  play(quickCfg()); if (typeof startBattle === 'function') startBattle();
+  if (!G.cfg.fog || G.cfg.aiMind !== true) throw new Error('the Classic battle did not start with fog and smarter lords');
+  for (let i = 0; i < 30; i++) update(1 / 30);
+  hud(); draw(${clock});
+}`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
 console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);

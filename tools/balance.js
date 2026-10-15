@@ -28,6 +28,8 @@ const DIFF = opt('diff', 'hard');
 const SECONDS = +opt('seconds', 600);
 // --castles N and --scale X play ordinary battles on another map size (the menu's Long preset is 26 and 1.25).
 const CASTLES = +opt('castles', 0), SCALE = +opt('scale', 0);
+// --preset quick|classic|siege|grand|everything plays the menu's preset (BATTLE_PRESETS in data.js).
+const PRESET_NAME = opt('preset', '');
 // The agreed band (see issue #47), tightened from 25–75% once every army sat inside 38–63% at 8 games on
 // Warlord and Knight; tighten it again as the armies are retuned.
 const [BAND_LO, BAND_HI] = opt('band', '0.33,0.67').split(',').map(Number);
@@ -55,7 +57,7 @@ const code = ['js/data.js', 'js/sim.js', 'js/grand.js', 'js/hill.js', 'js/strate
 const ctx = vm.createContext({ console });
 vm.runInContext(code + `
 ;globalThis.__api = {
-  ARMIES, ARMY_IDS, LORDS, LORDS_ALT, AI_MIND, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, STRATEGY, STRATEGY_ALL, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
+  ARMIES, ARMY_IDS, LORDS, LORDS_ALT, AI_MIND, GRAND, GRAND_MAPS, MONSTERS, HILL, DEFENSE, CROWN, STRATEGY, STRATEGY_ALL, BATTLE_PRESETS, newGame, update, totalOf, march, on, hillCfg, defenseCfg, crownCfg,
   get G() { return G; },
   seedRandom(s) { Math.random = mulberry(s); },
 };`, ctx, { filename: 'castle-siege-sim.js' });
@@ -88,7 +90,11 @@ let crashes = 0;
 
 function runGame(armies, mapOf, seed, label) {
   api.seedRandom(seed);
-  api.newGame({ seed, n: CASTLES || (armies.length === 2 ? 18 : 19), diff: DIFF, armies, map: mapOf, ...(SCALE ? { mapScale: SCALE } : {}), ...(STRATEGY_RUN ? { strategy: { ...STRATEGY_RUN } } : {}) });
+  const P = PRESET_NAME ? api.BATTLE_PRESETS[PRESET_NAME] : null;
+  if (PRESET_NAME && !P) { console.error(`--preset: no preset ${PRESET_NAME}`); process.exit(2); }
+  const presetCfg = P ? { n: armies.length === 4 + 1 ? Math.round(P.castles * 1.75) : P.castles + (armies.length === 2 ? 0 : 1), mapScale: P.map, start: P.start, neutral: P.neutral, speedMul: P.speed, recharge: P.recharge, capMul: P.cap, fog: P.fog, aiMind: P.mind,
+    ...(P.strategy ? { strategy: Object.fromEntries(Object.keys(api.STRATEGY_ALL).map(k => [k, P.strategy === 'all' || P.strategy.includes(k)])) } : {}) } : {};
+  api.newGame({ seed, n: CASTLES || (armies.length === 2 ? 18 : 19), diff: DIFF, armies, map: mapOf, ...(SCALE ? { mapScale: SCALE } : {}), ...(STRATEGY_RUN ? { strategy: { ...STRATEGY_RUN } } : {}), ...presetCfg });
   const G = api.G;
   // The player's seat is driven by the AI too.
   G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });

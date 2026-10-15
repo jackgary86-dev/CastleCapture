@@ -100,6 +100,14 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .diplo-row small.intent { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; max-width: 240px; }
 #ordersRivals { list-style: none; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--edge); display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 .opt-row { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.presets button { display: grid; gap: 3px; text-align: left; padding: 8px 10px; }
+.presets button b { font-size: 14px; }
+.presets button small { font-weight: 400; color: var(--ink-soft); font-size: 12px; line-height: 1.25; white-space: normal; }
+.presets button[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: var(--parchment); }
+.presets button[aria-checked="true"] small { color: var(--parchment); opacity: 0.85; }
+.preset-custom { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.settings label.check { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
 #btnMarch:disabled { opacity: 0.85; background: transparent; color: var(--muted); border-color: var(--edge); font-family: var(--ui); font-size: 15px; }
 #minimap { position: absolute; inset: auto 12px 12px auto; width: 168px; height: 168px; z-index: 1; border-radius: 6px; cursor: crosshair;
   border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); background: rgb(23 20 14 / 0.92); touch-action: none; }
@@ -672,18 +680,22 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
             <button data-field="theirs" aria-pressed="true">Invade their homeland</button>
             <button data-field="mine">Defend your homeland</button>
           </div>
+          <span class="sublabel">Battle preset</span>
+          <div class="presets" id="presetSeg" role="radiogroup" aria-label="Battle preset">
+            <button type="button" role="radio" aria-checked="false" data-preset="quick"><b>Quick</b><small>A small map, fast troops, no fog. Five minutes.</small></button>
+            <button type="button" role="radio" aria-checked="false" data-preset="classic"><b>Classic</b><small>The standard map under fog of war, lords at their smartest.</small></button>
+            <button type="button" role="radio" aria-checked="false" data-preset="siege"><b>Siege</b><small>A large map, slow marches, strong keeps; castles can become Keeps.</small></button>
+            <button type="button" role="radio" aria-checked="false" data-preset="grand"><b>Grand skirmish</b><small>All four lords on a huge map, coalitions and fog.</small></button>
+            <button type="button" role="radio" aria-checked="false" data-preset="everything"><b>Everything on</b><small>Classic with every strategy layer switched on.</small></button>
+          </div>
+          <p class="preset-custom" id="presetCustom" hidden>Custom: your own mix of the settings below.</p>
           <details class="custom" id="customBox">
-            <summary>Custom battle settings</summary>
-            <div class="seg" id="presetSeg">
-              <button data-preset="quick">Quick brawl</button>
-              <button data-preset="standard">Standard</button>
-              <button data-preset="long">Long war</button>
-            </div>
+            <summary>Advanced settings</summary>
             <div class="settings">
               <label for="setCastles">Castles <output id="outCastles" for="setCastles">18</output>
                 <input type="range" id="setCastles" min="10" max="28" step="1" value="18"></label>
               <label for="setMap">Map size
-                <select id="setMap"><option value="0.8">Small</option><option value="1">Normal</option><option value="1.25">Large</option></select></label>
+                <select id="setMap"><option value="0.8">Small</option><option value="1">Normal</option><option value="1.25">Large</option><option value="1.6">Huge</option></select></label>
               <label for="setStart">Starting troops
                 <select id="setStart"><option value="20">20</option><option value="30">30</option><option value="40">40</option><option value="60">60</option><option value="80">80</option></select></label>
               <label for="setNeutral">Unclaimed keeps
@@ -696,6 +708,7 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
                 <select id="setCap"><option value="0.75">Low</option><option value="1">Normal</option><option value="1.5">High</option><option value="2">Huge</option></select></label>
               <label for="setSeed" class="wide">Map seed <small>Leave blank for a new map each time</small>
                 <input id="setSeed" inputmode="numeric" autocomplete="off" placeholder="Random"></label>
+              <label class="wide check"><input type="checkbox" id="setMind" checked> <b>Smarter lords</b> <small>coalitions against the leader, grudges, openings</small></label>
             </div>
           </details>
           <span class="sublabel">Fog of war</span>

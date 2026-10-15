@@ -630,12 +630,12 @@ function startLevel(lv) {
   play({ ...LEVELS[lv - 1], level: lv, armies: [myArmy, ...rivals], map: rivals[0] });
 }
 // ---------- custom battle settings ----------
-const PRESETS = {
-  quick:    { castles: 12, map: 0.8,  start: 60, neutral: 0.5, speed: 1.25, recharge: 120, cap: 1 },
-  standard: { castles: 18, map: 1,    start: 40, neutral: 1,   speed: 1,    recharge: 300, cap: 1 },
-  long:     { castles: 26, map: 1.25, start: 30, neutral: 1.5, speed: 1,    recharge: 480, cap: 1 },
-};
+// The preset cards (#93) are BATTLE_PRESETS in data.js; 'standard' is the fallback for a blank Advanced field.
+const PRESETS = { ...BATTLE_PRESETS, standard: BATTLE_PRESETS.classic };
 const SET_IDS = { castles: 'setCastles', map: 'setMap', start: 'setStart', neutral: 'setNeutral', speed: 'setSpeed', recharge: 'setRecharge', cap: 'setCap' };
+// The strategy switches a preset means, as js/strategy-ui.js keeps them.
+const presetStrategy = p => typeof STRATEGY_ALL === 'undefined' ? {} : Object.fromEntries(Object.keys(STRATEGY_ALL).map(k => [k, p.strategy === 'all' || (Array.isArray(p.strategy) && p.strategy.includes(k))]));
+let mindSetting = store.get('cs-mind', true) !== false;   // smarter lords (js/mind.js); a preset sets it
 function readCustom() {
   const c = {};
   // A blank or unknown value falls back to Standard rather than becoming zero.
@@ -644,12 +644,34 @@ function readCustom() {
   c.seed = /^\d{1,10}$/.test(raw) ? +raw : null;
   return c;
 }
+// Which preset the current settings are, or null for a Custom mix: every map setting, fog, the strategy
+// switches and the smarter-lords switch have to match.
+function presetMatch() {
+  const now = readCustom(), picks = typeof strategyPicks === 'undefined' ? {} : strategyPicks;
+  return Object.keys(BATTLE_PRESETS).find(name => {
+    const p = BATTLE_PRESETS[name], want = presetStrategy(p);
+    return Object.keys(SET_IDS).every(k => p[k] === now[k]) && p.fog === fogOn && p.mind === mindSetting
+      && Object.keys(want).every(k => !!picks[k] === want[k]);
+  }) || null;
+}
 function showCustom(c) {
   for (const [k, id] of Object.entries(SET_IDS)) $(id).value = String(c[k]);
   $('outCastles').textContent = $('setCastles').value;
-  const now = readCustom();
-  const match = Object.keys(PRESETS).find(name => Object.keys(SET_IDS).every(k => PRESETS[name][k] === now[k]));
-  $('presetSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.preset === match)));
+  const match = presetMatch();
+  $('presetSeg').querySelectorAll('button').forEach(b => { b.setAttribute('aria-checked', String(b.dataset.preset === match)); b.tabIndex = b.dataset.preset === (match || 'classic') ? 0 : -1; });
+  $('presetCustom').hidden = !!match;
+}
+// Apply a preset card: the map settings, fog, the strategy switches, the smarter lords, and for the Grand
+// skirmish the rival count.
+function applyPreset(name) {
+  const p = BATTLE_PRESETS[name];
+  if (!p) return;
+  fogOn = p.fog; store.set('cs-fog', fogOn);
+  $('fogSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.fog === 'on') === fogOn)));
+  mindSetting = p.mind; store.set('cs-mind', mindSetting); $('setMind').checked = mindSetting;
+  if (typeof setStrategyPicks === 'function') setStrategyPicks(presetStrategy(p));
+  if (p.ais) { qAis = p.ais; $('aiSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.ais === qAis))); }
+  showCustom(p); saveCustom();
 }
 function saveCustom() {
   const c = readCustom();
@@ -658,13 +680,27 @@ function saveCustom() {
 }
 $('presetSeg').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  showCustom(PRESETS[b.dataset.preset]); saveCustom();
+  applyPreset(b.dataset.preset);
+});
+// A radiogroup: arrow keys move between the cards and pick them.
+$('presetSeg').addEventListener('keydown', e => {
+  const keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+  if (!(e.key in keys)) return;
+  const cards = [...$('presetSeg').querySelectorAll('button')], i = cards.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  const next = cards[(i + keys[e.key] + cards.length) % cards.length];
+  next.focus(); applyPreset(next.dataset.preset);
 });
 $('customBox').addEventListener('input', saveCustom);
+$('setMind').checked = mindSetting;
+$('setMind').addEventListener('change', () => { mindSetting = $('setMind').checked; store.set('cs-mind', mindSetting); showCustom(readCustom()); });
+$('fogSeg').addEventListener('click', () => showCustom(readCustom()));
+$('aiSeg').addEventListener('click', () => showCustom(readCustom()));
 {
   // Restore saved settings; anything missing or no longer offered falls back to Standard.
   const saved = store.get('cs-custom', null) || {};
-  showCustom({ ...PRESETS.standard });
+  for (const [k, id] of Object.entries(SET_IDS)) $(id).value = String(PRESETS.standard[k]);
   for (const [k, id] of Object.entries(SET_IDS)) {
     if (saved[k] == null) continue;
     const el = $(id), before = el.value;
@@ -689,7 +725,7 @@ function quickCfg() {
   return {
     seed: fixed ? c.seed : Math.floor(Math.random() * 1e9), fixedSeed: fixed,
     n: qAis === 4 ? Math.round(c.castles * 1.75) : c.castles + (qAis === 1 ? 0 : 1), mapScale: c.map, start: c.start, neutral: c.neutral, speedMul: c.speed, recharge: c.recharge, capMul: c.cap,
-    diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0], fog: fogOn,
+    diff: qDiff, armies: [myArmy, ...rivals], map: qField === 'mine' ? myArmy : rivals[0], fog: fogOn, aiMind: mindSetting,
     strategy: typeof strategySetting === 'function' ? strategySetting() : undefined,   // Custom battle's Deeper strategy switches (js/strategy-ui.js)
   };
 }

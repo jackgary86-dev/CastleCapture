@@ -17,6 +17,12 @@ let strategyPicks = { ...STRATEGY_ALL, ...store.get('cs-strategy', {}) };
 function strategySetting() {
   return Object.values(strategyPicks).some(Boolean) ? { ...strategyPicks } : undefined;
 }
+// A preset card (ui.js applyPreset) sets every switch at once.
+function setStrategyPicks(picks) {
+  strategyPicks = { ...STRATEGY_ALL, ...picks };
+  store.set('cs-strategy', strategyPicks);
+  document.querySelectorAll('input[data-strat]').forEach(c => { c.checked = !!strategyPicks[c.dataset.strat]; });
+}
 {
   const seed = document.getElementById('setSeed');
   const holder = seed && seed.closest('.settings');
@@ -29,6 +35,7 @@ function strategySetting() {
       const c = e.target.closest('input[data-strat]'); if (!c) return;
       strategyPicks[c.dataset.strat] = c.checked;
       store.set('cs-strategy', strategyPicks);
+      if (typeof showCustom === 'function') showCustom(readCustom());   // the preset cards follow
     });
     holder.append(box);
   }
