@@ -53,6 +53,18 @@ function powerDesc(o) {
   if (s !== 1) d = d.replace(/\b(\d+)%/, (m, n) => `${Math.round(+n * s)}%`);
   return d;
 }
+// Signature tells (#96): the warning, with a chime.
+on('tell', ({ o, kind, power }) => {
+  if (G.cfg.demo || o === 1) return;
+  const L = lordOf(o), what = kind === 'attack' ? 'Scaffold rises on her walls: her columns march in a few seconds.'
+    : kind === 'unit' ? `${L.short}'s coins are moving: a map unit is about to be built.`
+    : power === 'bloodMoon' ? 'A horn: the Blood Moon is rising. Columns that leave now ride with it.'
+    : power === 'wintersGrip' ? 'Frost creeps along the roads from her castles: step your columns off them.'
+    : power === 'crows' ? 'Crows gather over your largest castles: move the troops out.'
+    : `${L.short} is about to ${army(o).power.call}.`;
+  toast(`${L.short}'s tell`, what, army(o).color);
+  sfx.chime();
+});
 on('power', ({ o, army: A }) => {
   if (G.cfg.demo) return;
   toast(o === 1 ? `You ${A.power.call}!` : `${A.full} ${A.power.they}!`, o === 1 ? powerDesc(o) : powerDesc(o).replace(/\byour\b/g, 'their'), A.color);

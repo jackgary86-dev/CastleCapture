@@ -396,7 +396,7 @@ function newGame(cfg, portrait = false) {
     coins: Object.fromEntries(owners.map(o => [o, 0])), units: [], shots: [], bought: new Set(), placing: null,
     roadPts: roadSamples(map.roads), np: map.planets.length, rallyClock: 0, sight: {}, sightClock: 0,
     weather: { kind: 'clear', prev: 'clear', since: -WEATHER_FADE, until: WEATHER_FIRST },
-    pacts: [], pactCool: {}, lastOffer: {}, betrayers: {}, offer: null, diploClock: 0,
+    pacts: [], pactCool: {}, lastOffer: {}, betrayers: {}, tells: [], offer: null, diploClock: 0,
     lord: Object.fromEntries(owners.map((o, i) => [o, cfg.lordAlt && cfg.lordAlt[i] && LORDS_ALT[cfg.armies[i]] ? 'alt' : 'base'])),
     seen: Object.fromEntries(owners.map(o => [o, map.planets.map(p => ({ owner: p.owner, units: p.units }))])),
     history: [], events: [], nextSample: 0, stats: { sent: 0, roadLost: 0, castlesLost: 0, powerUses: 0 },
@@ -456,8 +456,11 @@ const defAt = p => defOf(p.owner) * (p.owner && wardOver(p, p.owner) ? 1.5 : 1) 
 // Enemy Great Wards halve marching speed inside them.
 const slowedAt = k => G.units.some(u => u.type === 'ward' && u.owner !== k.owner && dist(u, k) <= MAP_UNITS.ward.range);
 const incomeOf = o => G.planets.reduce((a, p) => a + (p.owner === o ? COIN_PER_MIN[tierOf(p)] * (G.cfg.strategy ? stratCoinMul(p) : 1) : 0), 0);   // Markets (js/strategy.js)
-// Winter's Grip freezes every rival, but not a kingdom under truce with Sigrun.
+// Winter's Grip freezes the columns the frost reached (k.frozenUntil, set when it fires); castles are never frozen.
 const frozen = o => G.owners.some(q => q !== o && !allied(q, o) && powerOn(q, 'wintersGrip'));
+const frozenK = k => k.frozenUntil != null && G.time < k.frozenUntil;
+// Blood Moon rides only with columns that left after the horn (k.born >= the charge's start).
+const moonMul = (k, atk) => { const q = k.owner, pw = G.pw[q]; return powerOn(q, 'bloodMoon') && army(q).power.id === 'bloodMoon' && pw.since != null && (k.born ?? 0) < pw.since ? (atk ? 1 / 1.5 : 1 / 2) : 1; };
 
 // ---------- castle upgrades and archers ----------
 const lvl = (p, kind) => (p.up && p.up[kind]) || 0;
@@ -531,9 +534,21 @@ function aiUpgrade(ai, mine, enemyCastles, inc, pz) {
   return false;
 }
 
-function usePower(o) {
+function usePower(o, now = false) {
   const pw = G.pw[o], A = army(o);
-  if (pw.ready > 0 || G.over) return false;
+  if ((pw.ready > 0 && !now) || G.over) return false;   // a told power was spent when its tell began (#96)
+  // Signature tells (#96): a lord's power is announced TELLS seconds before it lands; the player sees the tell
+  // (render.js) and can brace. The power is spent now so it can't be used twice; it fires from tellsTick().
+  if (!now && !human(o) && G.mode !== 'grand' && (TELLS[lordStyle(o)] || 0) > 0 && !G.cfg.demo) {
+    if (G.tells.some(t => t.o === o && t.kind === 'power')) return false;
+    const lead = TELLS[lordStyle(o)], tell = { o, kind: 'power', power: A.power.id, at: G.time + lead, since: G.time, targets: [] };
+    if (A.power.id === 'crows') tell.targets = G.planets.filter(p => p.owner && p.owner !== o && !allied(o, p.owner)).sort((a, b) => b.units - a.units).slice(0, 3).map(p => p.id);
+    if (A.power.id === 'wintersGrip') tell.targets = G.planets.filter(p => p.owner === o).map(p => p.id);
+    G.tells.push(tell);
+    pw.ready = rechargeTime() * powerTwist(o, 'rechargeMul');   // spent: no second cast while the tell runs
+    emit('tell', { o, kind: 'power', power: A.power.id, lead, targets: tell.targets });
+    return true;
+  }
   if (G.mode === 'grand' && G.phase === 'plan') {
     if (pw.queued) return false;
     pw.queued = true;
@@ -542,10 +557,22 @@ function usePower(o) {
     emit('order', { order });
     return true;
   }
-  pw.ready = rechargeTime() * powerTwist(o, 'rechargeMul');
+  if (!now) pw.ready = rechargeTime() * powerTwist(o, 'rechargeMul');
   pw.until = G.time + A.power.dur * powerTwist(o, 'durMul') * (G.mode === 'hill' && A.power.id === 'wintersGrip' ? HILL.freezeMul : 1);
+  pw.since = G.time;
+  if (A.power.id === 'wintersGrip') {
+    // The frost freezes the columns on the roads it crept along: those marching on Sigrun's castles, and any
+    // within reach of one. A column that stepped off those roads during the tell is spared.
+    const told = now && Array.isArray(now) ? now : null;
+    for (const k of G.packets) {
+      if (k.owner === o || allied(o, k.owner) || k.delay > 0) continue;
+      const onRoad = !told || (k.to && k.to.owner === o) || G.planets.some(p => p.owner === o && dist(p, k) < 220);
+      if (onRoad) k.frozenUntil = pw.until;
+    }
+  }
   if (A.power.id === 'crows') {
-    const targets = G.planets.filter(p => p.owner && p.owner !== o && !allied(o, p.owner)).sort((a, b) => b.units - a.units).slice(0, 3);
+    const told = now && Array.isArray(now) ? now.map(id => G.planets[id]).filter(p => p && p.owner && p.owner !== o && !allied(o, p.owner)) : null;
+    const targets = told || G.planets.filter(p => p.owner && p.owner !== o && !allied(o, p.owner)).sort((a, b) => b.units - a.units).slice(0, 3);
     for (const t of targets) { t.units -= Math.min(t.units * 0.4 * powerTwist(o, 'strengthMul'), G.mode === 'grand' ? 25 : Infinity); G.fx.push({ kind: 'crows', x: t.x, y: t.y, r: t.r, age: 0 }); }
   }
   emit('power', { o, army: A });
@@ -556,6 +583,23 @@ function usePower(o) {
   return true;
 }
 
+// Signature tells (#96): fire the ones that are due. A power fires on its announced targets; an attack
+// (Isolde) is columns held at their castles until the scaffold has risen, launched by launch() itself.
+function tellsTick() {
+  if (!G.tells || !G.tells.length) return;
+  const due = G.tells.filter(t => G.time >= t.at);
+  if (!due.length) return;
+  G.tells = G.tells.filter(t => G.time < t.at);
+  for (const t of due) {
+    if (t.kind === 'power') { if (!G.over) usePower(t.o, t.targets.length ? t.targets : true); emit('tellLanded', { o: t.o, kind: t.kind }); }
+    else if (t.kind === 'attack') {
+      const s = G.planets[t.from], to = G.planets[t.to], before = G.packets.length;
+      if (s && to && s.owner === t.o && to.owner !== t.o && send(t.o, [s], to, t.frac, t.type)) for (const k of G.packets.slice(before)) k.str = (k.str || 1) * TELL_SIEGE;
+      emit('tellLanded', { o: t.o, kind: t.kind });
+    }
+    else if (t.kind === 'unit') { if (!placeProblem(t.o, t.x, t.y)) placeUnit(t.o, t.type, t.x, t.y); else G.coins[t.o] += MAP_UNITS[t.type].price, G.bought.delete(t.o); emit('tellLanded', { o: t.o, kind: t.kind }); }
+  }
+}
 // A lord has something to say. The UI decides whether and how to show it.
 // Which lord sits in each seat (#71): G.lord[o] is 'alt' for an army's alternate lord (LORDS_ALT), else 'base'.
 const lordIsAlt = o => !!(G.lord && G.lord[o] === 'alt' && LORDS_ALT[G.fac[o]]);
@@ -748,7 +792,7 @@ function launch(owner, s, target, n, type = 'foot', escort = false) {
     let start = at((Math.random() - 0.5) * s.r * 1.1);
     if (crossesWater(G.terrain, start, path.length > 1 ? { x: first.x + jx, y: first.y + jy } : first)) start = at(0);
     G.packets.push({
-      owner, from: s, to: target, n: cnt, str: soldierStr(s), type, escort, delay: i * 0.06, phase: Math.random() * 6.28,
+      owner, from: s, to: target, n: cnt, str: soldierStr(s), type, escort, delay: i * 0.06, born: G.time, phase: Math.random() * 6.28,
       path, wp: 0, jx, jy, x: start.x, y: start.y,
     });
   }
@@ -923,6 +967,19 @@ function aiThink(ai) {
   // A Grand Campaign monster near death is worth a lord's turn (js/monsters.js).
   if (G.monster && typeof monsterAi === 'function' && monsterAi(ai)) return;
   const inc = incomingFor(me), pow = incomingPowerFor(me);
+  // Signature tells (#96): a lord reads them too. Crows gathering over one of its castles: half the garrison
+  // steps out to the nearest other castle it holds.
+  if (G.tells && G.tells.length && d !== 'easy') {
+    for (const t of G.tells) {
+      if (t.kind !== 'power' || t.power !== 'crows' || t.o === me) continue;
+      for (const id of t.targets) {
+        const p = G.planets[id];
+        if (!p || p.owner !== me || p.units < 10) continue;
+        const safe = G.planets.filter(q => q.owner === me && q !== p && !t.targets.includes(q.id)).sort((a, b) => travel(p, a) - travel(p, b))[0];
+        if (safe && send(me, [p], safe, 0.5)) return;
+      }
+    }
+  }
   // King of the Hill (#64): each lord's own play for the crowned keep comes first (js/hill.js).
   if (G.mode === 'hill' && typeof hillAi === 'function' && hillAi(ai, P, inc, pow)) return;
   // Capture the Crown (#66): guarding, moving and scouting for crowns comes first (js/crown.js).
@@ -1106,8 +1163,18 @@ function aiThink(ai) {
   }
 }
 
-// Send from one castle.
-function aiAttackFrom(me, s, t, frac, type) { send(me, [s], t, frac, type); }
+// Send from one castle. Isolde's tell (#96): scaffold rises on the castle for TELLS.aldmere seconds while the
+// columns wait, then they march.
+function aiAttackFrom(me, s, t, frac, type) {
+  // Not in Capture the Crown, where her every attack is a crown hunt and the warning gave it away (#96 balance).
+  const lead = G.mode !== 'grand' && G.mode !== 'crown' && !G.cfg.demo && lordStyle(me) === 'aldmere' && t.owner && t.owner !== me ? TELLS.aldmere : 0;
+  if (!lead) { send(me, [s], t, frac, type); return; }
+  // The troops stay in the garrison until the scaffold is up (tellsTick sends them), so the warning costs
+  // her the delay and nothing else.
+  if (s.owner !== me || G.tells.some(x => x.kind === 'attack' && x.o === me && x.from === s.id)) return;
+  G.tells.push({ o: me, kind: 'attack', at: G.time + lead, since: G.time, from: s.id, to: t.id, frac, type });
+  emit('tell', { o: me, kind: 'attack', lead, from: s.id, to: t.id });
+}
 
 // ---------- coins and map units ----------
 // Points along each drawn road, so map units aren't placed on top of one.
@@ -1140,6 +1207,13 @@ function buyUnit(o, type, x, y) {
     const order = { kind: 'unit', owner: o, type, x, y };
     G.orders.push(order);
     emit('order', { order });
+    return true;
+  }
+  if (!human(o) && !G.cfg.demo && (TELLS[lordStyle(o)] || 0) > 0) {
+    // Signature tell (#96): the coins glint towards the spot for TELLS seconds first; the player can race it.
+    const lead = TELLS[lordStyle(o)];
+    G.tells.push({ o, kind: 'unit', type, x, y, at: G.time + lead, since: G.time });
+    emit('tell', { o, kind: 'unit', lead, x, y });
     return true;
   }
   placeUnit(o, type, x, y);
@@ -1205,6 +1279,7 @@ function mapUnits(dt) {
 function aiBuyUnit(ai, mine) {
   const me = ai.id;
   if (G.bought.has(me)) return;
+  if (G.tells && G.tells.some(t => t.o === me && t.kind === 'unit')) return;
   if (G.mode === 'hill' && typeof hillBuyUnit === 'function' && hillBuyUnit(ai, mine)) return;
   const type = AI_UNIT[G.fac[me]], U = MAP_UNITS[type];
   if (G.coins[me] < U.price) return;
@@ -1264,7 +1339,7 @@ function update(dt) {
 
   for (let i = G.packets.length - 1; i >= 0; i--) {
     const k = G.packets[i];
-    if (frozen(k.owner)) continue;
+    if (frozenK(k)) continue;
     if (k.delay > 0) { k.delay -= dt; continue; }
     if (k.hold) continue;   // standing and fighting a map monster (js/monsters.js)
     // March towards the next waypoint on the route (bridge ends), then the castle itself.
@@ -1278,7 +1353,7 @@ function update(dt) {
       continue;
     }
     if (!last && dd < 3) { k.wp++; continue; }
-    const pace = unitOf(k).speed;
+    const pace = unitOf(k).speed * moonMul(k, false);
     const step = Math.min(dd, speedOf(k.owner) * pace * (slowedAt(k) ? 0.5 : 1) * (inForest(G.terrain, k) ? (army(k.owner).stats.forest ?? FOREST_SLOW) : 1) * (G.cfg.strategy ? stratSpeedMul(k) : 1) * dt);   // fords and roads (js/strategy.js)
     k.x += dx / dd * step; k.y += dy / dd * step;
     k.dir = dx < 0 ? -1 : 1;
@@ -1332,6 +1407,7 @@ function update(dt) {
   }
   checkSurrender();
   // King of the Hill (#64): the crowned keep scores, and the race can end the battle (js/hill.js).
+  tellsTick();
   if (G.mode === 'hill' && typeof hillTick === 'function' && hillTick(dt)) return;
   // Deeper strategy (#67): supply lines, the lords' branches and the champions' fates (js/strategy.js).
   if (G.cfg.strategy && typeof strategyTick === 'function') strategyTick(dt);

@@ -264,7 +264,7 @@ function drawJuice(now, ground) {
     juiceFx.last = now;
     if (!reduceMotion && dt > 0) {
       for (const k of G.packets) {
-        if (k.delay > 0 || frozen(k.owner) || (k.owner !== 1 && !G.cfg.demo && !seesAt(1, k.x, k.y))) continue;
+        if (k.delay > 0 || frozenK(k) || (k.owner !== 1 && !G.cfg.demo && !seesAt(1, k.x, k.y))) continue;
         const every = 0.14, t = juiceFx.dustAt.get(k) ?? 0;
         if (now / 1000 - t < every || juiceFx.parts.length >= JUICE_MAX_PARTS) continue;
         juiceFx.dustAt.set(k, now / 1000);
@@ -937,7 +937,7 @@ function draw(now) {
     if (it.u) { drawUnit(it.u, now); continue; }
     if (it.m) { drawMonster(it.m, now); continue; }
     if (it.p) { if (G.cfg.fog && !G.cfg.demo) drawRemembered(it.p, now); else drawCastle(it.p, now); if (!G.cfg.demo && allied(1, it.p.owner)) drawTruceMark(it.p); continue; }
-    const k = it.k, dir = k.dir || 1, isFrozen = frozen(k.owner);
+    const k = it.k, dir = k.dir || 1, isFrozen = frozenK(k);
     const style = army(k.owner).soldier;
     const figures = Math.min(Math.ceil(k.n), 3);
     if (powerOn(k.owner, 'bloodMoon')) {
@@ -961,6 +961,7 @@ function draw(now) {
   drawShots();
   drawPlacement(now);
 
+  drawTells(now);
   for (const f of G.fx) {
     if (MONSTER_FX[f.kind]) { drawMonsterFx(f, now); continue; }
     if (f.kind === 'clash') {
@@ -1037,5 +1038,43 @@ function draw(now) {
     ctx.fillStyle = alpha(TIMBER, 0.82); ctx.beginPath(); ctx.roundRect(cx - w / 2, y, w, h, 4); ctx.fill();
     ctx.fillStyle = '#ece2c6'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     lines.forEach((l, i) => ctx.fillText(l, cx, y + 15 + 18 * i, room - 16));
+  }
+}
+
+// ---------- signature tells (#96) ----------
+// Each pending tell in G.tells is drawn for its lead time: Isolde's scaffold on the castle her columns wait in,
+// Torvek's red tint rising, frost creeping from Sigrun's castles, coins glinting to Amaru's spot, crows circling
+// Veyra's targets. With reduced motion each is a still marker.
+function drawTells(now) {
+  if (!G.tells || !G.tells.length || G.cfg.demo) return;
+  for (const t of G.tells) {
+    const f = Math.max(0, Math.min(1, (G.time - t.since) / Math.max(0.01, t.at - t.since))), c = col(t.o);
+    const wob = reduceMotion ? 0 : Math.sin(now / 90);
+    if (t.kind === 'attack') {
+      const p = G.planets[t.from]; if (!p) continue;
+      ctx.strokeStyle = '#c9a66b'; ctx.lineWidth = 2;
+      const h = p.r * 1.6 * f;
+      for (const dx of [-p.r * 0.8, 0, p.r * 0.8]) { ctx.beginPath(); ctx.moveTo(p.x + dx, p.y + p.r * 0.4); ctx.lineTo(p.x + dx, p.y + p.r * 0.4 - h); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(p.x - p.r * 0.9, p.y + p.r * 0.4 - h); ctx.lineTo(p.x + p.r * 0.9, p.y + p.r * 0.4 - h); ctx.stroke();
+      const to = G.planets[t.to]; if (to) { ctx.setLineDash([4, 6]); ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(to.x, to.y); ctx.stroke(); ctx.setLineDash([]); }
+    } else if (t.kind === 'power' && t.power === 'bloodMoon') {
+      ctx.fillStyle = `rgba(200,30,30,${0.18 * f})`; ctx.fillRect(-ox / sc, -oy / sc, cw / sc, ch / sc);
+      for (const p of G.planets) if (p.owner === t.o) { ctx.strokeStyle = `rgba(255,80,60,${0.5 + 0.5 * f})`; ctx.lineWidth = 2 + 2 * f; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1.2 + 0.4 * f) + wob * 2, 0, Math.PI * 2); ctx.stroke(); }
+    } else if (t.kind === 'power' && t.power === 'wintersGrip') {
+      ctx.strokeStyle = `rgba(210,235,255,${0.5 + 0.4 * f})`; ctx.lineWidth = 3;
+      for (const id of t.targets) { const p = G.planets[id]; if (!p) continue; const R = p.r + 220 * f; ctx.setLineDash([3, 5]); ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    } else if (t.kind === 'power' && t.power === 'crows') {
+      ctx.strokeStyle = '#1a1410'; ctx.lineWidth = 1.5;
+      for (const id of t.targets) {
+        const p = G.planets[id]; if (!p) continue;
+        const n = 3 + Math.floor(f * 6);
+        for (let i = 0; i < n; i++) { const a = i * 2.1 + (reduceMotion ? 0 : now / 400), r = p.r * 0.9 + (i % 3) * 6; const x = p.x + Math.cos(a) * r, y = p.y - p.r * 0.9 - 10 + Math.sin(a) * r * 0.35; ctx.beginPath(); ctx.moveTo(x - 4, y); ctx.quadraticCurveTo(x, y - 3 - wob, x + 4, y); ctx.stroke(); }
+      }
+    } else if (t.kind === 'unit') {
+      const from = G.planets.filter(p => p.owner === t.o).sort((a, b) => b.units - a.units)[0]; if (!from) continue;
+      ctx.fillStyle = '#e9b43b';
+      for (let i = 0; i < 6; i++) { const g = ((i / 6) + (reduceMotion ? 0 : now / 1500)) % 1; if (g > f) continue; ctx.beginPath(); ctx.arc(from.x + (t.x - from.x) * g, from.y + (t.y - from.y) * g, 2.5, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = '#e9b43b'; ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.arc(t.x, t.y, 12 + 6 * f, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    }
   }
 }

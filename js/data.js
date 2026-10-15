@@ -73,6 +73,12 @@ const BATTLE_PRESETS = {
   grand:      { name: 'Grand skirmish', blurb: 'All four lords on a huge map, coalitions and fog.', castles: 17, map: 1.6, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: null, mind: true, ais: 4, hill: false },
   everything: { name: 'Everything on', blurb: 'Classic with every strategy layer switched on.', castles: 18, map: 1, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: 'all', mind: true, hill: false },
 };
+// Signature tells (#96): seconds of warning before a lord's signature move lands, by lord style. Isolde's
+// scaffold rises on the castles she will attack from; Torvek's horn sounds before the Blood Moon; frost creeps
+// from Sigrun's castles before Winter's Grip; Amaru's coins glint towards the keep he will build beside;
+// Veyra's crows gather over the castles she will plague. Off (0) in the Grand Campaign, where waves are the tell.
+const TELLS = { aldmere: 3, kharzul: 2, frostmark: 3, solmara: 3, nyx: 3 };
+const TELL_SIEGE = 1.15;   // Isolde's scaffold is siege works: the columns that march after it strike this much harder
 // Big maps (over castlesPer castles a kingdom: the Long preset, Capture the Crown): on the standard map these
 // don't apply, so its balance is untouched. The extra keeps let fast expanders snowball otherwise.
 const BIG_MAP = { castlesPer: 10, keep: 6, tithe: 1.3 };   // keep: most troops a lord leaves home; tithe: Golden Tithe training multiplier (2 on a standard map)

@@ -274,7 +274,7 @@ if (run('alternate lords check', `typeof LORDS_ALT === 'object' && typeof pickLo
   for (let i = 0; i < 300; i++) update(1 / 30);
   hud(); draw(${clock});
   // Its power twist: Ilkai's Blood Moon lasts 1.4 times as long.
-  G.pw[2].ready = 0; usePower(2);
+  G.pw[2].ready = 0; usePower(2, true);   // true: fire now, past the signature tell (#96)
   if (Math.abs((G.pw[2].until - G.time) - ARMIES.kharzul.power.dur * 1.4) > 1e-6) throw new Error('the power twist did not apply');
   if (typeof saveBattle === 'function') { saveBattle(); resumeBattle(); setPaused(false); if (lordOf(2).short !== 'Ilkai') throw new Error('the alternate lord was lost on resume'); }
   toMenu();
@@ -724,6 +724,34 @@ run('battle presets', `{
   play(quickCfg()); if (typeof startBattle === 'function') startBattle();
   if (!G.cfg.fog || G.cfg.aiMind !== true) throw new Error('the Classic battle did not start with fog and smarter lords');
   for (let i = 0; i < 30; i++) update(1 / 30);
+  hud(); draw(${clock});
+}`);
+// ---------- signature tells (#96): every tell comes before its effect, and never without it ----------
+run('signature tells', `{
+  Math.random = mulberry(${(+process.env.SMOKE_SEED || 1) * 19 + 7});
+  play({ diff: 'hard', n: 18, map: 'aldmere', armies: ['aldmere', 'nyx', 'frostmark'], fog: false });
+  if (typeof startBattle === 'function') startBattle();
+  G.intro = false; G.paused = false;
+  const told = [], landed = [];
+  on('tell', e => told.push({ o: e.o, kind: e.kind, power: e.power, t: G.time }));
+  on('power', e => landed.push({ o: e.o, t: G.time }));
+  G.pw[2].ready = 0; G.pw[3].ready = 0;
+  usePower(2); usePower(3);
+  if (!G.tells.some(t => t.o === 2 && t.power === 'crows') || !G.tells.some(t => t.o === 3 && t.power === 'wintersGrip')) throw new Error('an AI power did not become a tell');
+  if (landed.length) throw new Error('a power landed before its tell');
+  if (G.pw[2].ready <= 0) throw new Error('a told power was not spent');
+  const crowTargets = G.tells.find(t => t.o === 2).targets.map(id => G.planets[id]);
+  const before = crowTargets.map(p => p.units);
+  for (let i = 0; i < 30 * (TELLS.nyx + 0.5); i++) update(1 / 30);
+  if (!landed.some(e => e.o === 2) || !landed.some(e => e.o === 3)) throw new Error('a told power never landed');
+  if (G.tells.some(t => t.kind === 'power')) throw new Error('a landed tell stayed pending');
+  if (!crowTargets.some((p, i) => p.units < before[i] * 0.95)) throw new Error('the crows did not strike their announced castles');
+  const first = told.find(e => e.o === 2), land = landed.find(e => e.o === 2);
+  if (!(first && land && land.t - first.t >= TELLS.nyx - 0.1)) throw new Error('the crows landed before their warning ran out');
+  // A saved tell survives a resume.
+  G.pw[2].ready = 0; usePower(2);
+  saveBattle(); resumeBattle(); setPaused(false);
+  if (!G.tells.some(t => t.o === 2 && t.power === 'crows')) throw new Error('a pending tell was lost on resume');
   hud(); draw(${clock});
 }`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);

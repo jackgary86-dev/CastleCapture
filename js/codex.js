@@ -75,7 +75,13 @@
       const saves = typeof AI_UNIT !== 'undefined' && typeof MAP_UNITS !== 'undefined' && MAP_UNITS[AI_UNIT[id]];
       const intentNote = id === 'nyx' ? ` On the diplomacy panel ${LORDS[id].short} only ever shows as "Watching": she keeps her counsel.`
         : ` The diplomacy panel shows what ${LORDS[id].short} is doing: the opening, the border being eyed (only where you can see), grudges and coalitions.`;
-      html += section('As a rival', para(g.personality + (saves ? ` Saves coins for a ${saves.name}.` : '') + intentNote));
+      const tellText = { aldmere: 'scaffold rises on the castle she will attack from, and her columns march a few seconds later',
+        kharzul: 'a horn sounds and the sky reddens before the Blood Moon; only columns that leave after the horn ride with it',
+        frostmark: "frost creeps out from her castles before Winter's Grip; columns that step away from them in time aren't frozen",
+        solmara: 'coins glint from his treasury to the spot where he is about to build a map unit',
+        nyx: 'crows gather over the castles she will plague; troops moved out in time are spared' }[id];
+      const tell = tellText && typeof TELLS !== 'undefined' ? ` ${['kharzul', 'solmara'].includes(id) ? 'His' : 'Her'} tell: ${tellText} (${TELLS[id]} seconds of warning).` : '';
+      html += section('As a rival', para(g.personality + (saves ? ` Saves coins for a ${saves.name}.` : '') + intentNote + tell));
       html += section('Homeland', para(`${g.homeland}. Castles are built in the ${esc(a.castle)} style; its banners are ${g.flag === 'streamer' ? 'long streamers' : g.flag === 'tassel' ? 'horsehair tassels' : g.flag === 'square' ? 'square standards' : g.flag === 'pennant' ? 'long pennants' : 'swallow-tailed flags'}.`));
     } else {
       html += section('Homeland', para(T.name));

@@ -58,7 +58,7 @@ const CROWN_LORDS = {
   aldmere: { pick: 'strong', guard: 1.2, sharp: 1.6, hunt: 1.3, scout: 0.8, scoutGap: 20, moveOnScout: false, flee: false, every: 0, decoy: false, walls: true },
   // Torvek, the Red Wind: the crown stays in his own hall and never runs. He sends no scouts; he hits the
   // fattest castle he can see, every time.
-  kharzul: { pick: 'home', guard: 0.9, sharp: 1.8, hunt: 1.0, scout: 0, scoutGap: 0, moveOnScout: false, flee: false, every: 0, decoy: false, walls: false },
+  kharzul: { pick: 'home', guard: 0.9, sharp: 1.8, hunt: 0.9, scout: 0, scoutGap: 0, moveOnScout: false, flee: false, every: 0, decoy: false, walls: false },
   // Sigrun, the White Wall: hidden in the castle farthest from every rival, guarded well; moved deeper
   // the moment she is found out.
   frostmark: { pick: 'home', guard: 1.0, sharp: 1.0, hunt: 0.85, scout: 0.4, scoutGap: 22, moveOnScout: true, flee: false, every: 0, decoy: false, walls: false },
@@ -260,7 +260,7 @@ function crownTick(dt) {
     if (C.out[o] || C.at[o] != null) continue;
     const k = crownCarrier(o);
     if (!k) { crownSeized(o); continue; }
-    if (!frozen(o)) k.crown.t += dt;
+    if (!frozenK(k)) k.crown.t += dt;
     const f = Math.min(1, k.crown.t / k.crown.dur), pos = crownPathAt(k.crown.pts, f);
     k.x = pos.x; k.y = pos.y;
     if (pos.dx) k.dir = pos.dx < 0 ? -1 : 1;
