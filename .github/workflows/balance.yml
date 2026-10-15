@@ -17,11 +17,35 @@ jobs:
         run: for f in js/*.js tools/*.js; do node --check "$f"; done
       - name: Smoke test
         # Loads every script index.html loads, in order, with stand-in browser objects, then plays,
-        # saves, resumes and finishes every mode. Catches load-order mistakes and render/UI crashes
-        # that the balance test, which loads only the rule files (no DOM), can't see.
+        # saves, resumes and finishes every mode, and loads every save fixture in tests/saves. Catches
+        # load-order mistakes, render/UI crashes and save-format breaks that the balance test can't see.
         run: node tools/smoke.js
       - name: AI-vs-AI balance test (Warlord)
         # 8 games per pairing (32 per army) keeps the win rates stable; runs are seeded, so results are repeatable.
-        run: node tools/balance.js --games 8
+        run: node tools/balance.js --games 8 --jobs 2
       - name: AI-vs-AI balance test (Knight)
-        run: node tools/balance.js --games 8 --diff medium
+        run: node tools/balance.js --games 8 --diff medium --jobs 2
+
+  modes:
+    # Every mode and layer has its own runner (#100); each exits non-zero outside its band or on a crash.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        run:
+          - { name: King of the Hill, args: --mode hill --games 8 }
+          - { name: Capture the Crown, args: --mode crown --games 8 }
+          - { name: Siege Defense, args: --mode defense --games 4 }
+          - { name: Grand Campaign, args: --mode grand --games 4 --jobs 2 }
+          - { name: Grand Campaign with depth, args: --mode grand --games 4 --depth on --jobs 2 }
+          - { name: Alternate lords, args: --lords alt --games 8 --jobs 2 }
+          - { name: Deeper strategy, args: --strategy on --games 8 --jobs 2 }
+          - { name: Siege preset, args: --preset siege --games 8 --jobs 2 }
+          - { name: Grand skirmish preset, args: --preset grand --games 4 --jobs 2 }
+    name: ${{ matrix.run.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node tools/balance.js ${{ matrix.run.args }}

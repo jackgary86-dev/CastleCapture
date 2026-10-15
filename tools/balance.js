@@ -45,6 +45,25 @@ const STRATEGY_RUN = STRATEGY_OPT === 'off' ? null
 const LORDSET = opt('lords', 'base');
 if (!['base', 'alt'].includes(LORDSET)) { console.error('--lords must be base or alt'); process.exit(2); }
 const SEED0 = +opt('seed', 7000);  // Grand Campaign seeds run from here
+// --jobs N runs battle pairings (or Grand seeds) in N child processes and merges their results; the output is
+// byte-identical to a single process. Children are started with --shard i/N and print raw JSON.
+const JOBS = Math.max(1, +opt('jobs', 1) || 1);
+const SHARD = opt('shard', '');
+const [SHARD_I, SHARD_N] = SHARD ? SHARD.split('/').map(Number) : [0, 1];
+const inShard = k => k % SHARD_N === SHARD_I;
+function runShards(extraArgs) {
+  const { spawnSync } = require('child_process');
+  const base = process.argv.slice(2).filter((a, i, all) => !(a === '--jobs' || all[i - 1] === '--jobs' || a === '--json'));
+  const outs = [];
+  for (let i = 0; i < JOBS; i++) {
+    const r = spawnSync(process.execPath, [__filename, ...base, '--shard', `${i}/${JOBS}`, '--raw'], { encoding: 'utf8', maxBuffer: 1 << 28 });
+    if (r.status !== 0 && !r.stdout) { process.stderr.write(r.stderr || ''); process.exit(r.status || 1); }
+    process.stderr.write(r.stderr || '');
+    outs.push(JSON.parse(r.stdout));
+  }
+  return outs;
+}
+const RAW = process.argv.includes('--raw');
 // Simulate at the game's own step (the browser runs 1/60 s substeps); coarser steps let fast columns skip
 // past each other on the road and skew the results.
 const DT = 1 / +opt('fps', 60);
@@ -121,20 +140,34 @@ function runGame(armies, mapOf, seed, label) {
   return winner;
 }
 
-// Every pairing, alternating whose homeland is fought on.
-for (let i = 0; i < ids.length; i++) {
-  for (let j = i + 1; j < ids.length; j++) {
-    for (let g = 0; g < GAMES; g++) {
-      const a = ids[i], b = ids[j];
-      runGame([a, b], g % 2 ? a : b, 1000 + i * 100 + j * 10 + g, `${a} vs ${b} #${g}`);
+let pairStat;
+if (JOBS > 1 && !SHARD) {
+  // Parent: merge the children's raw tallies in shard order, so the result matches one process.
+  const outs = runShards();
+  const add = (into, from) => { for (const id of ids) for (const k of Object.keys(into[id])) into[id][k] += from[id][k]; };
+  pairStat = JSON.parse(JSON.stringify(stat));
+  for (const o of outs) { add(stat, o.stat); add(pairStat, o.pairStat); lengths.push(...o.lengths); crashes += o.crashes; }
+} else {
+  // Every pairing, alternating whose homeland is fought on. A shard plays every Nth pairing game.
+  let k = 0;
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      for (let g = 0; g < GAMES; g++, k++) {
+        if (!inShard(k)) continue;
+        const a = ids[i], b = ids[j];
+        runGame([a, b], g % 2 ? a : b, 1000 + i * 100 + j * 10 + g, `${a} vs ${b} #${g}`);
+      }
     }
   }
+  // Two three-way battles for crash coverage (shard 0 only). The win band is judged on the pairings only,
+  // so snapshot those results first; power, unit and surrender counts include everything.
+  pairStat = JSON.parse(JSON.stringify(stat));
+  if (SHARD_I === 0) {
+    runGame(['kharzul', 'frostmark', 'nyx'], 'solmara', 5, 'three-way A');
+    runGame(['aldmere', 'solmara', 'kharzul'], 'nyx', 9, 'three-way B');
+  }
+  if (RAW) { console.log(JSON.stringify({ stat, pairStat, lengths, crashes })); process.exit(0); }
 }
-// Two three-way battles for crash coverage. The win band is judged on the pairings only,
-// so snapshot those results first; power, unit and surrender counts include everything.
-const pairStat = JSON.parse(JSON.stringify(stat));
-runGame(['kharzul', 'frostmark', 'nyx'], 'solmara', 5, 'three-way A');
-runGame(['aldmere', 'solmara', 'kharzul'], 'nyx', 9, 'three-way B');
 
 lengths.sort((x, y) => x - y);
 const rows = ids.map(id => {
@@ -174,7 +207,13 @@ function runGrand() {
   // Each map's monster (#48, #50): count kills, who landed the final blow and what its special did.
   const monsterLog = [];
   api.on('monster', e => monsterLog.push(e));
+  if (JOBS > 1 && !SHARD) {
+    for (const o of runShards()) results.push(...o.results);
+    results.sort((a, b) => a.seed - b.seed);
+  }
   for (let g = 0; g < GAMES; g++) {
+    if (JOBS > 1 && !SHARD) break;
+    if (!inShard(g)) continue;
     const seed = SEED0 + g, grandMap = MAP === 'all' ? mapIds[g % mapIds.length] : MAP;
     api.seedRandom(seed);
     monsterLog.length = 0;
@@ -228,6 +267,7 @@ function runGrand() {
     }
     results.push(out);
   }
+  if (RAW) { console.log(JSON.stringify({ results })); process.exit(0); }
   const waves = results.map(r => r.waves).sort((a, b) => a - b);
   const median = waves[waves.length >> 1];
   const minutes = w => Math.round(w * (GR.waveSeconds + GR.planSecondsEstimate) / 60);

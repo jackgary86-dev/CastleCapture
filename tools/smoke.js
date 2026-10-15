@@ -811,6 +811,47 @@ run('play button', `{
   if (hintStage < 3 || store.get('cs-hinted', false) !== true) throw new Error('the power hint did not show or was not remembered');
   draw(${clock});
 }`);
+// ---------- save fixtures (#100): every save kind from past builds must still load ----------
+// tests/saves/<version>-<kind>.json are written by `SMOKE_WRITE_FIXTURES=1 node tools/smoke.js` from the
+// current build (do that when the save format changes, and commit them). Every run loads each file through
+// the game's own resume path and fails if one no longer restores.
+{
+  const fixDir = path.join(root, 'tests', 'saves');
+  const kinds = [
+    ['skirmish', `play({ diff: 'medium', n: 18, map: 'aldmere', armies: ['aldmere', 'kharzul'], fog: true, aiMind: true }); startBattle(); for (let i = 0; i < 90; i++) update(1 / 30); saveBattle(); localStorage.getItem('cs-save')`],
+    ['strategy', `play({ diff: 'medium', n: 18, map: 'solmara', armies: ['solmara', 'nyx'], strategy: { ...STRATEGY_ALL } }); startBattle(); for (let i = 0; i < 90; i++) update(1 / 30); saveBattle(); localStorage.getItem('cs-save')`],
+    ['hill', `startHill('frostmark', 2, 'hard'); startBattle(); for (let i = 0; i < 90; i++) update(1 / 30); saveBattle(); localStorage.getItem('cs-save')`],
+    ['crown', `startCrown('aldmere', 1, 'medium'); startBattle(); for (let i = 0; i < 90; i++) update(1 / 30); saveBattle(); localStorage.getItem('cs-save')`],
+    ['defense', `startDefense(false); startBattle(); for (let i = 0; i < 90; i++) update(1 / 30); saveBattle(); localStorage.getItem('cs-save')`],
+    ['grand', `startGrand('fells', 'nyx', 'hard'); startBattle(); march(); for (let i = 0; i < 30 * GRAND.waveSeconds + 2 && G.phase === 'march'; i++) update(1 / 30); saveGrandSlot(1); localStorage.getItem('cs-grand-1')`],
+  ];
+  if (process.env.SMOKE_WRITE_FIXTURES) {
+    fs.mkdirSync(fixDir, { recursive: true });
+    const ver = run('fixture version', 'SAVE_VERSION');
+    for (const [kind, code] of kinds) {
+      const json = run(`fixture ${kind}`, `{ ${code} }`);
+      if (!json) fail('fixture', kind, new Error('no save was written'));
+      fs.writeFileSync(path.join(fixDir, `v${ver}-${kind}.json`), json);
+    }
+    console.log(`wrote ${kinds.length} fixtures to tests/saves`);
+  }
+  if (fs.existsSync(fixDir)) {
+    for (const f of fs.readdirSync(fixDir).filter(n => n.endsWith('.json')).sort()) {
+      const json = fs.readFileSync(path.join(fixDir, f), 'utf8');
+      const grand = f.includes('-grand');
+      run(`fixture ${f}`, `{
+        const d = JSON.parse(${JSON.stringify(json)});
+        localStorage.setItem(${JSON.stringify(grand ? 'cs-grand-5' : 'cs-save')}, ${JSON.stringify(json)});
+        const ok = ${grand ? 'loadGrandSlot(5)' : 'resumeBattle()'};
+        if (!ok) throw new Error('the save did not restore');
+        if (G.cfg.mode !== d.cfg.mode) throw new Error('the save restored into the wrong mode: ' + G.cfg.mode + ' vs ' + d.cfg.mode);
+        if (G.cfg.armies.join() !== d.cfg.armies.join()) throw new Error('the save lost its armies');
+        setPaused(false); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});
+        ${grand ? 'deleteGrandSlot(5);' : ''}
+      }`);
+    }
+  }
+}
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
 console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);
