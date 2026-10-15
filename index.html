@@ -108,6 +108,11 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .presets button[aria-checked="true"] small { color: var(--parchment); opacity: 0.85; }
 .preset-custom { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .settings label.check { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+#milestoneBox { display: grid; gap: 6px; margin: 0 0 8px; padding: 8px; border: 1px solid var(--army); border-radius: 6px; background: rgb(23 20 14 / 0.6); font-size: 13px; }
+#milestoneBox button { text-align: left; font-size: 13px; padding: 6px 8px; }
+#chronicle { margin: 10px 0; text-align: left; }
+#chronicle h3 { margin: 0 0 6px; font-family: var(--display); font-size: 20px; }
+#chronicle ol { margin: 0 0 8px; padding-left: 20px; max-height: 220px; overflow: auto; font-size: 13px; display: grid; gap: 2px; }
 #btnMarch:disabled { opacity: 0.85; background: transparent; color: var(--muted); border-color: var(--edge); font-family: var(--ui); font-size: 15px; }
 #minimap { position: absolute; inset: auto 12px 12px auto; width: 168px; height: 168px; z-index: 1; border-radius: 6px; cursor: crosshair;
   border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); background: rgb(23 20 14 / 0.92); touch-action: none; }

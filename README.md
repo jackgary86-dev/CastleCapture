@@ -28,7 +28,7 @@ Run the installer again after pulling new commits to update the game. Saved game
 - **Rally points** that send a castle's new troops to the front automatically.
 - **Two players on one screen:** player 2 takes the rival army on the keyboard.
 - **Story campaigns:** five chapters for each army, with objectives and parchment story screens.
-- **Grand Campaign:** all five armies on one great map, played in waves of planning and marching, with four maps, a roaming **map monster** on each, and save slots.
+- **Grand Campaign:** all five armies on one great map, played in waves of planning and marching, with four maps, a roaming **map monster** on each, and save slots. Since #95 the campaign has **regions** (hold every castle of one of the five homelands and its garrisons train 10% faster), **events** between waves (plague, harvest, a wandering champion to recruit, a monster migration), **milestone boons** at waves 20, 50 and 100 (every realm picks one of two: stone, gold, peace or fire; the lords in character, you from a card on the orders panel) and a **chronicle** of the campaign on the end screen, copyable as text. `node tools/balance.js --mode grand --depth on` plays with all of it; off, the runner is byte-identical to before.
 - **King of the Hill:** a Skirmish rule (the Crowned keep switch, or the 'The hill' preset): a race to hold the crowned keep at the centre of the map.
 - **Siege Defense:** hold a five-castle fortress against ever bigger waves from up to three lords, with a score, a daily siege and a best-wave record.
 - **Capture the Crown:** a scouting and bluffing duel under fog of war: hide your crown, find your rival's with scouts, and take the castle that holds it.

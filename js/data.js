@@ -103,6 +103,17 @@ const GRAND = {
   neutralBonus: 0.4,           // share of an army's bonus against unclaimed keeps that counts in the Grand Campaign                // troops every lord leaves in a castle at least (Torvek's 4 hollowed out his realm)
   finishBias: 1.5,             // how much more a lord wants castles of a rival at under half its strength
   waveCap: 400,                // headless runs stop here
+  // Depth (#95): regions, events between waves, milestone boons and the chronicle. On from the menu
+  // (cfg.grandDepth), off in the headless runner unless --depth on, so balance.js stays byte-identical.
+  depth: {
+    regionTrain: 1.06,         // training in a region whose every castle one realm holds
+    eventEvery: 6,             // one plan phase in this many brings an event, never two waves running
+    plagueWaves: 5, plagueTrain: 0.5,
+    harvestCoins: 60,
+    championWaves: 10, championStrike: 1.1,
+    milestones: [20, 50, 100],
+    boonCoins: 100, boonTruceWaves: 10,
+  },
 };
 // Grand Campaign maps and monsters (#48, #50) are defined after THEMES below.
 // King of the Hill (#64): a short mode where one crowned keep at the centre of the map scores for its holder.

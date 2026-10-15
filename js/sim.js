@@ -428,7 +428,7 @@ const bribes = (o, t) => t.owner === 0 && lordStyle(o) === 'solmara' && G.time <
 // Against unclaimed keeps an army's neutral bonus applies; the Grand Campaign's map is mostly unclaimed keeps,
 // so there only part of it counts (GRAND.neutralBonus), or Veyra's +25% snowballed every campaign.
 const neutralMul = o => G.mode === 'grand' ? 1 + (army(o).stats.neutral - 1) * GRAND.neutralBonus : army(o).stats.neutral;
-const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? neutralMul(o) : 1) * bribes(o, t);
+const strikeOf = (o, t) => atkOf(o) * (t.owner === 0 ? neutralMul(o) : 1) * bribes(o, t) * (G.mode === 'grand' && typeof depthStrikeMul === 'function' ? depthStrikeMul(o) : 1);
 const tierOf = p => p.r < 18 ? 1 : p.r < 26 ? 2 : 3;
 // The Custom battle setting scales the cap (capMul); Walls add to it.
 const capOf = p => (GARRISON_CAP[tierOf(p)] * (G.cfg.capMul ?? 1) + WALL_CAP * lvl(p, 'walls')) * (G.cfg.strategy ? stratCapMul(p) : 1);   // a Keep holds more (js/strategy.js)
@@ -448,7 +448,7 @@ const upkeepOf = p => p.units > p.r * UPKEEP_AT * 2 ? 0.25 : p.units > p.r * UPK
 const coinCap = () => G.mode === 'grand' ? Infinity : (G.cfg.coinCap ?? COIN_CAP);
 // Harvest map event (#35): one kingdom trains faster for a while, shaped like a power.
 const harvestMul = o => G.ev && G.ev.harvest && G.ev.harvest.o === o && G.time < G.ev.harvest.until ? 1.5 : 1;
-const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? (bigMapOf(G) ? BIG_MAP.tithe : 2) : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() * (G.cfg.strategy ? stratRateMul(p) : 1) : 0;   // branches and supply lines (js/strategy.js)
+const rate = p => p.owner ? p.r * PROD * army(p.owner).stats.prod * (powerOn(p.owner, 'goldenTithe') ? (bigMapOf(G) ? BIG_MAP.tithe : 2) : 1) * (G.mode === 'grand' && typeof depthRateMul === 'function' ? depthRateMul(p) : 1) * harvestMul(p.owner) * (wardOver(p, p.owner) ? 2 : 1) * upkeepOf(p) * barracksTrainMul(p) * (kindOf(p) ? kindOf(p).prod : 1) * villageBoost(p) * weatherMul(p.owner, 'prod') * nightProd() * (G.cfg.strategy ? stratRateMul(p) : 1) : 0;   // branches and supply lines (js/strategy.js)
 // A big map has more than BIG_MAP.castlesPer castles a kingdom (the Grand Campaign has its own rules).
 const bigMapOf = g => g.mode !== 'grand' && g.planets.length / g.owners.length > BIG_MAP.castlesPer;
 // Wall strength of one castle: its owner's defence plus a Great Ward over it.

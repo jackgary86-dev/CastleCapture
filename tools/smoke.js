@@ -754,6 +754,44 @@ run('signature tells', `{
   if (!G.tells.some(t => t.o === 2 && t.power === 'crows')) throw new Error('a pending tell was lost on resume');
   hud(); draw(${clock});
 }`);
+// ---------- Grand Campaign depth (#95): regions, an event, a milestone boon and the chronicle ----------
+run('grand campaign depth', `{
+  Math.random = mulberry(${(+process.env.SMOKE_SEED || 1) * 23 + 9});
+  startGrand('realm', 'aldmere', 'hard');
+  if (typeof startBattle === 'function') startBattle();
+  if (!G.cfg.grandDepth || !G.depth) throw new Error('the menu did not start the campaign with depth');
+  // Hold every castle of the player's home region: the next plan phase records it.
+  const mine = G.planets.find(p => p.owner === 1), k = regionOf(mine);
+  for (const p of G.planets) if (regionOf(p) === k) { p.owner = 1; p.units = Math.max(p.units, 5); }
+  march(); for (let i = 0; i < 30 * GRAND.waveSeconds + 2 && G.phase === 'march'; i++) update(1 / 30);
+  if (G.depth.regions[k] !== 1) throw new Error('holding every castle of a region was not recorded');
+  if (Math.abs(depthRateMul(mine) - GRAND.depth.regionTrain) > 1e-9) throw new Error('a held region does not train faster');
+  if (!G.depth.log.some(e => /took all of/.test(e.text))) throw new Error('the chronicle has no region entry');
+  // Events: force each kind once.
+  depthEvent('harvest'); const coins = G.coins[1];
+  depthEvent('plague'); if (!G.depth.plague) throw new Error('the plague did not settle on a region');
+  depthEvent('champion'); if (G.depth.champKeep == null) throw new Error('no champion keep was marked');
+  const keep = G.planets[G.depth.champKeep];
+  emit('capture', { o: 1, was: 0, castle: keep });
+  if (!G.depth.champion || G.depth.champion.o !== 1 || Math.abs(depthStrikeMul(1) - GRAND.depth.championStrike) > 1e-9) throw new Error('taking the marked keep did not recruit the champion');
+  // A milestone: the player gets a card, the lords choose at once.
+  G.wave = GRAND.depth.milestones[0] - 1; G.phase = 'plan';
+  march(); for (let i = 0; i < 30 * GRAND.waveSeconds + 2 && G.phase === 'march'; i++) update(1 / 30);
+  if (!G.depth.offer || G.depth.offer.wave !== GRAND.depth.milestones[0]) throw new Error('no milestone offer for the player');
+  if (!Object.keys(G.depth.boons[GRAND.depth.milestones[0]]).some(o => +o !== 1)) throw new Error('the lords did not choose their boons');
+  const before = G.coins[1];
+  if (!grantBoon(1, 'coins') || G.coins[1] !== before + GRAND.depth.boonCoins || G.depth.offer) throw new Error('taking the gold boon failed');
+  hud(); draw(${clock});
+  if (!chronicleText().includes('boon')) throw new Error('the chronicle has no boon entry');
+  // Saves carry the depth state (the champion recruited at wave 2 rode home at the milestone; recruit again).
+  depthEvent('champion'); emit('capture', { o: 1, was: 0, castle: G.planets[G.depth.champKeep] });
+  saveGrandSlot(2); loadGrandSlot(2); setPaused(false);
+  if (!G.depth || G.depth.regions[k] !== 1 || !G.depth.champion) throw new Error('depth state was lost on load');
+  deleteGrandSlot(2);
+  G.planets.forEach(p => { if (p.owner && p.owner !== 1) p.owner = 1; }); G.packets = G.packets.filter(x => x.owner === 1);
+  update(1 / 30); hud(); draw(${clock});
+  if (!G.over || document.getElementById('chronicle').hidden) throw new Error('the end screen has no chronicle');
+}`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
 console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);

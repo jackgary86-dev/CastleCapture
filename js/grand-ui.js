@@ -12,6 +12,7 @@ function startGrand(mapId = 'realm', armyId = myArmy, diff = qDiff) {
     mode: 'grand', grandMap: GRAND_MAPS[mapId] ? mapId : 'realm',
     seed: Math.floor(Math.random() * 1e9), n: GRAND.castles, diff,
     armies: [armyId, ...rivals], map: armyId,
+    grandDepth: true,   // regions, events, milestones and the chronicle (#95)
   });
   // The realm is far bigger than the board: open zoomed in on the player's home castle.
   const home = G.planets.find(p => p.owner === 1);
@@ -126,8 +127,62 @@ addEventListener('keydown', e => {
 on('wave', ({ wave, phase }) => {
   if (!isGrand() || G.cfg.demo) return;
   renderOrders();
+  renderMilestone();
   if (phase === 'march' && shopOpen) setShop(false);   // the shop waits for the next plan phase too
   if (phase === 'plan') toast(`Wave ${wave}`, 'Plan your moves, then march.', army(1).color);
+});
+
+// ---------- depth (#95): banners, the milestone card, the chronicle ----------
+const regionLabel = k => typeof regionName === 'function' ? regionName(k) : `region ${k + 1}`;
+on('region', ({ k, owner, was }) => {
+  if (!isGrand() || G.cfg.demo) return;
+  if (owner) toast(owner === 1 ? `${regionLabel(k)} is yours` : `${lordOf(owner).short} holds ${regionLabel(k)}`, `Every castle in the region: its garrisons train ${Math.round((GRAND.depth.regionTrain - 1) * 100)}% faster.`, col(owner));
+  else if (was) toast(`${regionLabel(k)} is contested again`, was === 1 ? 'You no longer hold every castle there.' : `${lordOf(was).short} lost a castle there.`, col(was));
+});
+on('grandEvent', ({ kind }) => {
+  if (!isGrand() || G.cfg.demo) return;
+  const d = G.depth, text = {
+    plague: d.plague ? `Plague in ${regionLabel(d.plague.k)}: its castles train at half for ${GRAND.depth.plagueWaves} waves.` : 'A plague passes through.',
+    harvest: `A good harvest: every realm gains ${GRAND.depth.harvestCoins} coins.`,
+    champion: 'A wandering champion waits at a marked keep. The first realm to take it gains their sword.',
+    migration: 'The monster has moved to new hunting grounds.',
+  }[kind];
+  toast('Word from the realm', text, '#e9b43b');
+  if (kind === 'champion') mmLast = -1e9;
+});
+on('champion', ({ o }) => { if (isGrand() && !G.cfg.demo) toast(o === 1 ? 'The champion rides with you' : `The champion joins ${lordOf(o).short}`, `Their columns strike ${Math.round((GRAND.depth.championStrike - 1) * 100)}% harder for ${GRAND.depth.championWaves} waves.`, col(o)); });
+on('boon', ({ o, kind, wave }) => { if (isGrand() && !G.cfg.demo && o !== 1) toast(`Wave ${wave}: ${lordOf(o).short} chose ${BOON_TEXT[kind].split(':')[0].toLowerCase()}`, BOON_TEXT[kind].split(': ')[1].replace(/\byou(r)?\b/g, (m, r) => r ? 'their' : 'they'), col(o)); });
+// The milestone card sits above the orders while a choice is open.
+const milestoneBox = document.createElement('div');
+milestoneBox.id = 'milestoneBox'; milestoneBox.hidden = true;
+ordersList.before(milestoneBox);
+function renderMilestone() {
+  const d = isGrand() && G.depth, offer = d && d.offer;
+  milestoneBox.hidden = !offer;
+  if (!offer) { milestoneBox.innerHTML = ''; return; }
+  if (milestoneBox.dataset.wave === String(offer.wave)) return;
+  milestoneBox.dataset.wave = String(offer.wave);
+  milestoneBox.innerHTML = `<b>Wave ${offer.wave}: choose a boon</b>` + offer.options.map(k => `<button type="button" data-boon="${k}">${BOON_TEXT[k]}</button>`).join('');
+}
+milestoneBox.addEventListener('click', e => {
+  const b = e.target.closest('button[data-boon]'); if (!b) return;
+  if (grantBoon(1, b.dataset.boon)) { toast('Boon taken', BOON_TEXT[b.dataset.boon], army(1).color); renderMilestone(); hud(); }
+});
+on('milestone', () => { renderMilestone(); if (isGrand() && !G.cfg.demo) toast(`Wave ${G.wave}: a milestone`, 'Every realm chooses a boon. Yours is on the orders panel.', '#e9b43b'); });
+// The chronicle: the campaign's story on the end screen, exportable as text.
+const chronBox = document.createElement('section');
+chronBox.id = 'chronicle'; chronBox.hidden = true;
+document.getElementById('endQuote').after(chronBox);
+on('end', () => {
+  const show = isGrand() && !G.cfg.demo && G.depth && G.depth.log.length;
+  chronBox.hidden = !show;
+  if (!show) return;
+  chronBox.innerHTML = `<h3>Chronicle</h3><ol>${G.depth.log.map(e => `<li><b>Wave ${e.wave}</b> ${modeUi.esc(e.text)}</li>`).join('')}</ol><button type="button" id="btnChronicle">Copy the chronicle</button>`;
+  chronBox.querySelector('#btnChronicle').addEventListener('click', () => {
+    const text = `${placeName(G.cfg)}: ${army(1).full}, ${G.wave} waves\n` + chronicleText();
+    const done = () => { chronBox.querySelector('#btnChronicle').textContent = 'Copied'; };
+    try { navigator.clipboard.writeText(text).then(done, () => {}); } catch {}
+  });
 });
 on('order', () => renderOrders());
 

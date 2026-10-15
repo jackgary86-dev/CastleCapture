@@ -180,7 +180,8 @@ function runGrand() {
     monsterLog.length = 0;
     // Rotate who sits in each realm so every army plays every start.
     const armies = ids.map((_, i) => ids[(i + g) % ids.length]);
-    api.newGame({ mode: 'grand', seed, n: GR.castles, diff: DIFF, armies, map: armies[0], grandMap });
+    // --depth on plays with regions, events, milestones and the chronicle (#95); off keeps old runs identical.
+    api.newGame({ mode: 'grand', seed, n: GR.castles, diff: DIFF, armies, map: armies[0], grandMap, ...(opt('depth', 'off') === 'on' ? { grandDepth: true } : {}) });
     const G = api.G;
     G.ais.unshift({ id: 1, diff: DIFF, timer: 1, readyAt: null, counter: null, focus: null, recentCaps: [], snap: new Map() });
     const alive = o => G.planets.some(p => p.owner === o) || G.packets.some(k => k.owner === o);
