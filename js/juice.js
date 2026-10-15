@@ -149,6 +149,15 @@ function volumeBox(where) {
   group.className = 'group';
   group.innerHTML = '<span class="label">Sound</span>';
   volumeBox(b => group.append(b));
+  // Show lords' intentions (#97): the diplomacy panel's line on what each lord is up to.
+  const row = document.createElement('label');
+  row.className = 'opt-row';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.checked = store.get('cs-intent', true) !== false;
+  row.append(cb, document.createTextNode(" Show lords' intentions on the diplomacy panel"));
+  cb.addEventListener('change', () => { store.set('cs-intent', cb.checked); if (G) G.cfg.showIntent = cb.checked; });
+  on('newGame', g => { g.cfg.showIntent = store.get('cs-intent', true) !== false; });
+  group.append(row);
   const rules = [...document.querySelectorAll('#menu .label')].find(l => l.textContent.trim() === 'Rules of war');
   if (rules && rules.parentElement) rules.parentElement.before(group);
   const pauseRow = document.querySelector('#pauseOv .row');

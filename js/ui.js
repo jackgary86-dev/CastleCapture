@@ -98,12 +98,17 @@ function renderDiplo() {
     const status = p ? `Truce, ${Math.ceil(p.until - G.time)}s left` : 'At war';
     const action = p ? `<button data-break="${o}">Break truce</button>`
       : `<button data-offer="${o}" ${canPact(1, o) ? '' : 'disabled'}>Offer truce${G.fac[o] === 'solmara' ? ` (${AMARU_PRICE} coins)` : ''}</button>`;
-    return { o, status, html: `<div class="diplo-row" style="--c:${army(o).color}">${lordPortraitHtml(o)}<div><b>${L.short}</b><small data-status="${o}"></small></div>${action}</div>` };
+    return { o, status, intent: typeof lordIntent === 'function' ? lordIntent(o) : '', html: `<div class="diplo-row" style="--c:${army(o).color}">${lordPortraitHtml(o)}<div><b>${L.short}</b><small data-status="${o}"></small><small class="intent" data-intent="${o}"></small></div>${action}</div>` };
   });
   // Rebuilt only when a row or button changes, so a focused or half-clicked button survives the countdown ticking.
   const html = `<div class="diplo-head"><b>Diplomacy</b><button id="diploClose" aria-label="Close">✕</button></div>${rows.map(r => r.html).join('')}`;
   if (html !== lastDiploHtml) { diploPanel.innerHTML = html; lastDiploHtml = html; }
-  for (const r of rows) diploPanel.querySelector(`[data-status="${r.o}"]`).textContent = r.status;
+  for (const r of rows) {
+    diploPanel.querySelector(`[data-status="${r.o}"]`).textContent = r.status;
+    const el = diploPanel.querySelector(`[data-intent="${r.o}"]`);
+    if (el.textContent !== r.intent) el.textContent = r.intent;
+    el.hidden = !r.intent;
+  }
 }
 let lastDiploHtml = '';
 diploPanel.addEventListener('click', e => {

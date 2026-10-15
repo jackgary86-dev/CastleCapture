@@ -78,12 +78,29 @@ function renderOrders() {
 }
 btnMarch.addEventListener('click', () => { if (playable()) { march(); renderOrders(); hud(); } });
 
+// Under the orders: a line per living rival on what it is up to (js/mind.js lordIntent, #97), plan phase only.
+const rivalsLine = document.createElement('ul');
+rivalsLine.id = 'ordersRivals';
+rivalsLine.hidden = true;
+ordersList.after(rivalsLine);
+function renderRivalsLine() {
+  const show = G.phase === 'plan' && !G.over && typeof lordIntent === 'function';
+  const lines = show ? G.owners.slice(1).filter(o => G.planets.some(p => p.owner === o)).map(o => { const t = lordIntent(o); return t ? `${lordOf(o).short}: ${t}` : ''; }).filter(Boolean) : [];
+  const text = lines.join('\n');
+  rivalsLine.hidden = !lines.length;
+  if (rivalsLine.dataset.text === text) return;
+  rivalsLine.dataset.text = text;
+  rivalsLine.innerHTML = '';
+  for (const l of lines) { const li = document.createElement('li'); li.textContent = l; rivalsLine.append(li); }
+}
+
 // The header shows the wave and phase instead of the clock.
 const hudBase = hud;
 hud = function () {
   hudBase();
   renderOrders();
   if (!isGrand() || G.cfg.demo) return;
+  renderRivalsLine();
   const left = G.owners.filter(o => G.planets.some(p => p.owner === o) && !G.surrendered.has(o)).length;
   statusEl.textContent = `Wave ${G.wave} · ${G.phase === 'plan' ? 'Plan' : `March ${Math.max(0, Math.ceil(G.marchLeft))}s`} · ${left} realms left`;
 };

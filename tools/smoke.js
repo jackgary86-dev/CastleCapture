@@ -673,6 +673,27 @@ run('map build time', `{
   if (times[2] > 150) throw new Error('a standard river map took ' + times[2] + ' ms to build (limit 150 ms): ' + times.join(', '));
   globalThis.__mapBuildMs = times[2];
 }`);
+// ---------- lords' intentions (#97): a line per rival, honest but fog-bound, and the setting turns it off ----------
+run('lord intent lines', `{
+  Math.random = mulberry(${SEED * 17 + 3});
+  play({ diff: 'hard', n: 18, map: 'aldmere', armies: ['aldmere', 'kharzul', 'nyx'], fog: false });
+  if (typeof startBattle === 'function') startBattle();
+  G.intro = false; G.paused = false;
+  for (let i = 0; i < 30 * 40; i++) update(1 / 30);
+  const t = lordIntent(2), v = lordIntent(3);
+  if (typeof t !== 'string' || !t) throw new Error('no intent line for Torvek');
+  const ai = G.ais.find(a => a.id === 2), plan = ai.plan && G.planets[ai.plan.t];
+  if (plan && G.time - ai.plan.at < 40 && plan.owner === 1 && !/Marching on your/.test(t)) throw new Error('intent did not name the player as the target: ' + t);
+  if (plan && G.time - ai.plan.at < 40 && !plan.owner && !/unclaimed/.test(t)) throw new Error('intent did not say Torvek is expanding: ' + t);
+  if (!/Watching/.test(v)) throw new Error('Veyra should only be watching: ' + v);
+  diploPanel.hidden = false; renderDiplo();
+  if (!lastDiploHtml.includes('data-intent="2"')) throw new Error('the diplomacy panel has no intent line');   // the stub DOM can't read text back
+  G.cfg.showIntent = false;
+  if (lordIntent(2) !== '') throw new Error('the setting did not hide the intent');
+  G.cfg.showIntent = true;
+  diploPanel.hidden = true;
+  hud(); draw(${clock});
+}`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
 console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);

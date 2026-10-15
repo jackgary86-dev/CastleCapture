@@ -73,7 +73,9 @@
       html += section('Stats', `<div class="codex-stats">${stat('Attack', s.atk + '×')}${stat('Defence', s.def + '×')}${stat('Speed', s.speed + '×')}${stat('Training', s.prod + '×')}${stat('On the road', s.road + '×')}${stat('Vs keeps', s.neutral + '×')}</div>`);
       html += section(`Special power: ${g.power.name}`, para(`${g.power.desc} Lasts ${g.power.dur} seconds; ready ${FIRST_CHARGE} seconds into a battle, then every ${Math.round(RECHARGE / 60)} minutes.`));
       const saves = typeof AI_UNIT !== 'undefined' && typeof MAP_UNITS !== 'undefined' && MAP_UNITS[AI_UNIT[id]];
-      html += section('As a rival', para(g.personality + (saves ? ` Saves coins for a ${saves.name}.` : '')));
+      const intentNote = id === 'nyx' ? ` On the diplomacy panel ${LORDS[id].short} only ever shows as "Watching": she keeps her counsel.`
+        : ` The diplomacy panel shows what ${LORDS[id].short} is doing: the opening, the border being eyed (only where you can see), grudges and coalitions.`;
+      html += section('As a rival', para(g.personality + (saves ? ` Saves coins for a ${saves.name}.` : '') + intentNote));
       if (typeof UNIT_TYPES !== 'undefined') html += section('Troop types', list(Object.values(UNIT_TYPES).map(u => `${u.name}: ${u.desc}`)) + (id === 'kharzul' ? para(`${L ? L.short : 'Torvek'} trusts his horses and never fields catapults.`) : AI_SIEGE ? '' : para('As a rival, this army rides cavalry to reinforce but does not field catapults yet.')));
       html += section('Homeland', para(`${g.homeland}. Castles are built in the ${esc(a.castle)} style; its banners are ${g.flag === 'streamer' ? 'long streamers' : g.flag === 'tassel' ? 'horsehair tassels' : g.flag === 'square' ? 'square standards' : g.flag === 'pennant' ? 'long pennants' : 'swallow-tailed flags'}.`));
     } else {

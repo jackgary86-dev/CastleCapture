@@ -172,3 +172,50 @@ function mindWorthMul(ai, t) {
   return mul;
 }
 const openingName = ai => { const l = LORD_OPENINGS[lordKey(ai.id)]; return l && ai.opening != null ? l[ai.opening].name : null; };
+
+// ---------- what a lord is up to, in a line (#97) ----------
+// For the diplomacy panel and the Grand Campaign's orders panel. Honest (it is the lord's real plan), but
+// only as current as fog allows: a target the player can't see is 'massing somewhere'. Veyra only ever
+// 'watches'; that is her character. Off in two-player games, the tutorial and the demo, and by the
+// 'Show lords' intentions' setting (cfg.showIntent, from cs-intent).
+const intentOn = () => !!G && !G.cfg.demo && !G.cfg.tutorial && (G.cfg.humans || 1) === 1 && G.cfg.showIntent !== false;
+// Which way castle p lies from the player's realm, for fog-honest descriptions.
+function compassFrom(me, p) {
+  const mine = G.planets.filter(q => q.owner === me);
+  if (!mine.length) return '';
+  const cx = mine.reduce((a, q) => a + q.x, 0) / mine.length, cy = mine.reduce((a, q) => a + q.y, 0) / mine.length;
+  const dx = p.x - cx, dy = p.y - cy;
+  if (Math.hypot(dx, dy) < 60) return 'home';
+  return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'eastern' : 'western') : (dy > 0 ? 'southern' : 'northern');
+}
+function lordIntent(o) {
+  if (!intentOn() || human(o)) return '';
+  const ai = G.ais.find(a => a.id === o);
+  if (!ai) return '';
+  const parts = [], M = G.mind, C = M && M.coalition, vague = lordStyle(o) === 'nyx';
+  if (C && C.members.includes(o)) parts.push(C.against === 1 ? 'In the coalition against you' : `In a coalition against ${lordOf(C.against).short}`);
+  const g = grudgeOf(o, 1);
+  if (g >= 1) parts.push(`Holds a grudge against you (${Math.round(g)})`);
+  if (pactOf(o, 1)) parts.push('Keeping the truce');
+  else if (typeof canPact === 'function' && canPact(o, 1) && typeof lordAccepts === 'function' && lordAccepts(o, 1)) parts.push('Would take a truce');
+  const plan = ai.plan && G.planets[ai.plan.t];
+  if (vague) parts.push('Watching');
+  else if (plan && G.time - ai.plan.at < 40) {
+    const seen = seesAt(1, plan.x, plan.y) || G.packets.some(k => k.owner === o && k.to === plan && seesAt(1, k.x, k.y));
+    // It took the castle it was planning against (in the Grand Campaign, last wave): say where it grew.
+    if (plan.owner === o) { const d = compassFrom(1, plan); parts.push(d === 'home' ? 'Took a castle beside your seat' : `Took a castle${d ? ` to your ${d.replace('ern', '')}` : ''}${G.mode === 'grand' ? ' last wave' : ''}`); }
+    else if (!seen) parts.push('Massing somewhere');
+    else if (plan.owner === 1) { const d = compassFrom(1, plan); parts.push(d === 'home' ? 'Marching on your seat' : `Marching on your ${d ? `${d} ` : ''}castle`); }
+    else if (!plan.owner) parts.push('Expanding into unclaimed keeps');
+    else parts.push(`Eyeing ${lordOf(plan.owner).short}'s border`);
+  }
+  if (G.mode === 'crown' && typeof crownGuess === 'function' && G.crown && !G.crown.out[1] && !G.crown.revealed && !vague) {
+    const P = G.cfg.fog ? G.planets.map(p => knownOf(o, p)) : G.planets;
+    let best = null;
+    for (const [id, w] of crownGuess(o, 1, P)) if (!best || w > best.w) best = { id, w };
+    if (best && best.w >= 0.5) parts.push(`Thinks your crown is in your ${compassFrom(1, G.planets[best.id])} castle`);
+  }
+  const op = mindOn() && openingName(ai);
+  if (op && G.time < AI_MIND.openingSecs) parts.push(`Opening: ${op}`);
+  return parts.join(' · ');
+}
