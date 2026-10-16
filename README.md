@@ -194,6 +194,10 @@ Map units can't be destroyed once placed, and a Great Ward only helps the kingdo
 
 ## Music
 
+### Recorded samples
+
+The marches, clashes, captures, powers and lords' stings are recorded samples in `art/sfx/<army>/`, with shared chimes, horns, the victory and defeat stings and the monster's roar in `art/sfx/shared/` (all from Kenney's CC0 packs, listed in `art/sfx/CREDITS.md`). They load on the first click and play through the effects channel, so mute and the sliders apply. A missing or unplayable file falls back to the synthesised voice, and **Sound style: Synth** (beside the volume sliders) turns them all off. Drop in your own OGG files with the same names to replace them.
+
 Each homeland has its own synthesised theme (no audio files): a lute-like air in the Vale of Aldmere, droning saws and frame drums on the Red Steppe, slow bells in the Frostmark Fjords, a Hijaz melody and hand drums in the Sunscorched Sands, and a beating drone in Nyxhollow Mire. The music swells with the fighting, adding drums and quicker, higher lines when armies are on the march, clashing, or using a special power. A snare joins on the backbeat once the fighting is real, with tom rolls when it is fiercest, and the main menu has a stately theme of its own. The Music button or **N** turns it on or off, separately from the sound effects, and the **Sound** sliders on the menu and the pause sheet set the overall, effects and music volume.
 
 ## Deeper strategy

@@ -121,6 +121,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .sheet.collapsed > .group:not(.play):not(.learn):not(.army), .sheet.collapsed > .menu-intro, .sheet.collapsed > details { display: none; }
 .sheet.collapsed > .group.play { order: 1; }
 @media (max-height: 820px) { .sheet.collapsed .dossier { display: none; } }
+.sound-style { margin-top: 6px; }
 #btnMarch:disabled { opacity: 0.85; background: transparent; color: var(--muted); border-color: var(--edge); font-family: var(--ui); font-size: 15px; }
 #minimap { position: absolute; inset: auto 12px 12px auto; width: 168px; height: 168px; z-index: 1; border-radius: 6px; cursor: crosshair;
   border: 2px solid color-mix(in srgb, var(--army) 45%, var(--edge)); background: rgb(23 20 14 / 0.92); touch-action: none; }
@@ -882,3 +883,4 @@ body.touchui #sendCtl, body.touchui #btnAll { display: none; }
 <script src="js/tutorial.js"></script>
 <script src="js/strategy-ui.js"></script>
 <script src="js/juice.js"></script>
+<script src="js/sfx-samples.js"></script>

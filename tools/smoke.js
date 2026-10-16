@@ -892,6 +892,18 @@ run('tell answers', `{
   if (!a || !/Pull out/.test(a.label)) throw new Error('no Pull out action for the crows tell');
   hud(); draw(${clock});
 }`);
+// ---------- recorded samples (#94): the layer loads lazily, tolerates missing files, and the synth path still runs ----------
+run('sound samples', `{
+  if (typeof sfxSamples === 'undefined') throw new Error('sfx-samples.js did not load');
+  if (Object.keys(sfxSamples.files).length < 30) throw new Error('the sample table is short');
+  sfxSamples.setStyle('synth');
+  if (sfxSamples.play('shared/chime') !== false) throw new Error('synth style still played a sample');
+  sfx.chime(); sfx.drum(); sfx.clash('aldmere'); sfx.march('kharzul'); sfx.capture('nyx', true); sfx.horn(true); sfx.power(true);
+  sfxSamples.setStyle('recorded');
+  sfx.unlock();   // no fetch and no AudioContext here: every sample marks itself unavailable, and the synth path is taken
+  sfx.chime(); sfx.clash('frostmark');
+  if (store.get('cs-sound-style', null) !== 'recorded') throw new Error('the sound style was not saved');
+}`);
 run('back to menu', `toMenu(); for (let i = 0; i < 30; i++) update(1 / 30); hud(); draw(${clock});`);
 
 console.log(`Smoke test passed: ${scripts.length} scripts loaded (${scripts.join(', ')}), two battles played, saved, resumed and finished${hasHill ? ', a King of the Hill race played, saved, resumed, lost, won and timed out' : ''}${hasGrand ? ', four Grand Campaign waves planned, marched, saved and loaded, with a monster hunted on every map' : ''}${hasDefense ? ', a Siege Defense played through three waves, a save and resume, and the fall of the last castle' : ''}${hasCrown ? ', a Capture the Crown raid hidden, scouted, moved through a save and resume, won by knockouts and lost on the road' : ''}${hasStrategy ? ', a deeper-strategy battle with a branch, a cut-off castle, a hill and a champion who fell and returned' : ''}, and a standard river map built in ${run('map build ms', 'globalThis.__mapBuildMs')} ms.`);

@@ -27,6 +27,7 @@ Copy-Item (Join-Path $repo 'index.html') $Destination
 New-Item -ItemType Directory -Force (Join-Path $Destination 'js'), (Join-Path $Destination 'art') | Out-Null
 Copy-Item (Join-Path $repo 'js\*.js') (Join-Path $Destination 'js')
 Copy-Item (Join-Path $repo 'art\launch-bg.js'), (Join-Path $repo 'art\gallery.js') (Join-Path $Destination 'art')
+Copy-Item (Join-Path $repo 'art\sfx') (Join-Path $Destination 'art\sfx') -Recurse   # recorded samples (#94)
 Copy-Item (Join-Path $PSScriptRoot 'castle-siege.ico'), (Join-Path $PSScriptRoot 'uninstall.ps1') $Destination
 
 $index = Join-Path $Destination 'index.html'

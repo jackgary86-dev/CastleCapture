@@ -131,6 +131,10 @@ const sfx = (() => {
       setIntensity(x) { musicTarget = Math.max(0, Math.min(1, x)); },
     },
     unlock() { ensure(); if (ac && ac.state === 'suspended') ac.resume(); startMusic(); },
+    // For js/sfx-samples.js (#94): the context and the effects bus, and whether effects may sound now.
+    context() { return ac; },
+    effectsBus() { return master; },
+    ready() { return ready(); },
     get muted() { return muted; },
     setMuted(v) { muted = v; store.set('cs-muted', v); if (musicBus) musicBus.gain.value = musicGain(); },   // mute covers the music too
     // Volume channels: 'all', 'effects' or 'music', 0 to 1.
