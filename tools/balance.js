@@ -148,21 +148,36 @@ if (JOBS > 1 && !SHARD) {
   pairStat = JSON.parse(JSON.stringify(stat));
   for (const o of outs) { add(stat, o.stat); add(pairStat, o.pairStat); lengths.push(...o.lengths); crashes += o.crashes; }
 } else {
-  // Every pairing, alternating whose homeland is fought on. A shard plays every Nth pairing game.
+  const presetAis = PRESET_NAME && api.BATTLE_PRESETS[PRESET_NAME] && api.BATTLE_PRESETS[PRESET_NAME].ais;
   let k = 0;
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      for (let g = 0; g < GAMES; g++, k++) {
+  if (presetAis) {
+    // A preset with rivals (the Grand skirmish, ais: 4) is a free-for-all: every army takes the player's seat
+    // in turn against the other four, in a rotated order, on the seat-holder's homeland. The win band is
+    // judged against a five-way fair share (see below).
+    for (let g = 0; g < GAMES; g++) {
+      for (let i = 0; i < ids.length; i++, k++) {
         if (!inShard(k)) continue;
-        const a = ids[i], b = ids[j];
-        runGame([a, b], g % 2 ? a : b, 1000 + i * 100 + j * 10 + g, `${a} vs ${b} #${g}`);
+        const rest = ids.filter(id => id !== ids[i]), rot = rest.map((_, r) => rest[(r + g) % rest.length]);
+        const armies = [ids[i], ...rot.slice(0, presetAis)];
+        runGame(armies, ids[i], 1000 + i * 100 + g, `${ids[i]} and the realm #${g}`);
+      }
+    }
+  } else {
+    // Every pairing, alternating whose homeland is fought on. A shard plays every Nth pairing game.
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        for (let g = 0; g < GAMES; g++, k++) {
+          if (!inShard(k)) continue;
+          const a = ids[i], b = ids[j];
+          runGame([a, b], g % 2 ? a : b, 1000 + i * 100 + j * 10 + g, `${a} vs ${b} #${g}`);
+        }
       }
     }
   }
   // Two three-way battles for crash coverage (shard 0 only). The win band is judged on the pairings only,
   // so snapshot those results first; power, unit and surrender counts include everything.
   pairStat = JSON.parse(JSON.stringify(stat));
-  if (SHARD_I === 0) {
+  if (SHARD_I === 0 && !presetAis) {
     runGame(['kharzul', 'frostmark', 'nyx'], 'solmara', 5, 'three-way A');
     runGame(['aldmere', 'solmara', 'kharzul'], 'nyx', 9, 'three-way B');
   }
@@ -170,10 +185,14 @@ if (JOBS > 1 && !SHARD) {
 }
 
 lengths.sort((x, y) => x - y);
+// A free-for-all preset is judged against its fair share: a fifth of the wins, between half and 1.75x that.
+const FFA = PRESET_NAME && api.BATTLE_PRESETS[PRESET_NAME] && api.BATTLE_PRESETS[PRESET_NAME].ais;
+const fair = FFA ? 1 / (FFA + 1) : 0.5;
+const [LO, HI] = FFA ? [fair * 0.5, fair * 1.75] : [BAND_LO, BAND_HI];
 const rows = ids.map(id => {
   const s = pairStat[id];
   const rate = s.decided ? s.wins / s.decided : null;
-  const outside = rate !== null && s.decided >= MIN_DECIDED && (rate < BAND_LO || rate > BAND_HI);
+  const outside = rate !== null && s.decided >= MIN_DECIDED && (rate < LO || rate > HI);
   return { army: id, lord: lordShort(id), games: s.games, decided: s.decided, wins: s.wins, winRate: rate, powers: stat[id].powers, mapUnits: stat[id].units, surrenders: stat[id].surrenders, outside };
 });
 const summary = {
@@ -187,7 +206,7 @@ if (JSON_OUT) {
   console.log(JSON.stringify(summary, null, 2));
 } else {
   const pct = r => r.winRate === null ? '   -' : `${Math.round(r.winRate * 100)}%`.padStart(4);
-  console.log(`Castle Siege balance: ${DIFF}, ${GAMES} games per pairing, ${SECONDS}s cap, band ${Math.round(BAND_LO * 100)}–${Math.round(BAND_HI * 100)}%`);
+  console.log(`Castle Siege balance: ${DIFF}, ${GAMES} games per ${FFA ? 'seat (free-for-all)' : 'pairing'}, ${SECONDS}s cap, band ${Math.round(LO * 100)}–${Math.round(HI * 100)}%`);
   console.log(`median battle ${summary.medianLength}s, ${summary.undecided} pairing games undecided at the cap, ${crashes} crashes\n`);
   console.log('army        lord     games decided  wins  rate  powers  units  surrenders');
   for (const r of rows) {
