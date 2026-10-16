@@ -40,9 +40,9 @@ jobs:
           - { name: Grand Campaign with depth, args: --mode grand --games 4 --depth on --jobs 2 }
           - { name: Alternate lords, args: --lords alt --games 8 --jobs 2 }
           - { name: Deeper strategy, args: --strategy on --games 8 --jobs 2 }
-          # The two preset checks report but don't block: presets are curated setups whose win rates may sit
-          # outside the band (the README says which), and a crash still fails them.
-          - { name: Siege preset, args: --preset siege --games 8 --jobs 2, soft: true }
+          - { name: Siege preset, args: --preset siege --games 8 --jobs 2 }
+          # Reports but doesn't block (#101): Torvek wins about 70% of five-way games on the huge map; a crash
+          # still fails it.
           - { name: Grand skirmish preset, args: --preset grand --games 6 --jobs 2, soft: true }
     name: ${{ matrix.run.name }}
     continue-on-error: ${{ matrix.run.soft == true }}

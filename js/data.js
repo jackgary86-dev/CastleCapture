@@ -69,8 +69,8 @@ const BATTLE_PRESETS = {
   quick:      { name: 'Quick', blurb: 'A small map, fast troops, no fog. Five minutes.', castles: 12, map: 0.8, start: 60, neutral: 0.5, speed: 1.25, recharge: 120, cap: 1, fog: false, strategy: null, mind: false, hill: false },
   hill:       { name: 'The hill', blurb: 'A race for the crowned keep at the centre: first to 300 points.', castles: 15, map: 1, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: false, strategy: null, mind: false, hill: true },
   classic:    { name: 'Classic', blurb: 'The standard map under fog of war, lords at their smartest.', castles: 18, map: 1, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: null, mind: true, hill: false },
-  siege:      { name: 'Siege', blurb: 'A large map, slow marches, strong keeps; castles can become Keeps.', castles: 26, map: 1.25, start: 30, neutral: 1.5, speed: 0.75, recharge: 480, cap: 1, fog: false, strategy: ['spec'], mind: true, hill: false },
-  grand:      { name: 'Grand skirmish', blurb: 'All four lords on a huge map, coalitions and fog.', castles: 17, map: 1.6, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: null, mind: true, ais: 4, hill: false },
+  siege:      { name: 'Siege', blurb: 'A large map, slow marches, strong keeps; castles can become Keeps.', castles: 26, map: 1.25, start: 30, neutral: 1.5, speed: 0.85, recharge: 480, cap: 1, fog: false, strategy: ['spec'], mind: true, hill: false },
+  grand:      { name: 'Grand skirmish', blurb: 'All four lords on a huge map, coalitions and fog.', castles: 17, map: 1.6, start: 60, neutral: 0.5, speed: 1, recharge: 300, cap: 1, fog: true, strategy: null, mind: true, ais: 4, hill: false },
   everything: { name: 'Everything on', blurb: 'Classic with every strategy layer switched on.', castles: 18, map: 1, start: 40, neutral: 1, speed: 1, recharge: 300, cap: 1, fog: true, strategy: 'all', mind: true, hill: false },
 };
 // Signature tells (#96): seconds of warning before a lord's signature move lands, by lord style. Isolde's
