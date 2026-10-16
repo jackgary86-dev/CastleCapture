@@ -291,7 +291,7 @@ The game has no build step. `index.html` holds the markup and CSS and loads plai
 
 ## Balance tests
 
-Continuous integration (`.github/workflows/balance.yml`) runs the syntax check, the smoke test (which also loads every save fixture in `tests/saves/`), the standard Warlord and Knight balance, and a **modes** matrix: Hill, Crown, Siege Defense, the Grand Campaign with and without depth, alternate lords, Deeper strategy and the Siege and Grand skirmish presets. `--jobs N` runs a battle or Grand sweep across N processes with byte-identical output. When the save format changes, regenerate the fixtures with `SMOKE_WRITE_FIXTURES=1 node tools/smoke.js` and commit `tests/saves/`.
+Continuous integration (`.github/workflows/balance.yml`) runs the syntax check, the smoke test (which also loads every save fixture in `tests/saves/`), the standard Warlord and Knight balance, and a **modes** matrix: Hill, Crown, Siege Defense, the Grand Campaign with and without depth, alternate lords, Deeper strategy and the Siege and Grand skirmish presets (those two report without blocking the build: at the first run Siege had Veyra at 31% and Grand skirmish had Torvek at 75% and Veyra at 31%, so they are curated setups rather than balanced ladders until tuned). `--jobs N` runs a battle or Grand sweep across N processes with byte-identical output. When the save format changes, regenerate the fixtures with `SMOKE_WRITE_FIXTURES=1 node tools/smoke.js` and commit `tests/saves/`.
 
 `tools/balance.js` runs the simulation headlessly in Node: every army fights every other with the AI on both sides, and the run fails if any army's win rate leaves the agreed band.
 
